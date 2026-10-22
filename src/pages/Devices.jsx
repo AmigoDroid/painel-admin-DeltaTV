@@ -1,0 +1,80 @@
+import { useEffect, useState } from "react";
+import { api } from "../api.js";
+import { Badge, Empty, Modal, Pager, Table, fmtDateTime, useAction, useDebounced, useList, useUi } from "../ui.jsx";
+import CredentialsModal from "./CredentialsModal.jsx";
+
+export default function Devices({ onChanged }) {
+  const { confirm, toast } = useUi();
+  const run = useAction();
+  const [q, setQ] = useState("");
+  const dq = useDebounced(q);
+  const list = useList("/admin/devices", { q: "", status: "" });
+  const [history, setHistory] = useState(null);
+  const [registering, setRegistering] = useState(false);
+  const [adding, setAdding] = useState(null); // linha do MAC que vai receber outro parceiro (ou ter o acesso do parceiro atualizado)
+  useEffect(() => { list.filter({ q: dq }); /* eslint-disable-next-line */ }, [dq]);
+
+  const change = async (a, action, o) => {
+    const c = await confirm(o);
+    if (c && (await run(() => api(`/admin/devices/activations/${a.id}/${action}`, { method: "POST", body: { reason: c.reason } }), "Dispositivo atualizado."))) list.reload();
+  };
+  const openHistory = async (mac) => {
+    const r = await run(() => api("/admin/devices/history", { query: { mac } }));
+    if (r) setHistory(r);
+  };
+  const owner = (a) => (a.license ? `Licença ••••${a.license.codeLast4}${a.license.customer ? ` · ${a.license.customer.name}` : ""}` : a.partner ? `Parceiro: ${a.partner.name}` : "—");
+
+  return (
+    <>
+      <div className="page-head"><h2>Dispositivos</h2><button className="btn primary" onClick={() => setRegistering(true)}>Cadastrar dispositivo</button></div>
+      <div className="toolbar">
+        <input placeholder="Pesquisar por MAC" value={q} onChange={(e) => setQ(e.target.value)} />
+        <select value={list.params.status} onChange={(e) => list.filter({ status: e.target.value })}>
+          <option value="">Todos</option><option value="active">Ativos</option><option value="blocked">Bloqueados</option><option value="revoked">Removidos</option>
+        </select>
+      </div>
+      <Table><thead><tr><th>MAC</th><th>Vínculo atual</th><th>Status</th><th>Ativado em</th><th /></tr></thead>
+        <tbody>{list.data.map((a) => (
+          <tr key={a.id}><td className="mono">{a.mac || "—"}{a.claimPending && <span className="muted"> (migração pendente)</span>}</td><td>{owner(a)}</td>
+            <td><Badge status={a.status} />{a.statusReason && <div className="muted">{a.statusReason}</div>}</td><td>{fmtDateTime(a.activatedAt)}</td>
+            <td className="actions">
+              {a.mac && <button className="btn sm" onClick={() => openHistory(a.mac)}>Histórico</button>}
+              {a.status !== "revoked" && a.mac && <button className="btn sm" onClick={() => setAdding(a)}>Adicionar parceiro</button>}
+              {a.status === "active" && <button className="btn sm" onClick={() => change(a, "block", { title: "Bloquear dispositivo", message: `Somente ${a.mac} perde o acesso.`, reason: "required", danger: true })}>Bloquear</button>}
+              {a.status === "blocked" && <button className="btn sm" onClick={() => change(a, "unblock", { title: "Desbloquear", message: a.mac })}>Desbloquear</button>}
+              {a.status !== "revoked" && <button className="btn sm danger" onClick={() => change(a, "revoke", { title: "Remover ativação", message: `Somente este vínculo é removido; as outras listas do MAC ${a.mac} continuam.`, reason: "optional", danger: true })}>Remover</button>}
+            </td></tr>))}</tbody></Table>
+      <Empty loading={list.loading} error={list.error} count={list.data.length} />
+      <Pager meta={list.meta} onPage={list.setPage} />
+      {registering && (
+        <CredentialsModal
+          title="Cadastrar dispositivo" askMac submitLabel="Cadastrar"
+          intro="Informe o MAC e os dados de acesso. Se o MAC já tiver lista, o parceiro informado é adicionado e as outras listas continuam."
+          onSubmit={(body) => api("/admin/devices/register", { method: "POST", body })}
+          onClose={() => setRegistering(false)}
+          onDone={(r) => { setRegistering(false); toast(`${r.mac} cadastrado${r.listName ? ` na lista “${r.listName}”` : ""}.`); list.reload(); onChanged?.(); }}
+        />
+      )}
+      {adding && (
+        <CredentialsModal
+          title="Adicionar parceiro ao MAC" mac={adding.mac} submitLabel="Salvar parceiro"
+          intro="Um MAC pode ter vários parceiros. Se o código for de um parceiro que ainda não está neste MAC, ele é adicionado e as outras listas continuam. Se já estiver, o acesso dele é atualizado. A alteração fica registrada em seu nome."
+          onSubmit={(body) => api(`/admin/devices/registrations/${adding.deviceId}/configuration`, { method: "POST", body: { mode: "partner", confirm: true, ...body } })}
+          onClose={() => setAdding(null)}
+          onDone={() => { setAdding(null); toast("Parceiro salvo neste MAC."); list.reload(); onChanged?.(); }}
+        />
+      )}
+      {history && (
+        <Modal title={`Histórico de ${history.device.mac}`} onClose={() => setHistory(null)} wide>
+          <h4>Ativações</h4>
+          <Table><thead><tr><th>Vínculo</th><th>Status</th><th>Ativado</th><th>Removido</th></tr></thead><tbody>
+            {history.activations.map((a) => <tr key={a.id}><td>{owner(a)}</td><td><Badge status={a.status} /></td><td>{fmtDateTime(a.activatedAt)}</td><td>{fmtDateTime(a.revokedAt)}</td></tr>)}</tbody></Table>
+          <h4>Eventos</h4>
+          <Table><thead><tr><th>Quando</th><th>Evento</th><th>Quem</th><th>Resultado</th></tr></thead><tbody>
+            {history.events.map((e) => <tr key={e.id}><td>{fmtDateTime(e.createdAt)}</td><td>{e.action}</td><td>{e.metadata?.actorName || "—"}</td><td><Badge status={e.result} /></td></tr>)}</tbody></Table>
+          {history.events.length === 0 && <p className="muted">Sem eventos registrados.</p>}
+        </Modal>
+      )}
+    </>
+  );
+}
