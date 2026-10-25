@@ -36,7 +36,7 @@ export default function PartnerPortal() {
       <p className="muted">Para alterar os servidores, fale com a plataforma.</p>
       <h3>Códigos de ativação</h3>
       <div className="actions left"><button className="btn primary" onClick={() => setNewCode(true)}>Novo código</button></div>
-      <Table><thead><tr><th>Código</th><th>Status</th><th>Ativações máx.</th><th /></tr></thead><tbody>{codes.map((c) => <tr key={c.id}><td><strong>{c.code}</strong></td><td>{c.status === "active" ? "Ativo" : "Revogado"}</td><td>{c.maxActivations ?? "∞"}</td><td className="actions">{c.status === "active" && <button className="btn sm danger" onClick={() => revoke(c)}>Revogar</button>}</td></tr>)}</tbody></Table>
+      <Table><thead><tr><th>Código</th><th>Servidor</th><th>Status</th><th>Ativações máx.</th><th /></tr></thead><tbody>{codes.map((c) => <tr key={c.id}><td><strong>{c.code}</strong></td><td>{c.provider?.name || <span className="muted">Qualquer servidor</span>}</td><td>{c.status === "active" ? "Ativo" : "Revogado"}</td><td>{c.maxActivations ?? "∞"}</td><td className="actions">{c.status === "active" && <button className="btn sm danger" onClick={() => revoke(c)}>Revogar</button>}</td></tr>)}</tbody></Table>
       <h3 style={{ marginTop: 20 }}>Meus dispositivos</h3>
       <div className="toolbar"><input placeholder="Pesquisar por MAC" value={q} onChange={(e) => setQ(e.target.value)} /></div>
       <Table><thead><tr><th>MAC</th><th>Status</th><th>Ativado em</th><th /></tr></thead><tbody>{devices.data.map((a) => (
@@ -47,7 +47,7 @@ export default function PartnerPortal() {
       <Empty loading={devices.loading} error={devices.error} count={devices.data.length} /><Pager meta={devices.meta} onPage={devices.setPage} />
       <h3 style={{ marginTop: 20 }}>Mensalidades</h3>
       <Table><thead><tr><th>Competência</th><th>Valor</th><th>Pago</th><th>Vencimento</th><th>Status</th></tr></thead><tbody>{invoices.data.map((i) => <tr key={i.id}><td>{i.competence}</td><td>{fmtMoney(i.amountCents)}</td><td>{fmtMoney(i.paidCents)}</td><td>{fmtDate(i.dueDate)}</td><td><Badge status={i.status} /></td></tr>)}</tbody></Table>
-      {newCode && <CodeModal checkPath="/partner/codes/check" createPath="/partner/codes" onClose={() => setNewCode(false)} onCreated={() => { setNewCode(false); loadCodes(); }} />}
+      {newCode && <CodeModal checkPath="/partner/codes/check" createPath="/partner/codes" providers={providers} onClose={() => setNewCode(false)} onCreated={() => { setNewCode(false); loadCodes(); }} />}
     </>
   );
 }

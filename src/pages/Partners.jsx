@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api.js";
-import CodeModal from "./CodeModal.jsx";
-import { Badge, Empty, Field, LoadError, Modal, Pager, Table, dateInput, fmtDate, fmtDateTime, fmtMoney, spDateToIso, toCents, useAction, useDebounced, useList, useLoad, useUi } from "../ui.jsx";
+import CodeModal, { CodeEditModal } from "./CodeModal.jsx";
+import { Badge, DeliveryBadge, Empty, Field, LoadError, Modal, Pager, Table, dateInput, fmtDate, fmtDateTime, fmtMoney, spDateToIso, toCents, useAction, useDebounced, useList, useLoad, useUi } from "../ui.jsx";
 
 const MODELS = { fixed: "Mensalidade fixa", per_device: "Por dispositivo ativo", tiered: "Por faixa de dispositivos" };
 
@@ -106,6 +106,7 @@ function PartnerDetail({ id, onClose, onChanged }) {
   const [tab, setTab] = useState("codes");
   const [devices, setDevices] = useState([]);
   const [newCode, setNewCode] = useState(false);
+  const [editCode, setEditCode] = useState(null);
   const [provForm, setProvForm] = useState(null);
   const [editing, setEditing] = useState(false);
   const { data: p, error, reload: load, setData: setP } = useLoad(() => api(`/admin/partners/${id}`), [id]);
@@ -157,19 +158,19 @@ function PartnerDetail({ id, onClose, onChanged }) {
       <div className="tabs">{[["codes", "Códigos"], ["providers", "Servidores IPTV"], ["devices", "Dispositivos"], ["invoices", "Mensalidades"]].map(([k, n]) => <button key={k} className={`tab ${tab === k ? "active" : ""}`} onClick={() => setTab(k)}>{n}</button>)}</div>
       {tab === "codes" && <>
         <div className="actions left"><button className="btn primary" onClick={() => setNewCode(true)}>Novo código</button></div>
-        <Table><thead><tr><th>Código</th><th>Rótulo</th><th>Status</th><th>Ativações (usadas/limite)</th><th>Expira</th><th /></tr></thead><tbody>
-          {p.codes.map((c) => <tr key={c.id}><td><strong>{c.code}</strong></td><td>{c.label || "—"}</td><td><Badge status={c.status === "active" ? "active" : "revoked"} label={c.status === "active" ? "Ativo" : "Revogado"} /></td><td>{c.activationCount ?? 0} / {c.maxActivations ?? "∞"}</td><td>{fmtDate(c.expiresAt)}</td>
-            <td className="actions">{c.status === "active" && <button className="btn sm danger" onClick={() => revokeCode(c)}>Revogar</button>}</td></tr>)}
+        <Table><thead><tr><th>Código</th><th>Servidor</th><th>Rótulo</th><th>Status</th><th>Ativações (usadas/limite)</th><th>Expira</th><th /></tr></thead><tbody>
+          {p.codes.map((c) => <tr key={c.id}><td><strong>{c.code}</strong></td><td>{c.provider ? <>{c.provider.name}{c.provider.status !== "active" && <> <Badge status="disabled" label="Desativado" /></>}<div className="muted">{c.provider.baseUrl}</div></> : c.status === "active" ? <span className="muted" title="Código antigo: o app testa os servidores da parceria por prioridade. Edite para escolher um servidor.">Qualquer servidor ⚠</span> : "—"}</td><td>{c.label || "—"}</td><td><Badge status={c.status === "active" ? "active" : "revoked"} label={c.status === "active" ? "Ativo" : "Revogado"} /></td><td>{c.activationCount ?? 0} / {c.maxActivations ?? "∞"}</td><td>{fmtDate(c.expiresAt)}</td>
+            <td className="actions">{c.status === "active" && <button className="btn sm" onClick={() => setEditCode(c)}>Editar</button>}{c.status === "active" && <button className="btn sm danger" onClick={() => revokeCode(c)}>Revogar</button>}</td></tr>)}
         </tbody></Table></>}
       {tab === "providers" && <>
-        <p className="muted">Servidores do provedor desta parceria. O cliente digita código, usuário e senha; o servidor monta a URL da playlist e a valida antes de ativar. Com mais de um servidor, é usado o primeiro (menor prioridade) que aceitar as credenciais.</p>
+        <p className="muted">Servidores do provedor desta parceria. O cliente digita código, usuário e senha; o servidor monta a URL da playlist e a valida antes de ativar. Cada código aponta para um servidor (veja a coluna “Códigos”): quem usa o código é validado e atendido por ele. Só códigos antigos sem servidor testam todos, do menor para o maior número de prioridade. O modo de entrega vale para todos os dispositivos ligados ao servidor e muda em até alguns segundos.</p>
         <div className="actions left"><button className="btn primary" onClick={() => setProvForm({})}>Adicionar servidor</button></div>
-        <Table><thead><tr><th>Nome</th><th>URL base</th><th>Entrega</th><th>Prior.</th><th>Status</th><th /></tr></thead><tbody>
-          {p.providers.map((pr) => <tr key={pr.id}><td>{pr.name}</td><td>{pr.baseUrl}</td><td>{pr.deliveryMode === "proxy" ? "Proxy" : "Redirecionamento"}</td><td>{pr.priority}</td><td><Badge status={pr.status} /></td>
+        <Table><thead><tr><th>Nome</th><th>URL base</th><th>Códigos</th><th>Entrega</th><th>Prior.</th><th>Status</th><th /></tr></thead><tbody>
+          {p.providers.map((pr) => <tr key={pr.id}><td>{pr.name}</td><td>{pr.baseUrl}</td><td>{p.codes.filter((c) => c.providerId === pr.id && c.status === "active").map((c) => c.code).join(", ") || "—"}</td><td>{pr.deliveryMode === "proxy" ? "Proxy" : "Redirecionamento"}</td><td>{pr.priority}</td><td><Badge status={pr.status} /></td>
             <td className="actions"><button className="btn sm" onClick={() => setProvForm(pr)}>Editar</button><button className="btn sm danger" onClick={() => delProvider(pr)}>Excluir</button></td></tr>)}
         </tbody></Table></>}
-      {tab === "devices" && <Table><thead><tr><th>MAC</th><th>Status</th><th>Ativado em</th><th /></tr></thead><tbody>
-        {devices.map((a) => <tr key={a.id}><td>{a.mac}</td><td><Badge status={a.status} /></td><td>{fmtDateTime(a.activatedAt)}</td><td className="actions">
+      {tab === "devices" && <Table><thead><tr><th>MAC</th><th>Servidor</th><th>Entrega</th><th>Status</th><th>Ativado em</th><th /></tr></thead><tbody>
+        {devices.map((a) => <tr key={a.id}><td>{a.mac}</td><td>{a.provider?.name || "—"}</td><td><DeliveryBadge mode={a.deliveryMode} fixed={a.deliveryModeFixed} /></td><td><Badge status={a.status} /></td><td>{fmtDateTime(a.activatedAt)}</td><td className="actions">
           {a.status === "active" && <button className="btn sm" onClick={() => device(a, "block", { title: "Bloquear dispositivo", message: a.mac, reason: "required", danger: true })}>Bloquear</button>}
           {a.status === "blocked" && <button className="btn sm" onClick={() => device(a, "unblock", { title: "Desbloquear", message: a.mac })}>Desbloquear</button>}
           {a.status !== "revoked" && <button className="btn sm danger" onClick={() => device(a, "revoke", { title: "Remover ativação", message: a.mac, danger: true })}>Remover</button>}
@@ -179,7 +180,8 @@ function PartnerDetail({ id, onClose, onChanged }) {
         <Table><thead><tr><th>Competência</th><th>Dispositivos</th><th>Valor</th><th>Pago</th><th>Vencimento</th><th>Status</th></tr></thead><tbody>
           {p.invoices.map((i) => <tr key={i.id}><td>{i.competence}</td><td>{i.deviceCount}</td><td>{fmtMoney(i.amountCents)}</td><td>{fmtMoney(i.paidCents)}</td><td>{fmtDate(i.dueDate)}</td><td><Badge status={i.status} /></td></tr>)}
         </tbody></Table></>}
-      {newCode && <CodeModal checkPath="/admin/partners/codes/check" createPath={`/admin/partners/${id}/codes`} onClose={() => setNewCode(false)} onCreated={() => { setNewCode(false); load(); }} />}
+      {newCode && <CodeModal checkPath="/admin/partners/codes/check" createPath={`/admin/partners/${id}/codes`} providers={p.providers} onClose={() => setNewCode(false)} onCreated={() => { setNewCode(false); load(); }} />}
+      {editCode && <CodeEditModal partnerId={id} code={editCode} providers={p.providers} onClose={() => setEditCode(null)} onSaved={() => { setEditCode(null); load(); }} />}
       {provForm && <ProviderForm partnerId={id} provider={provForm.id ? provForm : null} onClose={() => setProvForm(null)} onSaved={() => { setProvForm(null); load(); }} />}
       {editing && <PartnerForm partner={p} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); load(); onChanged(); }} />}
     </Modal>
@@ -207,7 +209,7 @@ function ProviderForm({ partnerId, provider, onClose, onSaved }) {
       <Field label="URL base" hint="Apenas o endereço, ex.: http://valkiire.net (endereços internos são bloqueados)"><input value={f.baseUrl} onChange={set("baseUrl")} placeholder="http://valkiire.net" /></Field>
       <Field label="Caminho da playlist" hint="Use {username} e {password} (aceita também {usuario} e {senha}). Padrão Xtream: type=m3u_plus&output=m3u8"><textarea rows={2} value={f.playlistTemplate} onChange={set("playlistTemplate")} /></Field>
       <div className="row">
-        <Field label="Entrega" hint="Proxy resolve CORS no player web; redirecionamento não usa sua banda"><select value={f.deliveryMode} onChange={set("deliveryMode")}><option value="redirect">Redirecionamento (302)</option><option value="proxy">Proxy</option></select></Field>
+        <Field label="Entrega" hint="Proxy: seu servidor serve o conteúdo e o app nunca vê a URL nem a senha do provedor (consome sua banda). Redirecionamento: o app recebe as credenciais reais e fala direto com o provedor (não usa sua banda)."><select value={f.deliveryMode} onChange={set("deliveryMode")}><option value="redirect">Redirecionamento (302)</option><option value="proxy">Proxy</option></select></Field>
         <Field label="Prioridade" hint="Menor = tentado primeiro"><input type="number" min="0" value={f.priority} onChange={set("priority")} /></Field>
       </div>
       <Field label="Status"><select value={f.status} onChange={set("status")}><option value="active">Ativo</option><option value="disabled">Desativado</option></select></Field>

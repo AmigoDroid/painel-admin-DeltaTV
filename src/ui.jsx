@@ -35,10 +35,26 @@ const STATUS = {
   blocked: ["Bloqueada", "bad"], cancelled: ["Cancelada", "muted"], revoked: ["Removida", "muted"],
   open: ["Em aberto", "info"], partial: ["Parcial", "warn"], paid: ["Paga", "ok"], overdue: ["Vencida", "bad"],
   success: ["Sucesso", "ok"], failure: ["Falha", "bad"], denied: ["Negado", "warn"], disabled: ["Desativada", "muted"],
+  proxy: ["Proxy", "info"], redirect: ["Redirect", "muted"],
 };
 export function Badge({ status, label }) {
   const [text, tone] = STATUS[status] || [status, "muted"];
   return <span className={`badge ${tone}`}>{label || text}</span>;
+}
+
+/**
+ * Modo de entrega EFETIVO de uma ativação (campos deliveryMode/deliveryModeFixed devolvidos pelo backend):
+ * "proxy" = o servidor serve o conteúdo e o app nunca vê a URL/credencial real; "redirect" = o servidor autoriza e manda o
+ * app para a origem (302), que recebe as credenciais reais. Lista própria do cliente é sempre proxy ("fixo").
+ */
+export function DeliveryBadge({ mode, fixed }) {
+  if (!mode) return <span className="muted">—</span>;
+  const proxy = mode === "proxy";
+  return (
+    <span title={fixed ? "Lista própria do cliente: sempre proxy, não depende de configuração." : proxy ? "O servidor serve o conteúdo; o app não vê a URL nem a credencial do provedor." : "O servidor autoriza e redireciona (302) para o provedor; o app recebe as credenciais reais."}>
+      <Badge status={proxy ? "proxy" : "redirect"} />{fixed && <span className="muted"> fixo</span>}
+    </span>
+  );
 }
 
 /* ---------- Toasts e confirmações ---------- */

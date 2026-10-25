@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api.js";
-import { Badge, Empty, Modal, Pager, Table, fmtDateTime, useAction, useDebounced, useList, useUi } from "../ui.jsx";
+import { Badge, DeliveryBadge, Empty, Modal, Pager, Table, fmtDateTime, useAction, useDebounced, useList, useUi } from "../ui.jsx";
 import CredentialsModal from "./CredentialsModal.jsx";
 
 export default function Devices({ onChanged }) {
@@ -33,9 +33,10 @@ export default function Devices({ onChanged }) {
           <option value="">Todos</option><option value="active">Ativos</option><option value="blocked">Bloqueados</option><option value="revoked">Removidos</option>
         </select>
       </div>
-      <Table><thead><tr><th>MAC</th><th>Vínculo atual</th><th>Status</th><th>Ativado em</th><th /></tr></thead>
+      <Table><thead><tr><th>MAC</th><th>Vínculo atual</th><th>Entrega</th><th>Status</th><th>Ativado em</th><th /></tr></thead>
         <tbody>{list.data.map((a) => (
           <tr key={a.id}><td className="mono">{a.mac || "—"}{a.claimPending && <span className="muted"> (migração pendente)</span>}</td><td>{owner(a)}</td>
+            <td><DeliveryBadge mode={a.deliveryMode} fixed={a.deliveryModeFixed} /></td>
             <td><Badge status={a.status} />{a.statusReason && <div className="muted">{a.statusReason}</div>}</td><td>{fmtDateTime(a.activatedAt)}</td>
             <td className="actions">
               {a.mac && <button className="btn sm" onClick={() => openHistory(a.mac)}>Histórico</button>}
