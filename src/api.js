@@ -66,7 +66,7 @@ export async function api(path, opts = {}, retry = true) {
 }
 
 export async function login(email, password) {
-  const d = await raw("/auth/login", { method: "POST", body: { email, password } });
+  const d = await raw("/auth/login", { method: "POST", body: { email, password, audience: "admin" } });
   save({ accessToken: d.accessToken, refreshToken: d.refreshToken, user: d.user });
 }
 export async function logout() {

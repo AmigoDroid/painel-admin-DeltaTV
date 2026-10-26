@@ -9,7 +9,6 @@ import Unlinked from "./pages/Unlinked.jsx";
 import Sources from "./pages/Sources.jsx";
 import Billing from "./pages/Billing.jsx";
 import Audit from "./pages/Audit.jsx";
-import PartnerPortal from "./pages/PartnerPortal.jsx";
 import DeviceAccess from "./pages/DeviceAccess.jsx";
 
 const PAGES = {
@@ -42,7 +41,6 @@ function Login({ onDeviceAccess }) {
 }
 
 function Shell({ user }) {
-  const isPartner = user.role === "partner";
   // Itens do menu são conveniência: cada rota é protegida por permissão no backend.
   const menu = Object.entries(PAGES).filter(([k]) => !(user.role === "support" && k === "audit"));
   const allowed = (h) => menu.some(([k]) => k === h);
@@ -62,26 +60,23 @@ function Shell({ user }) {
   const [unlinked, setUnlinked] = useState(null);
   const refreshUnlinked = () => api("/admin/devices/unlinked", { query: { pageSize: 1 } }).then((r) => setUnlinked(r.meta.total)).catch(() => {});
   useEffect(() => {
-    if (isPartner) return undefined;
     refreshUnlinked();
     const t = setInterval(() => { if (!document.hidden) refreshUnlinked(); }, 30000);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPartner]);
+  }, []);
   return (
     <div className="layout">
       <aside className="sidebar">
         <div className="brand">Licenciamento IPTV</div>
-        {isPartner
-          ? <button className="nav active">Minha parceria</button>
-          : menu.map(([k, [label]]) => (
-            <button key={k} className={`nav ${page === k ? "active" : ""}`} onClick={() => setPage(k)}>
-              {label}{k === "unlinked" && unlinked > 0 && <span className="count" aria-label={`${unlinked} aguardando`}>{unlinked > 99 ? "99+" : unlinked}</span>}
-            </button>
-          ))}
+        {menu.map(([k, [label]]) => (
+          <button key={k} className={`nav ${page === k ? "active" : ""}`} onClick={() => setPage(k)}>
+            {label}{k === "unlinked" && unlinked > 0 && <span className="count" aria-label={`${unlinked} aguardando`}>{unlinked > 99 ? "99+" : unlinked}</span>}
+          </button>
+        ))}
         <div className="user">{user.name}<br />{user.email}<br /><button className="btn sm" style={{ marginTop: 8 }} onClick={logout}>Sair</button></div>
       </aside>
-      <main className="content">{isPartner ? <PartnerPortal /> : <Current onChanged={refreshUnlinked} />}</main>
+      <main className="content"><Current onChanged={refreshUnlinked} /></main>
     </div>
   );
 }
@@ -98,7 +93,7 @@ export default function App() {
   const toDevice = (on) => { setDeviceMode(on); location.hash = on ? "dispositivo" : ""; };
   return (
     <UiProvider>
-      {auth?.user ? <Shell user={auth.user} /> : deviceMode ? <DeviceAccess onBack={() => toDevice(false)} /> : <Login onDeviceAccess={() => toDevice(true)} />}
+      {auth?.user && auth.user.role !== "partner" ? <Shell user={auth.user} /> : deviceMode ? <DeviceAccess onBack={() => toDevice(false)} /> : <Login onDeviceAccess={() => toDevice(true)} />}
     </UiProvider>
   );
 }

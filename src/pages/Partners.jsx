@@ -4,6 +4,10 @@ import CodeModal, { CodeEditModal } from "./CodeModal.jsx";
 import { StockAdmin } from "./Stock.jsx";
 import { Badge, DeliveryBadge, Empty, Field, LoadError, Modal, Pager, Table, dateInput, fmtDate, fmtDateTime, fmtMoney, spDateToIso, toCents, useAction, useDebounced, useList, useLoad, useUi } from "../ui.jsx";
 
+// Mesmo texto gravado pelo back-end no autocadastro de revendedor (ver reseller-signup.service.js).
+const PENDING_REASON = "Aguardando aprovação do cadastro";
+const isPending = (p) => p.status === "suspended" && p.statusReason === PENDING_REASON;
+
 const MODELS = { fixed: "Mensalidade fixa", per_device: "Por dispositivo ativo", tiered: "Por faixa de dispositivos" };
 
 export default function Partners() {
@@ -19,14 +23,14 @@ export default function Partners() {
       <div className="toolbar">
         <input placeholder="Buscar por nome ou identificador" value={q} onChange={(e) => setQ(e.target.value)} />
         <select value={list.params.status} onChange={(e) => list.filter({ status: e.target.value })}>
-          <option value="">Todos os status</option><option value="active">Ativos</option><option value="expired">Expirados</option><option value="suspended">Suspensos</option><option value="blocked">Bloqueados</option><option value="cancelled">Cancelados</option>
+          <option value="">Todos os status</option><option value="pending">Aguardando aprovação</option><option value="active">Ativos</option><option value="expired">Expirados</option><option value="suspended">Suspensos</option><option value="blocked">Bloqueados</option><option value="cancelled">Cancelados</option>
         </select>
       </div>
       <Table>
         <thead><tr><th>Parceiro</th><th>Status</th><th>Modelo</th><th>Dispositivos</th><th>Término</th></tr></thead>
         <tbody>{list.data.map((p) => (
           <tr key={p.id} className="click" onClick={() => setOpenId(p.id)}>
-            <td>{p.name}<div className="muted">{p.slug}</div></td><td><Badge status={p.effectiveStatus} /></td>
+            <td>{p.name}<div className="muted">{p.slug}</div></td><td>{isPending(p) ? <Badge status="pending" label="Novo cadastro" /> : <Badge status={p.effectiveStatus} />}</td>
             <td>{MODELS[p.billingModel]}</td><td>{p.deviceCount}{p.deviceLimit != null ? `/${p.deviceLimit}` : ""}</td><td>{fmtDate(p.endsAt)}</td>
           </tr>))}</tbody>
       </Table>
@@ -144,6 +148,7 @@ function PartnerDetail({ id, onClose, onChanged }) {
     <Modal title={p.name} onClose={onClose} wide>
       <dl className="kv">
         <dt>Status</dt><dd><Badge status={p.effectiveStatus} /> {p.statusReason && <span className="muted">— {p.statusReason}</span>}</dd>
+        <dt>Contato</dt><dd>{[p.contactName, p.contactEmail, p.contactPhone].filter(Boolean).join(" · ") || "—"}</dd>
         <dt>Identificador</dt><dd>{p.slug}</dd><dt>Vigência</dt><dd>{fmtDate(p.startsAt)} → {fmtDate(p.endsAt)}</dd>
         <dt>Tipo</dt><dd>{{ content: "Parceria de conteúdo", reseller: "Revendedor", both: "Parceria de conteúdo e revendedor" }[p.kind] || p.kind}</dd>
         <dt>Cobrança</dt><dd>{MODELS[p.billingModel]} · vence dia {p.dueDay} · tolerância {p.graceDays} dia(s)</dd>
@@ -153,7 +158,7 @@ function PartnerDetail({ id, onClose, onChanged }) {
         <button className="btn" onClick={() => setEditing(true)}>Editar condições</button>
         {p.status === "active" && <button className="btn" onClick={() => act("suspend", { title: "Suspender parceria", message: "Todos os dispositivos vinculados perdem o acesso até a reativação.", reason: "required", danger: true, confirmLabel: "Suspender" })}>Suspender</button>}
         {["active", "suspended"].includes(p.status) && <button className="btn danger" onClick={() => act("block", { title: "Bloquear parceria", message: "Todos os dispositivos da parceria perdem o acesso, independentemente do código usado.", reason: "required", danger: true, confirmLabel: "Bloquear" })}>Bloquear</button>}
-        {["suspended", "blocked"].includes(p.status) && <button className="btn primary" onClick={() => act("reactivate", { title: "Reativar parceria", message: "Os dispositivos elegíveis recuperam o acesso." })}>Reativar</button>}
+        {["suspended", "blocked"].includes(p.status) && <button className="btn primary" onClick={() => act("reactivate", isPending(p) ? { title: "Aprovar cadastro", message: "O revendedor poderá usar o portal imediatamente.", confirmLabel: "Aprovar" } : { title: "Reativar parceria", message: "Os dispositivos elegíveis recuperam o acesso." })}>{isPending(p) ? "Aprovar cadastro" : "Reativar"}</button>}
         {p.status !== "cancelled" && <button className="btn danger" onClick={() => act("cancel", { title: "Cancelar parceria", message: "Os dispositivos perdem o acesso permanentemente.", reason: "required", danger: true })}>Cancelar</button>}
       </div>
       <div className="tabs">{[["codes", "Códigos"], ["providers", "Servidores IPTV"], ...(p.kind !== "content" ? [["stock", "Estoque de licenças"]] : []), ["devices", "Dispositivos"], ["invoices", "Mensalidades"]].map(([k, n]) => <button key={k} className={`tab ${tab === k ? "active" : ""}`} onClick={() => setTab(k)}>{n}</button>)}</div>
