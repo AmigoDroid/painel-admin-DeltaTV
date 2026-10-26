@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api.js";
 import CodeModal, { CodeEditModal } from "./CodeModal.jsx";
+import { StockAdmin } from "./Stock.jsx";
 import { Badge, DeliveryBadge, Empty, Field, LoadError, Modal, Pager, Table, dateInput, fmtDate, fmtDateTime, fmtMoney, spDateToIso, toCents, useAction, useDebounced, useList, useLoad, useUi } from "../ui.jsx";
 
 const MODELS = { fixed: "Mensalidade fixa", per_device: "Por dispositivo ativo", tiered: "Por faixa de dispositivos" };
@@ -155,7 +156,7 @@ function PartnerDetail({ id, onClose, onChanged }) {
         {["suspended", "blocked"].includes(p.status) && <button className="btn primary" onClick={() => act("reactivate", { title: "Reativar parceria", message: "Os dispositivos elegíveis recuperam o acesso." })}>Reativar</button>}
         {p.status !== "cancelled" && <button className="btn danger" onClick={() => act("cancel", { title: "Cancelar parceria", message: "Os dispositivos perdem o acesso permanentemente.", reason: "required", danger: true })}>Cancelar</button>}
       </div>
-      <div className="tabs">{[["codes", "Códigos"], ["providers", "Servidores IPTV"], ["devices", "Dispositivos"], ["invoices", "Mensalidades"]].map(([k, n]) => <button key={k} className={`tab ${tab === k ? "active" : ""}`} onClick={() => setTab(k)}>{n}</button>)}</div>
+      <div className="tabs">{[["codes", "Códigos"], ["providers", "Servidores IPTV"], ...(p.kind !== "content" ? [["stock", "Estoque de licenças"]] : []), ["devices", "Dispositivos"], ["invoices", "Mensalidades"]].map(([k, n]) => <button key={k} className={`tab ${tab === k ? "active" : ""}`} onClick={() => setTab(k)}>{n}</button>)}</div>
       {tab === "codes" && <>
         <div className="actions left"><button className="btn primary" onClick={() => setNewCode(true)}>Novo código</button></div>
         <Table><thead><tr><th>Código</th><th>Servidor</th><th>Rótulo</th><th>Status</th><th>Ativações (usadas/limite)</th><th>Expira</th><th /></tr></thead><tbody>
@@ -169,6 +170,7 @@ function PartnerDetail({ id, onClose, onChanged }) {
           {p.providers.map((pr) => <tr key={pr.id}><td>{pr.name}</td><td>{pr.baseUrl}</td><td>{p.codes.filter((c) => c.providerId === pr.id && c.status === "active").map((c) => c.code).join(", ") || "—"}</td><td>{pr.deliveryMode === "proxy" ? "Proxy" : "Redirecionamento"}</td><td>{pr.priority}</td><td><Badge status={pr.status} /></td>
             <td className="actions"><button className="btn sm" onClick={() => setProvForm(pr)}>Editar</button><button className="btn sm danger" onClick={() => delProvider(pr)}>Excluir</button></td></tr>)}
         </tbody></Table></>}
+      {tab === "stock" && p.kind !== "content" && <StockAdmin partnerId={id} />}
       {tab === "devices" && <Table><thead><tr><th>MAC</th><th>Servidor</th><th>Entrega</th><th>Status</th><th>Ativado em</th><th /></tr></thead><tbody>
         {devices.map((a) => <tr key={a.id}><td>{a.mac}</td><td>{a.provider?.name || "—"}</td><td><DeliveryBadge mode={a.deliveryMode} fixed={a.deliveryModeFixed} /></td><td><Badge status={a.status} /></td><td>{fmtDateTime(a.activatedAt)}</td><td className="actions">
           {a.status === "active" && <button className="btn sm" onClick={() => device(a, "block", { title: "Bloquear dispositivo", message: a.mac, reason: "required", danger: true })}>Bloquear</button>}

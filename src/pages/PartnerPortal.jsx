@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../api.js";
 import CodeModal from "./CodeModal.jsx";
 import MacDevice from "./MacDevice.jsx";
+import { StockPortal } from "./Stock.jsx";
 import { Badge, Empty, Pager, Table, fmtDate, fmtDateTime, fmtMoney, useAction, useDebounced, useList, useUi } from "../ui.jsx";
 
 // Portal do parceiro: o backend restringe tudo ao parceiro do token (nunca confie neste front).
@@ -30,7 +31,7 @@ export default function PartnerPortal() {
     <>
       <div className="page-head"><h2>{me?.name || "Minha parceria"}</h2>{me && <Badge status={me.effectiveStatus} />}</div>
       {me && <div className="grid cards"><div className="card stat"><small>Dispositivos</small><strong>{me.deviceCount}{me.deviceLimit != null ? `/${me.deviceLimit}` : ""}</strong></div><div className="card stat"><small>Vigência até</small><strong>{fmtDate(me.endsAt)}</strong></div><div className="card stat"><small>Vencimento</small><strong>dia {me.dueDay}</strong><span>tolerância {me.graceDays} dia(s)</span></div></div>}
-      {(me?.kind === "reseller" || me?.kind === "both") && <MacDevice />}
+      {(me?.kind === "reseller" || me?.kind === "both") && <><StockPortal /><MacDevice /></>}
       <h3>Servidores do provedor</h3>
       <Table><thead><tr><th>Nome</th><th>URL base</th><th>Status</th></tr></thead><tbody>{providers.map((p) => <tr key={p.id}><td>{p.name}</td><td>{p.baseUrl}</td><td><Badge status={p.status} /></td></tr>)}</tbody></Table>
       <p className="muted">Para alterar os servidores, fale com a plataforma.</p>

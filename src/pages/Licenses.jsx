@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api.js";
+import { NewPlanInline } from "./Stock.jsx";
 import { Badge, Empty, Field, LoadError, Modal, Pager, SecretCode, Table, fmtDate, fmtDateTime, fmtMoney, toCents, useAction, useDebounced, useList, useLoad, useUi } from "../ui.jsx";
 
 const STATUSES = [["", "Todos os status"], ["active", "Ativas"], ["pending", "Pendentes"], ["expired", "Expiradas"], ["suspended", "Suspensas"], ["blocked", "Bloqueadas"], ["cancelled", "Canceladas"]];
@@ -54,7 +55,7 @@ function CreateLicense({ onClose, onCreated }) {
   useEffect(() => {
     // O plano padrão sai só dos ATIVOS (antes era o primeiro da lista, ativo ou não -> "Plano inválido ou inativo").
     api("/admin/licenses/plans")
-      .then((r) => { const active = r.data.filter((p) => p.active); setPlans(active); setF((x) => ({ ...x, planId: active[0]?.id || "" })); })
+      .then((r) => { const active = r.data.filter((p) => p.active); setPlans(active); setF((x) => ({ ...x, planId: (active.find((p) => p.durationMonths === 1) || active[0])?.id || "" })); })
       .catch((e) => toast(e.message, "bad"));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -75,6 +76,7 @@ function CreateLicense({ onClose, onCreated }) {
   return (
     <Modal title="Nova licença" onClose={onClose}>
       <Field label="Plano (duração)"><select value={f.planId} onChange={set("planId")}>{plans.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
+      <NewPlanInline onCreated={(p) => { setPlans((x) => (x.some((y) => y.id === p.id) ? x : [...x, p].sort((a, b) => a.durationMonths - b.durationMonths))); setF((x) => ({ ...x, planId: p.id })); }} />
       <div className="row"><Field label="Nome do cliente"><input value={f.name} onChange={set("name")} /></Field><Field label="E-mail"><input type="email" value={f.email} onChange={set("email")} /></Field></div>
       <div className="row"><Field label="Telefone"><input value={f.phone} onChange={set("phone")} /></Field><Field label="Limite de dispositivos" hint="Vazio = padrão do plano"><input type="number" min="1" max="50" value={f.maxDevices} onChange={set("maxDevices")} /></Field></div>
       <div className="row"><Field label="Valor pago (R$)" hint="Opcional: registra a venda"><input value={f.amount} onChange={set("amount")} /></Field><Field label="Forma de pagamento"><input value={f.method} onChange={set("method")} placeholder="pix, cartão…" /></Field></div>
@@ -149,7 +151,7 @@ function Renew({ license, onClose, onDone }) {
   useEffect(() => {
     // Se o plano atual foi desativado, ele não está na lista: a seleção cai no primeiro ativo (antes o campo mostrava um plano e enviava outro).
     api("/admin/licenses/plans")
-      .then((r) => { const active = r.data.filter((p) => p.active); setPlans(active); setPlanId(active.some((p) => p.id === license.planId) ? license.planId : active[0]?.id || ""); })
+      .then((r) => { const active = r.data.filter((p) => p.active); setPlans(active); setPlanId(active.some((p) => p.id === license.planId) ? license.planId : (active.find((p) => p.durationMonths === 1) || active[0])?.id || ""); })
       .catch((e) => toast(e.message, "bad"));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -163,6 +165,7 @@ function Renew({ license, onClose, onDone }) {
     <Modal title="Renovar licença" onClose={onClose}>
       <p className="muted">Renovar antes do vencimento soma ao saldo; depois do vencimento, conta a partir de hoje.</p>
       <Field label="Plano"><select value={planId} onChange={(e) => setPlanId(e.target.value)}>{plans.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
+      <NewPlanInline onCreated={(p) => { setPlans((x) => (x.some((y) => y.id === p.id) ? x : [...x, p].sort((a, b) => a.durationMonths - b.durationMonths))); setPlanId(p.id); }} />
       <Field label="Valor pago (R$)" hint="Opcional"><input value={amount} onChange={(e) => setAmount(e.target.value)} /></Field>
       <div className="actions"><button className="btn" onClick={onClose}>Cancelar</button><button className="btn primary" disabled={!planId} onClick={submit}>Renovar</button></div>
     </Modal>

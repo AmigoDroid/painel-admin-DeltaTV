@@ -3,6 +3,7 @@ import { api } from "../api.js";
 import { Badge, Table, fmtDateTime, useAction, useUi } from "../ui.jsx";
 import ConfigureForm from "./ConfigureForm.jsx";
 import DeviceLists, { livesOf, removeMessage, saveMessage } from "./DeviceLists.jsx";
+import { ApplyStock } from "./Stock.jsx";
 
 const ACTION = {
   "device.configuration.confirm": "Lista adicionada/atualizada",
@@ -84,6 +85,7 @@ export default function MacDevice() {
           </p>
 
           <DeviceLists device={device} onRemove={remove} />
+          <ApplyStock mac={mac} onApplied={() => { reload(); setHistory(null); }} />
           <ConfigureForm key={device.deviceId} device={device} onSubmit={submit} onHistory={loadHistory} />
         </div>
       )}
