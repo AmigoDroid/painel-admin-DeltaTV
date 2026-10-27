@@ -8,12 +8,13 @@ import Devices from "./pages/Devices.jsx";
 import Unlinked from "./pages/Unlinked.jsx";
 import Sources from "./pages/Sources.jsx";
 import Billing from "./pages/Billing.jsx";
+import Pix from "./pages/Pix.jsx";
 import Audit from "./pages/Audit.jsx";
 import DeviceAccess from "./pages/DeviceAccess.jsx";
 
 const PAGES = {
   dashboard: ["Visão geral", Dashboard], licenses: ["Licenças", Licenses], partners: ["Parceiros", Partners],
-  devices: ["Dispositivos", Devices], unlinked: ["Sem vínculo", Unlinked], sources: ["Fontes", Sources], billing: ["Financeiro", Billing], audit: ["Auditoria", Audit],
+  devices: ["Dispositivos", Devices], unlinked: ["Sem vínculo", Unlinked], sources: ["Fontes", Sources], billing: ["Financeiro", Billing], pix: ["Pix", Pix], audit: ["Auditoria", Audit],
 };
 
 function Login({ onDeviceAccess }) {

@@ -36,6 +36,7 @@ const STATUS = {
   open: ["Em aberto", "info"], partial: ["Parcial", "warn"], paid: ["Paga", "ok"], overdue: ["Vencida", "bad"],
   success: ["Sucesso", "ok"], failure: ["Falha", "bad"], denied: ["Negado", "warn"], disabled: ["Desativada", "muted"],
   proxy: ["Proxy", "info"], redirect: ["Redirect", "muted"],
+  review: ["Em conferência", "warn"], refunded: ["Devolvido", "muted"], failed: ["Falhou", "bad"],
 };
 export function Badge({ status, label }) {
   const [text, tone] = STATUS[status] || [status, "muted"];
