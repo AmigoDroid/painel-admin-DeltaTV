@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
-import { api } from "../api.js";
+import { api, getAuth } from "../api.js";
+import { ClientsPanel } from "./Clients.jsx";
+import { UsersPanel } from "./Users.jsx";
 import CodeModal, { CodeEditModal } from "./CodeModal.jsx";
 import { StockAdmin } from "./Stock.jsx";
 import { Badge, DeliveryBadge, Empty, Field, LoadError, Modal, Pager, Table, dateInput, fmtDate, fmtDateTime, fmtMoney, spDateToIso, toCents, useAction, useDebounced, useList, useLoad, useUi } from "../ui.jsx";
@@ -53,7 +55,7 @@ function PartnerForm({ partner, onClose, onSaved }) {
   const run = useAction();
   const edit = !!partner;
   const [f, setF] = useState({
-    name: partner?.name || "", slug: partner?.slug || "", contactName: partner?.contactName || "", contactEmail: partner?.contactEmail || "",
+    name: partner?.name || "", slug: partner?.slug || "", contactName: partner?.contactName || "", contactEmail: partner?.contactEmail || "", contactPhone: partner?.contactPhone || "",
     startsAt: dateInput(partner?.startsAt) || dateInput(new Date()), endsAt: dateInput(partner?.endsAt) || dateInput(new Date(Date.now() + 365 * 86400000)),
     billingModel: partner?.billingModel || "fixed", monthly: partner ? String(partner.monthlyFeeCents / 100) : "", perDevice: partner ? String(partner.perDeviceCents / 100) : "",
     minFee: partner ? String(partner.minFeeCents / 100) : "", tiers: tiersToText(partner?.tiers), deviceLimit: partner?.deviceLimit ?? "",
@@ -69,12 +71,17 @@ function PartnerForm({ partner, onClose, onSaved }) {
       return toast("Há um valor inválido em R$ (ou nas faixas). Use números, ex.: 200,00.", "bad");
     }
     const body = {
-      name: f.name, contactName: f.contactName || null, contactEmail: f.contactEmail || null, billingModel: f.billingModel,
+      name: f.name, contactName: f.contactName || null, contactEmail: f.contactEmail || null, contactPhone: f.contactPhone || null, billingModel: f.billingModel,
       ...money,
       tiers, deviceLimit: f.deviceLimit === "" ? null : Number(f.deviceLimit),
       dueDay: Number(f.dueDay), graceDays: Number(f.graceDays), suspendPolicy: f.suspendPolicy, kind: f.kind,
     };
-    if (!edit) {
+    if (edit) {
+      // Só envia o que mudou: reenviar a data igual a regravaria (fim do dia) sem necessidade.
+      if (f.slug !== partner.slug) body.slug = f.slug;
+      if (f.startsAt !== dateInput(partner.startsAt)) body.startsAt = spDateToIso(f.startsAt);
+      if (f.endsAt !== dateInput(partner.endsAt)) body.endsAt = spDateToIso(f.endsAt, true);
+    } else {
       Object.assign(body, { slug: f.slug, startsAt: spDateToIso(f.startsAt), endsAt: spDateToIso(f.endsAt, true) });
       if (f.portalEmail) body.portalUser = { name: f.portalName || f.name, email: f.portalEmail, password: f.portalPassword };
     }
@@ -83,9 +90,10 @@ function PartnerForm({ partner, onClose, onSaved }) {
   };
   return (
     <Modal title={edit ? "Editar parceiro" : "Novo parceiro"} onClose={onClose} wide>
-      <div className="row"><Field label="Nome / empresa"><input value={f.name} onChange={set("name")} /></Field><Field label="Identificador (slug)" hint="minúsculas, números e hífens"><input value={f.slug} onChange={set("slug")} disabled={edit} /></Field></div>
+      <div className="row"><Field label="Nome / empresa"><input value={f.name} onChange={set("name")} /></Field><Field label="Identificador (slug)" hint="minúsculas, números e hífens"><input value={f.slug} onChange={set("slug")} /></Field></div>
       <div className="row"><Field label="Contato"><input value={f.contactName} onChange={set("contactName")} /></Field><Field label="E-mail do contato"><input value={f.contactEmail} onChange={set("contactEmail")} /></Field></div>
-      {!edit && <div className="row"><Field label="Início da parceria"><input type="date" value={f.startsAt} onChange={set("startsAt")} /></Field><Field label="Término da parceria"><input type="date" value={f.endsAt} onChange={set("endsAt")} /></Field></div>}
+      <Field label="Telefone do contato"><input value={f.contactPhone} onChange={set("contactPhone")} /></Field>
+      <div className="row"><Field label="Início da parceria"><input type="date" value={f.startsAt} onChange={set("startsAt")} /></Field><Field label="Término da parceria"><input type="date" value={f.endsAt} onChange={set("endsAt")} /></Field></div>
       <div className="row">
         <Field label="Modelo de cobrança"><select value={f.billingModel} onChange={set("billingModel")}>{Object.entries(MODELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Field>
         <Field label="Limite de dispositivos" hint="Vazio = ilimitado"><input type="number" min="0" value={f.deviceLimit} onChange={set("deviceLimit")} /></Field>
@@ -114,6 +122,7 @@ function PartnerDetail({ id, onClose, onChanged }) {
   const [editCode, setEditCode] = useState(null);
   const [provForm, setProvForm] = useState(null);
   const [editing, setEditing] = useState(false);
+  const role = getAuth()?.user?.role;
   const { data: p, error, reload: load, setData: setP } = useLoad(() => api(`/admin/partners/${id}`), [id]);
   const loadDevices = () => api(`/admin/partners/${id}/devices`, { query: { pageSize: 100 } }).then((r) => setDevices(r.data)).catch(() => {});
   useEffect(() => { loadDevices(); /* eslint-disable-next-line */ }, [id]);
@@ -161,7 +170,7 @@ function PartnerDetail({ id, onClose, onChanged }) {
         {["suspended", "blocked"].includes(p.status) && <button className="btn primary" onClick={() => act("reactivate", isPending(p) ? { title: "Aprovar cadastro", message: "O revendedor poderá usar o portal imediatamente.", confirmLabel: "Aprovar" } : { title: "Reativar parceria", message: "Os dispositivos elegíveis recuperam o acesso." })}>{isPending(p) ? "Aprovar cadastro" : "Reativar"}</button>}
         {p.status !== "cancelled" && <button className="btn danger" onClick={() => act("cancel", { title: "Cancelar parceria", message: "Os dispositivos perdem o acesso permanentemente.", reason: "required", danger: true })}>Cancelar</button>}
       </div>
-      <div className="tabs">{[["codes", "Códigos"], ["providers", "Servidores IPTV"], ...(p.kind !== "content" ? [["stock", "Estoque de licenças"]] : []), ["devices", "Dispositivos"], ["invoices", "Mensalidades"]].map(([k, n]) => <button key={k} className={`tab ${tab === k ? "active" : ""}`} onClick={() => setTab(k)}>{n}</button>)}</div>
+      <div className="tabs">{[["codes", "Códigos"], ["providers", "Servidores IPTV"], ...(p.kind !== "content" ? [["stock", "Estoque de licenças"], ["clients", "Clientes"]] : []), ["devices", "Dispositivos"], ["invoices", "Mensalidades"], ...(["superadmin", "admin"].includes(role) ? [["users", "Usuários do portal"]] : [])].map(([k, n]) => <button key={k} className={`tab ${tab === k ? "active" : ""}`} onClick={() => setTab(k)}>{n}</button>)}</div>
       {tab === "codes" && <>
         <div className="actions left"><button className="btn primary" onClick={() => setNewCode(true)}>Novo código</button></div>
         <Table><thead><tr><th>Código</th><th>Servidor</th><th>Rótulo</th>{p.kind !== "content" && <th>Licença do estoque</th>}<th>Status</th><th>Ativações (usadas/limite)</th><th>Expira</th><th /></tr></thead><tbody>
@@ -176,6 +185,8 @@ function PartnerDetail({ id, onClose, onChanged }) {
             <td className="actions"><button className="btn sm" onClick={() => setProvForm(pr)}>Editar</button><button className="btn sm danger" onClick={() => delProvider(pr)}>Excluir</button></td></tr>)}
         </tbody></Table></>}
       {tab === "stock" && p.kind !== "content" && <StockAdmin partnerId={id} />}
+      {tab === "clients" && p.kind !== "content" && <ClientsPanel partnerId={id} />}
+      {tab === "users" && <UsersPanel partnerId={id} />}
       {tab === "devices" && <Table><thead><tr><th>MAC</th><th>Servidor</th><th>Entrega</th><th>Status</th><th>Ativado em</th><th /></tr></thead><tbody>
         {devices.map((a) => <tr key={a.id}><td>{a.mac}</td><td>{a.provider?.name || "—"}</td><td><DeliveryBadge mode={a.deliveryMode} fixed={a.deliveryModeFixed} /></td><td><Badge status={a.status} /></td><td>{fmtDateTime(a.activatedAt)}</td><td className="actions">
           {a.status === "active" && <button className="btn sm" onClick={() => device(a, "block", { title: "Bloquear dispositivo", message: a.mac, reason: "required", danger: true })}>Bloquear</button>}

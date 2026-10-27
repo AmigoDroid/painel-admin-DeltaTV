@@ -11,10 +11,12 @@ import Billing from "./pages/Billing.jsx";
 import Pix from "./pages/Pix.jsx";
 import Audit from "./pages/Audit.jsx";
 import DeviceAccess from "./pages/DeviceAccess.jsx";
+import Clients from "./pages/Clients.jsx";
+import Users from "./pages/Users.jsx";
 
 const PAGES = {
-  dashboard: ["Visão geral", Dashboard], licenses: ["Licenças", Licenses], partners: ["Parceiros", Partners],
-  devices: ["Dispositivos", Devices], unlinked: ["Sem vínculo", Unlinked], sources: ["Fontes", Sources], billing: ["Financeiro", Billing], pix: ["Pix", Pix], audit: ["Auditoria", Audit],
+  dashboard: ["Visão geral", Dashboard], licenses: ["Licenças", Licenses], partners: ["Parceiros", Partners], clients: ["Clientes", Clients],
+  devices: ["Dispositivos", Devices], unlinked: ["Sem vínculo", Unlinked], sources: ["Fontes", Sources], billing: ["Financeiro", Billing], pix: ["Pix", Pix], users: ["Usuários", Users], audit: ["Auditoria", Audit],
 };
 
 function Login({ onDeviceAccess }) {
@@ -43,7 +45,8 @@ function Login({ onDeviceAccess }) {
 
 function Shell({ user }) {
   // Itens do menu são conveniência: cada rota é protegida por permissão no backend.
-  const menu = Object.entries(PAGES).filter(([k]) => !(user.role === "support" && k === "audit"));
+  const hidden = (k) => (user.role === "support" && k === "audit") || (k === "users" && user.role !== "superadmin");
+  const menu = Object.entries(PAGES).filter(([k]) => !hidden(k));
   const allowed = (h) => menu.some(([k]) => k === h);
   const fromHash = () => (allowed(location.hash.slice(1)) ? location.hash.slice(1) : "dashboard");
   const [page, setPage] = useState(fromHash);
