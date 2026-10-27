@@ -10,7 +10,7 @@ import { Badge, DeliveryBadge, Empty, Field, LoadError, Modal, Pager, Table, dat
 const PENDING_REASON = "Aguardando aprovação do cadastro";
 const isPending = (p) => p.status === "suspended" && p.statusReason === PENDING_REASON;
 
-const MODELS = { fixed: "Mensalidade fixa", per_device: "Por dispositivo ativo", tiered: "Por faixa de dispositivos" };
+const MODELS = { none: "Sem mensalidade", fixed: "Mensalidade fixa", per_device: "Por dispositivo ativo", tiered: "Por faixa de dispositivos" };
 
 export default function Partners() {
   const [q, setQ] = useState("");
@@ -95,18 +95,18 @@ function PartnerForm({ partner, onClose, onSaved }) {
       <Field label="Telefone do contato"><input value={f.contactPhone} onChange={set("contactPhone")} /></Field>
       <div className="row"><Field label="Início da parceria"><input type="date" value={f.startsAt} onChange={set("startsAt")} /></Field><Field label="Término da parceria"><input type="date" value={f.endsAt} onChange={set("endsAt")} /></Field></div>
       <div className="row">
-        <Field label="Modelo de cobrança"><select value={f.billingModel} onChange={set("billingModel")}>{Object.entries(MODELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Field>
+        <Field label="Modelo de cobrança" hint={f.billingModel === "none" ? "Sem mensalidade: nenhuma cobrança é gerada. Indicado para revendedor que só compra licenças." : undefined}><select value={f.billingModel} onChange={set("billingModel")}>{Object.entries(MODELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Field>
         <Field label="Limite de dispositivos" hint="Vazio = ilimitado"><input type="number" min="0" value={f.deviceLimit} onChange={set("deviceLimit")} /></Field>
       </div>
       {f.billingModel === "fixed" && <Field label="Mensalidade (R$)"><input value={f.monthly} onChange={set("monthly")} /></Field>}
       {f.billingModel === "per_device" && <div className="row"><Field label="Valor por dispositivo (R$)"><input value={f.perDevice} onChange={set("perDevice")} /></Field><Field label="Mínimo mensal (R$)"><input value={f.minFee} onChange={set("minFee")} /></Field></div>}
       {f.billingModel === "tiered" && <Field label="Faixas" hint='Uma por linha: "até quantos dispositivos:valor". Última faixa sem limite: "*:valor"'><textarea rows={4} value={f.tiers} onChange={set("tiers")} placeholder={"50:200,00\n200:500,00\n*:900,00"} /></Field>}
-      <div className="row">
+      {f.billingModel !== "none" && <div className="row">
         <Field label="Dia de vencimento (1–28)"><input type="number" min="1" max="28" value={f.dueDay} onChange={set("dueDay")} /></Field>
         <Field label="Tolerância (dias)"><input type="number" min="0" value={f.graceDays} onChange={set("graceDays")} /></Field>
-      </div>
-      <Field label="Tipo de cadastro" hint="Revendedores e 'ambos' podem editar dispositivos por MAC no portal; todas as alterações ficam auditadas."><select value={f.kind} onChange={set("kind")}><option value="content">Parceria de conteúdo</option><option value="reseller">Revendedor</option><option value="both">Parceria de conteúdo e revendedor</option></select></Field>
-      <Field label="Política de inadimplência"><select value={f.suspendPolicy} onChange={set("suspendPolicy")}><option value="auto_after_grace">Suspender automaticamente após a tolerância</option><option value="manual">Somente manual</option></select></Field>
+      </div>}
+      <Field label="Tipo de cadastro" hint="Revendedores e 'ambos' podem editar dispositivos por MAC no portal; todas as alterações ficam auditadas."><select value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value, ...(!edit && e.target.value === "reseller" && f.billingModel === "fixed" ? { billingModel: "none" } : {}) })}><option value="content">Parceria de conteúdo</option><option value="reseller">Revendedor</option><option value="both">Parceria de conteúdo e revendedor</option></select></Field>
+      {f.billingModel !== "none" && <Field label="Política de inadimplência"><select value={f.suspendPolicy} onChange={set("suspendPolicy")}><option value="auto_after_grace">Suspender automaticamente após a tolerância</option><option value="manual">Somente manual</option></select></Field>}
       {!edit && <><h3>Acesso ao portal do parceiro (opcional)</h3><div className="row"><Field label="Nome"><input value={f.portalName} onChange={set("portalName")} /></Field><Field label="E-mail"><input value={f.portalEmail} onChange={set("portalEmail")} /></Field></div><Field label="Senha inicial (mín. 12 caracteres)"><input type="password" value={f.portalPassword} onChange={set("portalPassword")} /></Field></>}
       <div className="actions"><button className="btn" onClick={onClose}>Cancelar</button><button className="btn primary" onClick={submit}>Salvar</button></div>
     </Modal>
@@ -150,7 +150,7 @@ function PartnerDetail({ id, onClose, onChanged }) {
   const generate = async () => {
     const competence = new Date().toISOString().slice(0, 7);
     const r = await run(() => api(`/admin/partners/${id}/invoices`, { method: "POST", body: { competence } }));
-    if (r) { toast(r.created ? `Cobrança de ${competence} gerada.` : `A cobrança de ${competence} já existia; nada foi criado.`); load(); }
+    if (r) { toast(r.created ? `Cobrança de ${competence} gerada.` : r.skipped ? "Sem mensalidade a cobrar neste cadastro; nenhuma cobrança foi gerada." : `A cobrança de ${competence} já existia; nada foi criado.`); load(); }
   };
 
   return (
@@ -160,7 +160,7 @@ function PartnerDetail({ id, onClose, onChanged }) {
         <dt>Contato</dt><dd>{[p.contactName, p.contactEmail, p.contactPhone].filter(Boolean).join(" · ") || "—"}</dd>
         <dt>Identificador</dt><dd>{p.slug}</dd><dt>Vigência</dt><dd>{fmtDate(p.startsAt)} → {fmtDate(p.endsAt)}</dd>
         <dt>Tipo</dt><dd>{{ content: "Parceria de conteúdo", reseller: "Revendedor", both: "Parceria de conteúdo e revendedor" }[p.kind] || p.kind}</dd>
-        <dt>Cobrança</dt><dd>{MODELS[p.billingModel]} · vence dia {p.dueDay} · tolerância {p.graceDays} dia(s)</dd>
+        <dt>Cobrança</dt><dd>{p.billingModel === "none" ? "Sem mensalidade" : `${MODELS[p.billingModel]} · vence dia ${p.dueDay} · tolerância ${p.graceDays} dia(s)`}</dd>
         <dt>Dispositivos</dt><dd>{p.deviceCount}{p.deviceLimit != null ? ` de ${p.deviceLimit}` : " (sem limite)"}</dd>
       </dl>
       <div className="actions left">
@@ -170,7 +170,7 @@ function PartnerDetail({ id, onClose, onChanged }) {
         {["suspended", "blocked"].includes(p.status) && <button className="btn primary" onClick={() => act("reactivate", isPending(p) ? { title: "Aprovar cadastro", message: "O revendedor poderá usar o portal imediatamente.", confirmLabel: "Aprovar" } : { title: "Reativar parceria", message: "Os dispositivos elegíveis recuperam o acesso." })}>{isPending(p) ? "Aprovar cadastro" : "Reativar"}</button>}
         {p.status !== "cancelled" && <button className="btn danger" onClick={() => act("cancel", { title: "Cancelar parceria", message: "Os dispositivos perdem o acesso permanentemente.", reason: "required", danger: true })}>Cancelar</button>}
       </div>
-      <div className="tabs">{[["codes", "Códigos"], ["providers", "Servidores IPTV"], ...(p.kind !== "content" ? [["stock", "Estoque de licenças"], ["clients", "Clientes"]] : []), ["devices", "Dispositivos"], ["invoices", "Mensalidades"], ...(["superadmin", "admin"].includes(role) ? [["users", "Usuários do portal"]] : [])].map(([k, n]) => <button key={k} className={`tab ${tab === k ? "active" : ""}`} onClick={() => setTab(k)}>{n}</button>)}</div>
+      <div className="tabs">{[["codes", "Códigos"], ["providers", "Servidores IPTV"], ...(p.kind !== "content" ? [["stock", "Estoque de licenças"], ["clients", "Clientes"]] : []), ["devices", "Dispositivos"], ...(p.billingModel !== "none" || p.invoices.length ? [["invoices", "Mensalidades"]] : []), ...(["superadmin", "admin"].includes(role) ? [["users", "Usuários do portal"]] : [])].map(([k, n]) => <button key={k} className={`tab ${tab === k ? "active" : ""}`} onClick={() => setTab(k)}>{n}</button>)}</div>
       {tab === "codes" && <>
         <div className="actions left"><button className="btn primary" onClick={() => setNewCode(true)}>Novo código</button></div>
         <Table><thead><tr><th>Código</th><th>Servidor</th><th>Rótulo</th>{p.kind !== "content" && <th>Licença do estoque</th>}<th>Status</th><th>Ativações (usadas/limite)</th><th>Expira</th><th /></tr></thead><tbody>
