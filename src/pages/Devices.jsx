@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { api } from "../api.js";
+import { api, getAuth } from "../api.js";
 import { Badge, DeliveryBadge, Empty, Modal, Pager, Table, fmtDateTime, useAction, useDebounced, useList, useUi } from "../ui.jsx";
 import CredentialsModal from "./CredentialsModal.jsx";
+import EditDeviceModal from "./EditDeviceModal.jsx";
 
 export default function Devices({ onChanged }) {
   const { confirm, toast } = useUi();
@@ -11,6 +12,8 @@ export default function Devices({ onChanged }) {
   const list = useList("/admin/devices", { q: "", status: "" });
   const [history, setHistory] = useState(null);
   const [registering, setRegistering] = useState(false);
+  const [editing, setEditing] = useState(null); // ativação em edição (só superadmin)
+  const isSuper = getAuth()?.user?.role === "superadmin";
   const [adding, setAdding] = useState(null); // linha do MAC que vai receber outro parceiro (ou ter o acesso do parceiro atualizado)
   useEffect(() => { list.filter({ q: dq }); /* eslint-disable-next-line */ }, [dq]);
 
@@ -39,6 +42,7 @@ export default function Devices({ onChanged }) {
             <td><DeliveryBadge mode={a.deliveryMode} fixed={a.deliveryModeFixed} /></td>
             <td><Badge status={a.status} />{a.statusReason && <div className="muted">{a.statusReason}</div>}</td><td>{fmtDateTime(a.activatedAt)}</td>
             <td className="actions">
+              {isSuper && a.status !== "revoked" && <button className="btn sm" onClick={() => setEditing(a)}>Editar</button>}
               {a.mac && <button className="btn sm" onClick={() => openHistory(a.mac)}>Histórico</button>}
               {a.status !== "revoked" && a.mac && <button className="btn sm" onClick={() => setAdding(a)}>Adicionar parceiro</button>}
               {a.status === "active" && <button className="btn sm" onClick={() => change(a, "block", { title: "Bloquear dispositivo", message: `Somente ${a.mac} perde o acesso.`, reason: "required", danger: true })}>Bloquear</button>}
@@ -64,6 +68,9 @@ export default function Devices({ onChanged }) {
           onClose={() => setAdding(null)}
           onDone={() => { setAdding(null); toast("Parceiro salvo neste MAC."); list.reload(); onChanged?.(); }}
         />
+      )}
+      {editing && (
+        <EditDeviceModal device={editing} onClose={() => setEditing(null)} onDone={() => { setEditing(null); list.reload(); onChanged?.(); }} />
       )}
       {history && (
         <Modal title={`Histórico de ${history.device.mac}`} onClose={() => setHistory(null)} wide>

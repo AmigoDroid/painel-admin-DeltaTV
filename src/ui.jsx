@@ -52,7 +52,7 @@ export function DeliveryBadge({ mode, fixed }) {
   if (!mode) return <span className="muted">—</span>;
   const proxy = mode === "proxy";
   return (
-    <span title={fixed ? "Lista própria do cliente: sempre proxy, não depende de configuração." : proxy ? "O servidor serve o conteúdo; o app não vê a URL nem a credencial do provedor." : "O servidor autoriza e redireciona (302) para o provedor; o app recebe as credenciais reais."}>
+    <span title={fixed ? "Lista própria do cliente: redirect automático (o superadmin pode forçar outro modo em Editar)." : proxy ? "O servidor serve o conteúdo; o app não vê a URL nem a credencial do provedor." : "O servidor autoriza e redireciona (302) para o provedor; o app recebe as credenciais reais."}>
       <Badge status={proxy ? "proxy" : "redirect"} />{fixed && <span className="muted"> fixo</span>}
     </span>
   );
