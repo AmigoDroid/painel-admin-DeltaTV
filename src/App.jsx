@@ -13,10 +13,11 @@ import Audit from "./pages/Audit.jsx";
 import DeviceAccess from "./pages/DeviceAccess.jsx";
 import Clients from "./pages/Clients.jsx";
 import Users from "./pages/Users.jsx";
+import Mail from "./pages/Mail.jsx";
 
 const PAGES = {
   dashboard: ["Visão geral", Dashboard], licenses: ["Licenças", Licenses], partners: ["Parceiros", Partners], clients: ["Clientes", Clients],
-  devices: ["Dispositivos", Devices], unlinked: ["Sem vínculo", Unlinked], sources: ["Fontes", Sources], billing: ["Financeiro", Billing], pix: ["Pix", Pix], users: ["Usuários", Users], audit: ["Auditoria", Audit],
+  devices: ["Dispositivos", Devices], unlinked: ["Sem vínculo", Unlinked], sources: ["Fontes", Sources], billing: ["Financeiro", Billing], pix: ["Pix", Pix], users: ["Usuários", Users], mail: ["E-mails", Mail], audit: ["Auditoria", Audit],
 };
 
 // Ícones do menu (traço simples, herdam a cor do texto).
@@ -31,6 +32,7 @@ const ICONS = {
   billing: <><rect x="3" y="6" width="18" height="13" rx="2" /><path d="M3 10.5h18M7 15h3" /></>,
   pix: <><path d="M12 2.8l9.2 9.2-9.2 9.2L2.8 12z" /><path d="M12 8l4 4-4 4-4-4z" /></>,
   users: <path d="M12 3l8 3v6c0 4.5-3.2 8-8 9-4.8-1-8-4.5-8-9V6z" />,
+  mail: <><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 7l9 6 9-6" /></>,
   audit: <><path d="M8 3h8v3H8z" /><path d="M6 5H5a1 1 0 00-1 1v14a1 1 0 001 1h14a1 1 0 001-1V6a1 1 0 00-1-1h-1M8 12h8M8 16h5" /></>,
 };
 const NavIcon = ({ k }) => (
@@ -67,7 +69,7 @@ function Login({ onDeviceAccess }) {
 
 function Shell({ user }) {
   // Itens do menu são conveniência: cada rota é protegida por permissão no backend.
-  const hidden = (k) => (user.role === "support" && k === "audit") || (k === "users" && user.role !== "superadmin");
+  const hidden = (k) => (user.role === "support" && k === "audit") || ((k === "users" || k === "mail") && user.role !== "superadmin");
   const menu = Object.entries(PAGES).filter(([k]) => !hidden(k));
   const allowed = (h) => menu.some(([k]) => k === h);
   const fromHash = () => (allowed(location.hash.slice(1)) ? location.hash.slice(1) : "dashboard");
