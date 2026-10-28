@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, getAuth } from "../api.js";
-import { Badge, DeliveryBadge, Empty, Modal, Pager, Table, fmtDateTime, useAction, useDebounced, useList, useUi } from "../ui.jsx";
+import { Badge, DeliveryBadge, accessStatus, Empty, Modal, Pager, Table, fmtDateTime, useAction, useDebounced, useList, useUi } from "../ui.jsx";
 import CredentialsModal from "./CredentialsModal.jsx";
 import EditDeviceModal from "./EditDeviceModal.jsx";
 
@@ -25,7 +25,7 @@ export default function Devices({ onChanged }) {
     const r = await run(() => api("/admin/devices/history", { query: { mac } }));
     if (r) setHistory(r);
   };
-  const owner = (a) => (a.license ? `Licença ••••${a.license.codeLast4}${a.license.customer ? ` · ${a.license.customer.name}` : ""}` : a.partner ? `Parceiro: ${a.partner.name}` : "—");
+  const owner = (a) => (a.license ? `Licença ••••${a.license.codeLast4}${a.license.customer ? ` · ${a.license.customer.name}` : ""}` : a.grantedLicense ? `Licença ••••${a.grantedLicense.codeLast4}${a.partner ? ` · Revenda: ${a.partner.name}` : ""}` : a.partner ? `Parceiro: ${a.partner.name}` : "—");
 
   return (
     <>
@@ -40,7 +40,7 @@ export default function Devices({ onChanged }) {
         <tbody>{list.data.map((a) => (
           <tr key={a.id}><td className="mono">{a.mac || "—"}{a.claimPending && <span className="muted"> (migração pendente)</span>}</td><td>{owner(a)}</td>
             <td><DeliveryBadge mode={a.deliveryMode} fixed={a.deliveryModeFixed} /></td>
-            <td><Badge status={a.status} />{a.statusReason && <div className="muted">{a.statusReason}</div>}</td><td>{fmtDateTime(a.activatedAt)}</td>
+            <td><Badge status={accessStatus(a)} />{a.statusReason && <div className="muted">{a.statusReason}</div>}{a.status === "active" && a.access && !a.access.allowed && <div className="muted">{a.access.message}</div>}</td><td>{fmtDateTime(a.activatedAt)}</td>
             <td className="actions">
               {isSuper && a.status !== "revoked" && <button className="btn sm" onClick={() => setEditing(a)}>Editar</button>}
               {a.mac && <button className="btn sm" onClick={() => openHistory(a.mac)}>Histórico</button>}

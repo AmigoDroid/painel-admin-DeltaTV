@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api.js";
 import { NewPlanInline } from "./Stock.jsx";
-import { Badge, Empty, Field, LoadError, Modal, Pager, SecretCode, Table, fmtDate, fmtDateTime, fmtMoney, toCents, useAction, useDebounced, useList, useLoad, useUi } from "../ui.jsx";
+import { Badge, Empty, accessStatus, Field, LoadError, Modal, Pager, SecretCode, Table, fmtDate, fmtDateTime, fmtMoney, toCents, useAction, useDebounced, useList, useLoad, useUi } from "../ui.jsx";
 
 const STATUSES = [["", "Todos os status"], ["active", "Ativas"], ["pending", "Pendentes"], ["expired", "Expiradas"], ["suspended", "Suspensas"], ["blocked", "Bloqueadas"], ["cancelled", "Canceladas"]];
 
@@ -112,6 +112,7 @@ function LicenseDetail({ id, onClose, onChanged }) {
       <dl className="kv">
         <dt>Cliente</dt><dd>{l.Customer?.name || "—"} {l.Customer?.email && <span className="muted">({l.Customer.email})</span>}</dd>
         <dt>Status</dt><dd><Badge status={s} /> {l.statusReason && <span className="muted">— {l.statusReason}</span>}</dd>
+        <dt>Revendedor</dt><dd>{l.Owner?.name || "—"}</dd>
         <dt>Plano</dt><dd>{l.Plan?.name}</dd><dt>Validade</dt><dd>{fmtDateTime(l.startsAt)} → {fmtDateTime(l.expiresAt)}</dd>
         <dt>Dispositivos</dt><dd>{l.deviceCount}/{l.maxDevices}</dd><dt>Criada em</dt><dd>{fmtDateTime(l.createdAt)}</dd>
       </dl>
@@ -124,9 +125,10 @@ function LicenseDetail({ id, onClose, onChanged }) {
       </div>
       <div className="tabs">{[["devices", "Dispositivos"], ["renewals", "Renovações"], ["payments", "Pagamentos"]].map(([k, n]) => <button key={k} className={`tab ${tab === k ? "active" : ""}`} onClick={() => setTab(k)}>{n}</button>)}</div>
       {tab === "devices" && (
-        <Table><thead><tr><th>MAC</th><th>Status</th><th>Ativado em</th><th /></tr></thead><tbody>
+        <Table><thead><tr><th>MAC</th><th>Status</th><th>Origem</th><th>Ativado em</th><th /></tr></thead><tbody>
+          {l.Activations.length === 0 && <tr><td colSpan={5} className="muted">Nenhum dispositivo ligado a esta licença.</td></tr>}
           {l.Activations.map((a) => (
-            <tr key={a.id}><td>{a.mac}</td><td><Badge status={a.status} />{a.statusReason && <span className="muted"> {a.statusReason}</span>}</td><td>{fmtDateTime(a.activatedAt)}</td>
+            <tr key={a.id}><td>{a.mac}</td><td><Badge status={accessStatus(a)} />{a.statusReason && <span className="muted"> {a.statusReason}</span>}{a.status === "active" && a.access && !a.access.allowed && <div className="muted">{a.access.message}</div>}</td><td>{a.viaPartner ? `Código de revenda${a.Partner?.name ? ` · ${a.Partner.name}` : ""}` : "Licença individual"}</td><td>{fmtDateTime(a.activatedAt)}</td>
               <td className="actions">
                 {a.status === "active" && <button className="btn sm" onClick={() => device(a.id, "block", { title: "Bloquear dispositivo", message: `Somente ${a.mac} perde o acesso.`, reason: "required", danger: true })}>Bloquear</button>}
                 {a.status === "blocked" && <button className="btn sm" onClick={() => device(a.id, "unblock", { title: "Desbloquear", message: a.mac })}>Desbloquear</button>}

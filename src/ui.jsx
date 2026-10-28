@@ -38,6 +38,9 @@ const STATUS = {
   proxy: ["Proxy", "info"], redirect: ["Redirect", "muted"],
   review: ["Em conferência", "warn"], refunded: ["Devolvido", "muted"], failed: ["Falhou", "bad"],
 };
+// Status que o usuário precisa ver: a ativação pode estar "active" e o acesso negado (licença cancelada/suspensa/expirada...).
+const DENIED_AS = { LICENSE_CANCELLED: "cancelled", LICENSE_SUSPENDED: "suspended", LICENSE_BLOCKED: "blocked", LICENSE_EXPIRED: "expired", LICENSE_NOT_STARTED: "pending" };
+export const accessStatus = (a) => (a.status !== "active" || !a.access || a.access.allowed ? a.status : DENIED_AS[a.access.code] ?? "blocked");
 export function Badge({ status, label }) {
   const [text, tone] = STATUS[status] || [status, "muted"];
   return <span className={`badge ${tone}`}>{label || text}</span>;

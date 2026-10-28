@@ -4,7 +4,7 @@ import { ClientsPanel } from "./Clients.jsx";
 import { UsersPanel } from "./Users.jsx";
 import CodeModal, { CodeEditModal } from "./CodeModal.jsx";
 import { StockAdmin } from "./Stock.jsx";
-import { Badge, DeliveryBadge, Empty, Field, LoadError, Modal, Pager, Table, dateInput, fmtDate, fmtDateTime, fmtMoney, spDateToIso, toCents, useAction, useDebounced, useList, useLoad, useUi } from "../ui.jsx";
+import { Badge, DeliveryBadge, accessStatus, Empty, Field, LoadError, Modal, Pager, Table, dateInput, fmtDate, fmtDateTime, fmtMoney, spDateToIso, toCents, useAction, useDebounced, useList, useLoad, useUi } from "../ui.jsx";
 
 // Mesmo texto gravado pelo back-end no autocadastro de revendedor (ver reseller-signup.service.js).
 const PENDING_REASON = "Aguardando aprovação do cadastro";
@@ -188,7 +188,7 @@ function PartnerDetail({ id, onClose, onChanged }) {
       {tab === "clients" && p.kind !== "content" && <ClientsPanel partnerId={id} />}
       {tab === "users" && <UsersPanel partnerId={id} />}
       {tab === "devices" && <Table><thead><tr><th>MAC</th><th>Servidor</th><th>Entrega</th><th>Status</th><th>Ativado em</th><th /></tr></thead><tbody>
-        {devices.map((a) => <tr key={a.id}><td>{a.mac}</td><td>{a.provider?.name || "—"}</td><td><DeliveryBadge mode={a.deliveryMode} fixed={a.deliveryModeFixed} /></td><td><Badge status={a.status} /></td><td>{fmtDateTime(a.activatedAt)}</td><td className="actions">
+        {devices.map((a) => <tr key={a.id}><td>{a.mac}</td><td>{a.provider?.name || "—"}</td><td><DeliveryBadge mode={a.deliveryMode} fixed={a.deliveryModeFixed} /></td><td><Badge status={accessStatus(a)} /></td><td>{fmtDateTime(a.activatedAt)}</td><td className="actions">
           {a.status === "active" && <button className="btn sm" onClick={() => device(a, "block", { title: "Bloquear dispositivo", message: a.mac, reason: "required", danger: true })}>Bloquear</button>}
           {a.status === "blocked" && <button className="btn sm" onClick={() => device(a, "unblock", { title: "Desbloquear", message: a.mac })}>Desbloquear</button>}
           {a.status !== "revoked" && <button className="btn sm danger" onClick={() => device(a, "revoke", { title: "Remover ativação", message: a.mac, danger: true })}>Remover</button>}
