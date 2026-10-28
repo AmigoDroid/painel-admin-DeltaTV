@@ -249,3 +249,18 @@ export function useLoad(fn, deps) {
 export const LoadError = ({ error, onRetry }) => (
   <div><p className="error">{error}</p><button className="btn" onClick={onRetry}>Tentar novamente</button></div>
 );
+
+/** Logo do DeltaTV: um Δ com o botão de play recortado no meio. */
+export function BrandMark({ size = 28 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden="true" style={{ flex: "none" }}>
+      <defs>
+        <linearGradient id="dl-brand-g" x1="6" y1="4" x2="26" y2="28" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#8b89ff" /><stop offset="1" stopColor="#5a57f2" />
+        </linearGradient>
+      </defs>
+      <path d="M16 3.5 29.5 27.5H2.5z" fill="url(#dl-brand-g)" />
+      <path d="M13 15.2 20.4 19.6 13 24z" fill="#0a0c1a" />
+    </svg>
+  );
+}

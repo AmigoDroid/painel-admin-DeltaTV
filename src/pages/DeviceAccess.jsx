@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { deviceApi } from "../api.js";
-import { Badge, Field, fmtDateTime, useAction, useUi } from "../ui.jsx";
+import { Badge, BrandMark, Field, fmtDateTime, useAction, useUi } from "../ui.jsx";
 import ConfigureForm from "./ConfigureForm.jsx";
 import DeviceLists, { livesOf, removeMessage, saveMessage } from "./DeviceLists.jsx";
 
@@ -57,7 +57,8 @@ export default function DeviceAccess({ onBack }) {
 
   if (!session) {
     return (
-      <div className="login card">
+      <div className="auth"><div className="login card">
+        <div className="auth-brand"><BrandMark size={44} /><div><strong>DeltaTV</strong><span>Acesso por chave da TV</span></div></div>
         <h2 style={{ marginBottom: 8 }}>Login de dispositivo</h2>
         <p className="muted" style={{ marginBottom: 16 }}>Na TV: Configurações → Acesso por chave → OK. Informe o MAC e a chave de 6 dígitos exibidos.</p>
         <form onSubmit={login}>
@@ -66,12 +67,12 @@ export default function DeviceAccess({ onBack }) {
           <button className="btn primary" style={{ width: "100%" }} disabled={busy || key.length !== 6 || mac.trim().length < 11}>{busy ? "Entrando…" : "Entrar"}</button>
         </form>
         {onBack && <p style={{ marginTop: 16, textAlign: "center" }}><button className="btn sm" onClick={onBack}>Voltar ao login do painel</button></p>}
-      </div>
+      </div></div>
     );
   }
 
   return (
-    <div className="login card" style={{ maxWidth: 640, width: "100%" }}>
+    <div className="auth"><div className="login card" style={{ maxWidth: 640, width: "100%" }}>
       <div className="page-head">
         <h3 style={{ margin: 0 }}>{session.mac}</h3>
         {device && <Badge status={livesOf(device).some((l) => l.configured) ? "active" : "pending"} label={`${livesOf(device).length} lista(s)`} />}
@@ -80,6 +81,6 @@ export default function DeviceAccess({ onBack }) {
       {device && <DeviceLists device={device} onRemove={remove} />}
       {device && <ConfigureForm device={device} onSubmit={submit} />}
       <p style={{ marginTop: 16 }}><button className="btn sm" onClick={logout}>Sair</button></p>
-    </div>
+    </div></div>
   );
 }

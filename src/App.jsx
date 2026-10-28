@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, getAuth, login, logout } from "./api.js";
-import { UiProvider, Field, useAction } from "./ui.jsx";
+import { UiProvider, Field, useAction, BrandMark } from "./ui.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import Licenses from "./pages/Licenses.jsx";
 import Partners from "./pages/Partners.jsx";
@@ -19,6 +19,24 @@ const PAGES = {
   devices: ["Dispositivos", Devices], unlinked: ["Sem vínculo", Unlinked], sources: ["Fontes", Sources], billing: ["Financeiro", Billing], pix: ["Pix", Pix], users: ["Usuários", Users], audit: ["Auditoria", Audit],
 };
 
+// Ícones do menu (traço simples, herdam a cor do texto).
+const ICONS = {
+  dashboard: <><rect x="3" y="3" width="7.5" height="7.5" rx="2" /><rect x="13.5" y="3" width="7.5" height="7.5" rx="2" /><rect x="3" y="13.5" width="7.5" height="7.5" rx="2" /><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2" /></>,
+  licenses: <><circle cx="8" cy="15" r="4" /><path d="M11 12l9-9M16 7l3 3M14 9l2 2" /></>,
+  partners: <><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5" /><path d="M16 4.8a3.5 3.5 0 010 6.4M18.5 14.8c1.7.7 2.8 2.3 3 5.2" /></>,
+  clients: <><circle cx="12" cy="8" r="4" /><path d="M4 21c.8-4 4-6 8-6s7.2 2 8 6" /></>,
+  devices: <><rect x="3" y="5" width="18" height="12" rx="2" /><path d="M8 21h8M12 17v4" /></>,
+  unlinked: <><path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1" /><path d="M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1" /><path d="M4 4l16 16" /></>,
+  sources: <><ellipse cx="12" cy="6" rx="8" ry="3" /><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6" /></>,
+  billing: <><rect x="3" y="6" width="18" height="13" rx="2" /><path d="M3 10.5h18M7 15h3" /></>,
+  pix: <><path d="M12 2.8l9.2 9.2-9.2 9.2L2.8 12z" /><path d="M12 8l4 4-4 4-4-4z" /></>,
+  users: <path d="M12 3l8 3v6c0 4.5-3.2 8-8 9-4.8-1-8-4.5-8-9V6z" />,
+  audit: <><path d="M8 3h8v3H8z" /><path d="M6 5H5a1 1 0 00-1 1v14a1 1 0 001 1h14a1 1 0 001-1V6a1 1 0 00-1-1h-1M8 12h8M8 16h5" /></>,
+};
+const NavIcon = ({ k }) => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{ICONS[k]}</svg>
+);
+
 function Login({ onDeviceAccess }) {
   const run = useAction();
   const [email, setEmail] = useState("");
@@ -31,14 +49,18 @@ function Login({ onDeviceAccess }) {
     setBusy(false);
   };
   return (
-    <div className="login card">
-      <h2 style={{ marginBottom: 16 }}>Plataforma de licenciamento</h2>
-      <form onSubmit={submit}>
-        <Field label="E-mail"><input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required /></Field>
-        <Field label="Senha"><input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required /></Field>
-        <button className="btn primary" style={{ width: "100%" }} disabled={busy}>{busy ? "Entrando…" : "Entrar"}</button>
-      </form>
-      <p style={{ marginTop: 16, textAlign: "center" }}><button className="btn sm" onClick={onDeviceAccess}>Acessar com a chave da TV</button></p>
+    <div className="auth">
+      <div className="login card">
+        <div className="auth-brand"><BrandMark size={44} /><div><strong>DeltaTV</strong><span>Painel de licenciamento</span></div></div>
+        <h2>Entrar</h2>
+        <p className="muted auth-sub">Use o e-mail e a senha da sua conta.</p>
+        <form onSubmit={submit}>
+          <Field label="E-mail"><input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required /></Field>
+          <Field label="Senha"><input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required /></Field>
+          <button className="btn primary block" disabled={busy}>{busy ? "Entrando…" : "Entrar"}</button>
+        </form>
+        <div className="auth-alt"><button className="btn sm" onClick={onDeviceAccess}>Acessar com a chave da TV</button></div>
+      </div>
     </div>
   );
 }
@@ -72,13 +94,17 @@ function Shell({ user }) {
   return (
     <div className="layout">
       <aside className="sidebar">
-        <div className="brand">Licenciamento IPTV</div>
+        <div className="brand"><BrandMark size={32} /><div><strong>DeltaTV</strong><span>Licenciamento</span></div></div>
         {menu.map(([k, [label]]) => (
           <button key={k} className={`nav ${page === k ? "active" : ""}`} onClick={() => setPage(k)}>
-            {label}{k === "unlinked" && unlinked > 0 && <span className="count" aria-label={`${unlinked} aguardando`}>{unlinked > 99 ? "99+" : unlinked}</span>}
+            <span className="nav__label"><NavIcon k={k} />{label}</span>{k === "unlinked" && unlinked > 0 && <span className="count" aria-label={`${unlinked} aguardando`}>{unlinked > 99 ? "99+" : unlinked}</span>}
           </button>
         ))}
-        <div className="user">{user.name}<br />{user.email}<br /><button className="btn sm" style={{ marginTop: 8 }} onClick={logout}>Sair</button></div>
+        <div className="user">
+          <span className="avatar" aria-hidden="true">{(user.name || user.email || "?").trim().charAt(0).toUpperCase()}</span>
+          <div className="who"><strong>{user.name}</strong><span>{user.email}</span></div>
+          <button className="btn sm" onClick={logout}>Sair</button>
+        </div>
       </aside>
       <main className="content"><Current onChanged={refreshUnlinked} /></main>
     </div>
