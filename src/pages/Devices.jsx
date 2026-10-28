@@ -47,6 +47,7 @@ export default function Devices({ onChanged }) {
               {a.status !== "revoked" && a.mac && <button className="btn sm" onClick={() => setAdding(a)}>Adicionar parceiro</button>}
               {a.status === "active" && <button className="btn sm" onClick={() => change(a, "block", { title: "Bloquear dispositivo", message: `Somente ${a.mac} perde o acesso.`, reason: "required", danger: true })}>Bloquear</button>}
               {a.status === "blocked" && <button className="btn sm" onClick={() => change(a, "unblock", { title: "Desbloquear", message: a.mac })}>Desbloquear</button>}
+              {a.status === "revoked" && isSuper && <button className="btn sm" onClick={() => change(a, "restore", { title: "Restaurar ativação", message: `Desfaz a remoção de ${a.mac}.` })}>Restaurar</button>}
               {a.status !== "revoked" && <button className="btn sm danger" onClick={() => change(a, "revoke", { title: "Remover ativação", message: `Somente este vínculo é removido; as outras listas do MAC ${a.mac} continuam.`, reason: "optional", danger: true })}>Remover</button>}
             </td></tr>))}</tbody></Table>
       <Empty loading={list.loading} error={list.error} count={list.data.length} />

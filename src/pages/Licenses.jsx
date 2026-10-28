@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api } from "../api.js";
+import { api, getAuth } from "../api.js";
 import { NewPlanInline } from "./Stock.jsx";
 import { Badge, Empty, accessStatus, Field, LoadError, Modal, Pager, SecretCode, Table, fmtDate, fmtDateTime, fmtMoney, toCents, useAction, useDebounced, useList, useLoad, useUi } from "../ui.jsx";
 
@@ -106,6 +106,7 @@ function LicenseDetail({ id, onClose, onChanged }) {
     if (await run(() => api(`/admin/devices/activations/${aid}/${action}`, { method: "POST", body: { reason: c.reason } }), "Dispositivo atualizado.")) { load(); onChanged(); }
   };
   const s = l.effectiveStatus;
+  const isSuper = getAuth()?.user?.role === "superadmin";
 
   return (
     <Modal title={`Licença ••••${l.codeLast4}`} onClose={onClose} wide>
@@ -120,8 +121,8 @@ function LicenseDetail({ id, onClose, onChanged }) {
         {!["cancelled", "blocked"].includes(l.status) && <button className="btn primary" onClick={() => setRenewing(true)}>Renovar</button>}
         {l.status === "active" && <button className="btn" onClick={() => act("suspend", { title: "Suspender licença", message: "Todos os dispositivos perdem o acesso até a reativação.", reason: "optional" })}>Suspender</button>}
         {["active", "suspended"].includes(l.status) && <button className="btn danger" onClick={() => act("block", { title: "Bloquear licença", message: "Todos os dispositivos desta licença perdem o acesso imediatamente (no backend).", reason: "required", danger: true, confirmLabel: "Bloquear" })}>Bloquear</button>}
-        {["suspended", "blocked"].includes(l.status) && <button className="btn primary" onClick={() => act("reactivate", { title: "Reativar licença", message: "Os dispositivos elegíveis recuperam o acesso (respeitando a validade)." })}>Reativar</button>}
-        {l.status !== "cancelled" && <button className="btn danger" onClick={() => act("cancel", { title: "Cancelar licença", message: "Esta ação não pode ser desfeita.", reason: "required", danger: true, confirmLabel: "Cancelar licença" })}>Cancelar</button>}
+        {(["suspended", "blocked"].includes(l.status) || (isSuper && l.status === "cancelled")) && <button className="btn primary" onClick={() => act("reactivate", { title: "Reativar licença", message: l.status === "cancelled" ? "A licença cancelada volta a valer e os dispositivos recuperam o acesso (respeitando a validade). Fica registrado na auditoria." : "Os dispositivos elegíveis recuperam o acesso (respeitando a validade)." })}>Reativar</button>}
+        {l.status !== "cancelled" && <button className="btn danger" onClick={() => act("cancel", { title: "Cancelar licença", message: "Os dispositivos perdem o acesso. Só o superadmin pode reativar depois.", reason: "required", danger: true, confirmLabel: "Cancelar licença" })}>Cancelar</button>}
       </div>
       <div className="tabs">{[["devices", "Dispositivos"], ["renewals", "Renovações"], ["payments", "Pagamentos"]].map(([k, n]) => <button key={k} className={`tab ${tab === k ? "active" : ""}`} onClick={() => setTab(k)}>{n}</button>)}</div>
       {tab === "devices" && (
@@ -132,6 +133,7 @@ function LicenseDetail({ id, onClose, onChanged }) {
               <td className="actions">
                 {a.status === "active" && <button className="btn sm" onClick={() => device(a.id, "block", { title: "Bloquear dispositivo", message: `Somente ${a.mac} perde o acesso.`, reason: "required", danger: true })}>Bloquear</button>}
                 {a.status === "blocked" && <button className="btn sm" onClick={() => device(a.id, "unblock", { title: "Desbloquear", message: a.mac })}>Desbloquear</button>}
+                {a.status === "revoked" && isSuper && <button className="btn sm" onClick={() => device(a.id, "restore", { title: "Restaurar ativação", message: `Desfaz a remoção de ${a.mac}.` })}>Restaurar</button>}
                 {a.status !== "revoked" && <button className="btn sm danger" onClick={() => device(a.id, "revoke", { title: "Remover ativação", message: `Remove somente este vínculo; as outras listas do MAC ${a.mac} continuam.`, reason: "optional", danger: true })}>Remover</button>}
               </td></tr>
           ))}
