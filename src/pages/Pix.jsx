@@ -3,7 +3,7 @@ import { api } from "../api.js";
 import { Badge, Empty, Field, LoadError, Modal, Pager, Table, fmtDateTime, fmtMoney, toCents, useAction, useList, useLoad, useUi } from "../ui.jsx";
 
 const monthsLabel = (m) => `${m} ${m === 1 ? "mês" : "meses"}`;
-const what = (c) => (c.purpose === "invoice" ? `Mensalidade ${c.invoice?.competence ?? ""}`.trim() : `${c.quantity} licença(s) de ${monthsLabel(c.months)}`);
+const what = (c) => (c.purpose === "invoice" ? `Mensalidade ${c.invoice?.competence ?? ""}`.trim() : c.purpose === "license" ? `Licença de ${monthsLabel(c.months)} (site) · ${c.mac ?? ""}` : `${c.quantity} licença(s) de ${monthsLabel(c.months)}`);
 const ChargeBadge = ({ status }) => (status === "pending" ? <Badge status="info" label="Aguardando" /> : <Badge status={status} />);
 
 /**
@@ -68,7 +68,7 @@ function Charges({ provider, onChanged }) {
           <option value="paid">Pagos</option><option value="expired">Expirados</option><option value="cancelled">Cancelados</option><option value="refunded">Devolvidos</option><option value="failed">Falharam</option>
         </select>
         <select value={list.params.purpose} onChange={(e) => list.filter({ purpose: e.target.value })}>
-          <option value="">Mensalidades e licenças</option><option value="invoice">Mensalidades</option><option value="stock">Compra de licenças</option>
+          <option value="">Mensalidades e licenças</option><option value="invoice">Mensalidades</option><option value="stock">Compra de licenças</option><option value="license">Licenças do site</option>
         </select>
       </div>
       <Table>
@@ -76,7 +76,7 @@ function Charges({ provider, onChanged }) {
         <tbody>{list.data.map((c) => (
           <tr key={c.id}>
             <td>{fmtDateTime(c.createdAt)}</td>
-            <td>{c.partner?.name || "—"}</td>
+            <td>{c.partner?.name || (c.purpose === "license" ? "Site (cliente)" : "—")}</td>
             <td>{what(c)}</td>
             <td>{fmtMoney(c.amountCents)}{c.paidAmountCents != null && c.paidAmountCents !== c.amountCents && <div className="error">pago: {fmtMoney(c.paidAmountCents)}</div>}</td>
             <td><ChargeBadge status={c.status} />{c.error && <div className="muted" style={{ maxWidth: 320, fontSize: 12 }}>{c.error}</div>}</td>
