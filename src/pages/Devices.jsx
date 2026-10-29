@@ -3,6 +3,7 @@ import { api, getAuth } from "../api.js";
 import { Badge, DeliveryBadge, accessStatus, Empty, Modal, Pager, Table, fmtDateTime, useAction, useDebounced, useList, useUi } from "../ui.jsx";
 import CredentialsModal from "./CredentialsModal.jsx";
 import EditDeviceModal from "./EditDeviceModal.jsx";
+import DeviceListsModal from "./DeviceListsModal.jsx";
 
 export default function Devices({ onChanged }) {
   const { confirm, toast } = useUi();
@@ -13,6 +14,7 @@ export default function Devices({ onChanged }) {
   const [history, setHistory] = useState(null);
   const [registering, setRegistering] = useState(false);
   const [editing, setEditing] = useState(null); // ativação em edição (só superadmin)
+  const [viewing, setViewing] = useState(null); // linha do MAC cujas listas estão abertas (sem precisar da chave da TV)
   const isSuper = getAuth()?.user?.role === "superadmin";
   const [adding, setAdding] = useState(null); // linha do MAC que vai receber outro parceiro (ou ter o acesso do parceiro atualizado)
   useEffect(() => { list.filter({ q: dq }); /* eslint-disable-next-line */ }, [dq]);
@@ -42,6 +44,7 @@ export default function Devices({ onChanged }) {
             <td><DeliveryBadge mode={a.deliveryMode} fixed={a.deliveryModeFixed} /></td>
             <td><Badge status={accessStatus(a)} />{a.statusReason && <div className="muted">{a.statusReason}</div>}{a.status === "active" && a.access && !a.access.allowed && <div className="muted">{a.access.message}</div>}</td><td>{fmtDateTime(a.activatedAt)}</td>
             <td className="actions">
+              {a.mac && a.deviceId && <button className="btn sm" onClick={() => setViewing(a)}>Listas</button>}
               {isSuper && a.status !== "revoked" && <button className="btn sm" onClick={() => setEditing(a)}>Editar</button>}
               {a.mac && <button className="btn sm" onClick={() => openHistory(a.mac)}>Histórico</button>}
               {a.status !== "revoked" && a.mac && <button className="btn sm" onClick={() => setAdding(a)}>Adicionar parceiro</button>}
@@ -69,6 +72,9 @@ export default function Devices({ onChanged }) {
           onClose={() => setAdding(null)}
           onDone={() => { setAdding(null); toast("Parceiro salvo neste MAC."); list.reload(); onChanged?.(); }}
         />
+      )}
+      {viewing && (
+        <DeviceListsModal device={viewing} onClose={() => setViewing(null)} onChanged={() => { list.reload(); onChanged?.(); }} />
       )}
       {editing && (
         <EditDeviceModal device={editing} onClose={() => setEditing(null)} onDone={() => { setEditing(null); list.reload(); onChanged?.(); }} />
