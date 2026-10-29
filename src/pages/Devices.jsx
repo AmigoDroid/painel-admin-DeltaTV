@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, getAuth } from "../api.js";
-import { Badge, DeliveryBadge, accessStatus, Empty, Modal, Pager, Table, fmtDateTime, useAction, useDebounced, useList, useUi } from "../ui.jsx";
+import { Badge, DeliveryBadge, PlatformBadge, accessStatus, Empty, Modal, Pager, Table, fmtDateTime, useAction, useDebounced, useList, useUi } from "../ui.jsx";
 import CredentialsModal from "./CredentialsModal.jsx";
 import EditDeviceModal from "./EditDeviceModal.jsx";
 import DeviceListsModal from "./DeviceListsModal.jsx";
@@ -38,9 +38,9 @@ export default function Devices({ onChanged }) {
           <option value="">Todos</option><option value="active">Ativos</option><option value="blocked">Bloqueados</option><option value="revoked">Removidos</option>
         </select>
       </div>
-      <Table><thead><tr><th>MAC</th><th>Vínculo atual</th><th>Entrega</th><th>Status</th><th>Ativado em</th><th /></tr></thead>
+      <Table><thead><tr><th>MAC</th><th>Tipo</th><th>Vínculo atual</th><th>Entrega</th><th>Status</th><th>Ativado em</th><th /></tr></thead>
         <tbody>{list.data.map((a) => (
-          <tr key={a.id}><td className="mono">{a.mac || "—"}{a.claimPending && <span className="muted"> (migração pendente)</span>}</td><td>{owner(a)}</td>
+          <tr key={a.id}><td className="mono">{a.mac || "—"}{a.claimPending && <span className="muted"> (migração pendente)</span>}</td><td><PlatformBadge platform={a.platform} /></td><td>{owner(a)}</td>
             <td><DeliveryBadge mode={a.deliveryMode} fixed={a.deliveryModeFixed} /></td>
             <td><Badge status={accessStatus(a)} />{a.statusReason && <div className="muted">{a.statusReason}</div>}{a.status === "active" && a.access && !a.access.allowed && <div className="muted">{a.access.message}</div>}</td><td>{fmtDateTime(a.activatedAt)}</td>
             <td className="actions">

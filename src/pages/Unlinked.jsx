@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api.js";
-import { Empty, Pager, Table, fmtDateTime, useAction, useDebounced, useList, useUi } from "../ui.jsx";
+import { Empty, Pager, PlatformBadge, Table, fmtDateTime, useAction, useDebounced, useList, useUi } from "../ui.jsx";
 import CredentialsModal from "./CredentialsModal.jsx";
 
 const REFRESH_MS = 15000;
@@ -54,11 +54,12 @@ export default function Unlinked({ onChanged }) {
         <label className="check"><input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} /> Atualizar automaticamente</label>
       </div>
       <Table>
-        <thead><tr><th>MAC</th><th>Situação</th><th>Última atividade</th><th>Primeiro registro</th><th /></tr></thead>
+        <thead><tr><th>MAC</th><th>Tipo</th><th>Situação</th><th>Última atividade</th><th>Primeiro registro</th><th /></tr></thead>
         <tbody>
           {list.data.map((d) => (
             <tr key={d.id} className="click" onClick={() => setLinking(d)}>
               <td className="mono">{d.mac}</td>
+              <td><PlatformBadge platform={d.platform} /></td>
               <td className="wrap">
                 {d.previouslyLinked
                   ? <><span className="badge warn">Desvinculado</span><div className="muted">{d.lastUnlinkReason || "Lista removida"} · {fmtDateTime(d.lastUnlinkedAt)}</div></>

@@ -51,6 +51,13 @@ export function Badge({ status, label }) {
  * "proxy" = o servidor serve o conteúdo e o app nunca vê a URL/credencial real; "redirect" = o servidor autoriza e manda o
  * app para a origem (302), que recebe as credenciais reais. Lista própria do cliente é sempre proxy ("fixo").
  */
+/** Tipo do aparelho, como o servidor guarda em devices.platform (rokutv vira roku; webtv vira web). */
+export const PLATFORM_LABEL = { roku: "Roku", android: "Android TV", tizen: "Samsung", webos: "LG", web: "Web" };
+export function PlatformBadge({ platform }) {
+  if (!platform) return <span className="muted">—</span>;
+  return <span className="badge info" title={`Plataforma: ${platform}`}>{PLATFORM_LABEL[platform] || platform}</span>;
+}
+
 export function DeliveryBadge({ mode, fixed }) {
   if (!mode) return <span className="muted">—</span>;
   const proxy = mode === "proxy";
