@@ -44,7 +44,7 @@ button,input,select,textarea{font:inherit}
 .who{min-width:0}.who strong{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .who span{display:block;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sidebar .user .btn{grid-column:1/-1;margin-top:10px;width:100%}
-.content{padding:30px 36px 48px;min-width:0;max-width:1360px;width:100%}
+.content{padding:30px 36px 48px;min-width:0;width:100%}
 .page-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:22px;flex-wrap:wrap}
 
 /* ---- Cartões e números ---- */
