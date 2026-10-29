@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api.js";
-import { Empty, Pager, PlatformBadge, Table, fmtDateTime, useAction, useDebounced, useList, useUi } from "../ui.jsx";
+import { Empty, OnlineBadge, Pager, PlatformBadge, Table, fmtDateTime, useAction, useDebounced, useList, useUi } from "../ui.jsx";
 import CredentialsModal from "./CredentialsModal.jsx";
 
 const REFRESH_MS = 15000;
@@ -66,7 +66,7 @@ export default function Unlinked({ onChanged }) {
                   : <span className="badge info">Novo</span>}
                 {d.waiting && <div><span className="dot" /> <span className="muted">TV aguardando agora</span></div>}
               </td>
-              <td>{fmtDateTime(d.lastSeenAt)}</td>
+              <td><OnlineBadge online={d.online} lastSeenAt={d.lastSeenAt} /><div className="muted">{fmtDateTime(d.lastSeenAt)}</div></td>
               <td>{fmtDateTime(d.firstSeenAt)}</td>
               <td className="actions" onClick={(e) => e.stopPropagation()}>
                 <button className="btn sm primary" onClick={() => setLinking(d)}>Vincular</button>

@@ -5,6 +5,15 @@ import { api } from "./api.js";
 export const fmtDate = (v) => (v ? new Date(v).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "—");
 export const fmtDateTime = (v) =>
   v ? new Date(v).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" }) : "—";
+/** "há 5 s", "há 3 min", "há 2 h", "há 4 d" — para a última atividade. */
+export function fmtAgo(v, now = Date.now()) {
+  if (!v) return "nunca";
+  const s = Math.max(0, Math.round((now - new Date(v).getTime()) / 1000));
+  if (s < 60) return `há ${s} s`;
+  if (s < 3600) return `há ${Math.floor(s / 60)} min`;
+  if (s < 86400) return `há ${Math.floor(s / 3600)} h`;
+  return `há ${Math.floor(s / 86400)} d`;
+}
 export const fmtMoney = (cents) =>
   (Number(cents || 0) / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 /**
@@ -31,6 +40,7 @@ export function formatMac(v) {
 }
 
 const STATUS = {
+  online: ["Online", "ok"], offline: ["Offline", "muted"],
   active: ["Ativa", "ok"], pending: ["Pendente", "info"], expired: ["Expirada", "warn"], suspended: ["Suspensa", "warn"],
   blocked: ["Bloqueada", "bad"], cancelled: ["Cancelada", "muted"], revoked: ["Removida", "muted"],
   open: ["Em aberto", "info"], partial: ["Parcial", "warn"], paid: ["Paga", "ok"], overdue: ["Vencida", "bad"],
@@ -53,6 +63,16 @@ export function Badge({ status, label }) {
  */
 /** Tipo do aparelho, como o servidor guarda em devices.platform (rokutv vira roku; webtv vira web). */
 export const PLATFORM_LABEL = { roku: "Roku", android: "Android TV", tizen: "Samsung", webos: "LG", web: "Web" };
+/** Presença do aparelho (campos `online` e `lastSeenAt` devolvidos pelo backend). Offline mostra há quanto tempo foi visto. */
+export function OnlineBadge({ online, lastSeenAt }) {
+  return (
+    <span title={lastSeenAt ? `Última atividade: ${fmtDateTime(lastSeenAt)}` : "Nunca deu sinal"}>
+      <Badge status={online ? "online" : "offline"} />
+      {!online && <div className="muted">{fmtAgo(lastSeenAt)}</div>}
+    </span>
+  );
+}
+
 export function PlatformBadge({ platform }) {
   if (!platform) return <span className="muted">—</span>;
   return <span className="badge info" title={`Plataforma: ${platform}`}>{PLATFORM_LABEL[platform] || platform}</span>;

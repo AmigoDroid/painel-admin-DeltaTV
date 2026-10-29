@@ -10,7 +10,15 @@ const Stat = ({ label, value, hint, href, attention }) => {
 export default function Dashboard() {
   const [d, setD] = useState(null);
   const [error, setError] = useState("");
+  const [presence, setPresence] = useState(null);
   useEffect(() => { api("/admin/dashboard").then(setD).catch((e) => setError(e.message)); }, []);
+  // Só a contagem de online é atualizada em tempo quase real (consulta leve); o resto do painel não é recarregado.
+  useEffect(() => {
+    const load = () => { if (!document.hidden) api("/admin/devices/presence").then(setPresence).catch(() => {}); };
+    load();
+    const t = setInterval(load, 20000);
+    return () => clearInterval(t);
+  }, []);
   if (error) return <p className="error">{error}</p>;
   if (!d) return <p className="muted">Carregando…</p>;
   return (
@@ -19,6 +27,7 @@ export default function Dashboard() {
       <div className="grid cards">
         <Stat label="Licenças ativas" value={d.licenses.active} hint={`${d.licenses.expired} expiradas · ${d.licenses.suspended} suspensas · ${d.licenses.blocked} bloqueadas`} />
         <Stat label="Dispositivos ativados" value={d.devices.active} hint={`${d.devices.blocked} bloqueados`} />
+        <Stat label="Online agora" value={presence ? presence.online : "—"} hint={presence ? `Atividade nos últimos ${presence.windowSeconds} s` : "Carregando…"} href="#devices" />
         <Stat label="Sem vínculo" value={d.devices.unlinked ?? 0} hint={d.devices.unlinked ? "Aguardando configuração →" : "Nenhum aguardando"} href="#unlinked" attention={d.devices.unlinked > 0} />
         <Stat label="Parceiros ativos" value={d.partners.active} hint={`${d.partners.suspended} suspensos/bloqueados`} />
         <Stat label="Receita recorrente prevista" value={fmtMoney(d.billing.mrrCents)} hint={`Recebido no mês: ${fmtMoney(d.billing.receivedThisMonthCents)}`} />

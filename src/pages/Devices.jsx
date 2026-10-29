@@ -1,16 +1,18 @@
 import { useEffect, useState } from "react";
 import { api, getAuth } from "../api.js";
-import { Badge, DeliveryBadge, PlatformBadge, accessStatus, Empty, Modal, Pager, Table, fmtDateTime, useAction, useDebounced, useList, useUi } from "../ui.jsx";
+import { Badge, DeliveryBadge, OnlineBadge, PlatformBadge, accessStatus, Empty, Modal, Pager, Table, fmtDateTime, useAction, useDebounced, useList, useUi } from "../ui.jsx";
 import CredentialsModal from "./CredentialsModal.jsx";
 import EditDeviceModal from "./EditDeviceModal.jsx";
 import DeviceListsModal from "./DeviceListsModal.jsx";
+
+const REFRESH_MS = 20000;
 
 export default function Devices({ onChanged }) {
   const { confirm, toast } = useUi();
   const run = useAction();
   const [q, setQ] = useState("");
   const dq = useDebounced(q);
-  const list = useList("/admin/devices", { q: "", status: "" });
+  const list = useList("/admin/devices", { q: "", status: "", online: "" });
   const [history, setHistory] = useState(null);
   const [registering, setRegistering] = useState(false);
   const [editing, setEditing] = useState(null); // ativação em edição (só superadmin)
@@ -18,6 +20,14 @@ export default function Devices({ onChanged }) {
   const isSuper = getAuth()?.user?.role === "superadmin";
   const [adding, setAdding] = useState(null); // linha do MAC que vai receber outro parceiro (ou ter o acesso do parceiro atualizado)
   useEffect(() => { list.filter({ q: dq }); /* eslint-disable-next-line */ }, [dq]);
+
+  // Atualização automática da presença: pausa com a aba escondida ou com janela aberta (não atrapalha quem está editando).
+  const busy = registering || editing || viewing || adding || history;
+  useEffect(() => {
+    if (busy) return undefined;
+    const t = setInterval(() => { if (!document.hidden) list.reload(); }, REFRESH_MS);
+    return () => clearInterval(t);
+  }, [busy, list.reload]);
 
   const change = async (a, action, o) => {
     const c = await confirm(o);
@@ -37,10 +47,13 @@ export default function Devices({ onChanged }) {
         <select value={list.params.status} onChange={(e) => list.filter({ status: e.target.value })}>
           <option value="">Todos</option><option value="active">Ativos</option><option value="blocked">Bloqueados</option><option value="revoked">Removidos</option>
         </select>
+        <select value={list.params.online} onChange={(e) => list.filter({ online: e.target.value })} aria-label="Conexão">
+          <option value="">Online e offline</option><option value="true">Só online</option><option value="false">Só offline</option>
+        </select>
       </div>
-      <Table><thead><tr><th>MAC</th><th>Tipo</th><th>Vínculo atual</th><th>Entrega</th><th>Status</th><th>Ativado em</th><th /></tr></thead>
+      <Table><thead><tr><th>MAC</th><th>Tipo</th><th>Conexão</th><th>Vínculo atual</th><th>Entrega</th><th>Status</th><th>Ativado em</th><th /></tr></thead>
         <tbody>{list.data.map((a) => (
-          <tr key={a.id}><td className="mono">{a.mac || "—"}{a.claimPending && <span className="muted"> (migração pendente)</span>}</td><td><PlatformBadge platform={a.platform} /></td><td>{owner(a)}</td>
+          <tr key={a.id}><td className="mono">{a.mac || "—"}{a.claimPending && <span className="muted"> (migração pendente)</span>}</td><td><PlatformBadge platform={a.platform} /></td><td><OnlineBadge online={a.online} lastSeenAt={a.lastSeenAt} /></td><td>{owner(a)}</td>
             <td><DeliveryBadge mode={a.deliveryMode} fixed={a.deliveryModeFixed} /></td>
             <td><Badge status={accessStatus(a)} />{a.statusReason && <div className="muted">{a.statusReason}</div>}{a.status === "active" && a.access && !a.access.allowed && <div className="muted">{a.access.message}</div>}</td><td>{fmtDateTime(a.activatedAt)}</td>
             <td className="actions">
