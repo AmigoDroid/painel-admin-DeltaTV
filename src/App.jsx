@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, getAuth, login, logout } from "./api.js";
 import { UiProvider, Field, useAction, BrandMark } from "./ui.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
@@ -89,6 +89,36 @@ function Login({ onDeviceAccess }) {
   );
 }
 
+/** Perfil no canto superior direito: avatar + nome; ao clicar abre e-mail e "Sair". */
+function UserMenu({ user }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDown = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("mousedown", onDown); document.removeEventListener("keydown", onKey); };
+  }, [open]);
+  const initial = (user.name || user.email || "?").trim().charAt(0).toUpperCase();
+  return (
+    <div className="usermenu" ref={ref}>
+      <button type="button" className="usermenu-btn" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+        <span className="avatar" aria-hidden="true">{initial}</span>
+        <span className="usermenu-name">{user.name || user.email}</span>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+      </button>
+      {open && (
+        <div className="usermenu-pop" role="menu">
+          <div className="who"><strong>{user.name}</strong><span>{user.email}</span></div>
+          <button type="button" className="btn sm" role="menuitem" onClick={logout}>Sair</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Shell({ user }) {
   // Itens do menu são conveniência: cada rota é protegida por permissão no backend.
   const hidden = (k) => (user.role === "support" && k === "audit") || ((k === "users" || k === "mail") && user.role !== "superadmin");
@@ -148,20 +178,16 @@ function Shell({ user }) {
             );
           })}
         </nav>
-        <div className="user">
-          <span className="avatar" aria-hidden="true">{(user.name || user.email || "?").trim().charAt(0).toUpperCase()}</span>
-          <div className="who"><strong>{user.name}</strong><span>{user.email}</span></div>
-          <button className="btn sm" onClick={logout}>Sair</button>
-        </div>
       </aside>
       {open && <div className="scrim" onClick={() => setOpen(false)} />}
       <div className="main">
         <div className="topbar">
-          <button type="button" className="icon" aria-label="Abrir menu" aria-controls="menu-principal" aria-expanded={open} onClick={() => setOpen(true)}>
+          <button type="button" className="icon menu-btn" aria-label="Abrir menu" aria-controls="menu-principal" aria-expanded={open} onClick={() => setOpen(true)}>
             <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
           </button>
-          <strong>{PAGES[page][0]}</strong>
+          <strong className="topbar-title">{PAGES[page][0]}</strong>
           {badges.unlinked > 0 || badges.resellers > 0 ? <span className="count" aria-label="Itens aguardando">{(badges.unlinked || 0) + (badges.resellers || 0)}</span> : null}
+          <UserMenu user={user} />
         </div>
         <main className="content"><Current onChanged={refreshCounts} /></main>
       </div>
