@@ -9,6 +9,7 @@ import Unlinked from "./pages/Unlinked.jsx";
 import Sources from "./pages/Sources.jsx";
 import Billing from "./pages/Billing.jsx";
 import Pix from "./pages/Pix.jsx";
+import Credits from "./pages/Credits.jsx";
 import Audit from "./pages/Audit.jsx";
 import DeviceAccess from "./pages/DeviceAccess.jsx";
 import Clients from "./pages/Clients.jsx";
@@ -17,7 +18,7 @@ import Mail from "./pages/Mail.jsx";
 
 const PAGES = {
   dashboard: ["Visão geral", Dashboard], licenses: ["Licenças", Licenses], partners: ["Parceiros", Partners], clients: ["Clientes", Clients],
-  devices: ["Dispositivos", Devices], unlinked: ["Sem vínculo", Unlinked], sources: ["Fontes", Sources], billing: ["Financeiro", Billing], pix: ["Pix", Pix], users: ["Usuários", Users], mail: ["E-mails", Mail], audit: ["Auditoria", Audit],
+  devices: ["Dispositivos", Devices], unlinked: ["Sem vínculo", Unlinked], sources: ["Fontes", Sources], billing: ["Financeiro", Billing], pix: ["Pix", Pix], credits: ["Créditos", Credits], users: ["Usuários", Users], mail: ["E-mails", Mail], audit: ["Auditoria", Audit],
 };
 
 // Ícones do menu (traço simples, herdam a cor do texto).
@@ -31,6 +32,7 @@ const ICONS = {
   sources: <><ellipse cx="12" cy="6" rx="8" ry="3" /><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6" /></>,
   billing: <><rect x="3" y="6" width="18" height="13" rx="2" /><path d="M3 10.5h18M7 15h3" /></>,
   pix: <><path d="M12 2.8l9.2 9.2-9.2 9.2L2.8 12z" /><path d="M12 8l4 4-4 4-4-4z" /></>,
+  credits: <><circle cx="12" cy="12" r="9" /><path d="M14.8 9.3c-.5-.9-1.5-1.3-2.8-1.3-1.7 0-2.8.8-2.8 2 0 3 5.6 1.2 5.6 4.2 0 1.2-1.1 2-2.8 2-1.3 0-2.4-.5-2.9-1.4M12 6.5V8m0 8v1.5" /></>,
   users: <path d="M12 3l8 3v6c0 4.5-3.2 8-8 9-4.8-1-8-4.5-8-9V6z" />,
   mail: <><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 7l9 6 9-6" /></>,
   audit: <><path d="M8 3h8v3H8z" /><path d="M6 5H5a1 1 0 00-1 1v14a1 1 0 001 1h14a1 1 0 001-1V6a1 1 0 00-1-1h-1M8 12h8M8 16h5" /></>,

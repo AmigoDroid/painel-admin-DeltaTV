@@ -3,7 +3,7 @@ import { api } from "../api.js";
 import { Badge, Empty, Field, LoadError, Modal, Pager, Table, fmtDateTime, fmtMoney, toCents, useAction, useList, useLoad, useUi } from "../ui.jsx";
 
 const monthsLabel = (m) => `${m} ${m === 1 ? "mês" : "meses"}`;
-const what = (c) => (c.purpose === "invoice" ? `Mensalidade ${c.invoice?.competence ?? ""}`.trim() : c.purpose === "license" ? `Licença de ${monthsLabel(c.months)} (site) · ${c.mac ?? ""}` : `${c.quantity} licença(s) de ${monthsLabel(c.months)}`);
+const what = (c) => (c.purpose === "invoice" ? `Mensalidade ${c.invoice?.competence ?? ""}`.trim() : c.purpose === "license" ? `Licença de ${monthsLabel(c.months)} (site) · ${c.mac ?? ""}` : c.purpose === "credit" ? `${c.quantity} crédito(s) (recarga)` : `${c.quantity} licença(s) de ${monthsLabel(c.months)}`);
 const ChargeBadge = ({ status }) => (status === "pending" ? <Badge status="info" label="Aguardando" /> : <Badge status={status} />);
 
 /**
