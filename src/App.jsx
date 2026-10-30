@@ -96,6 +96,7 @@ function Shell({ user }) {
   const allowed = (h) => menu.some(([k]) => k === h);
   const fromHash = () => (allowed(location.hash.slice(1)) ? location.hash.slice(1) : "dashboard");
   const [page, setPage] = useState(fromHash);
+  const [open, setOpen] = useState(false); // gaveta do menu em tela pequena
   useEffect(() => { if (location.hash.slice(1) !== page) location.hash = page; }, [page]);
   // Botão voltar/avançar do navegador e links #pagina: sincroniza a tela com o endereço (e barra páginas sem permissão).
   useEffect(() => {
@@ -105,6 +106,14 @@ function Shell({ user }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user.role]);
   const Current = PAGES[page][1];
+  const go = (k) => { setPage(k); setOpen(false); window.scrollTo(0, 0); };
+  // Esc fecha a gaveta; ao voltar para tela grande ela não fica "aberta" escondida.
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
 
   // Selos do menu: dispositivos aguardando vínculo e cadastros de revenda aguardando aprovação. Falhar aqui nunca atrapalha o painel.
   const [badges, setBadges] = useState({});
@@ -120,7 +129,7 @@ function Shell({ user }) {
   }, []);
   return (
     <div className="layout">
-      <aside className="sidebar">
+      <aside className={`sidebar ${open ? "open" : ""}`} id="menu-principal">
         <div className="brand"><BrandMark size={32} /><div><strong>DeltaTV</strong><span>Licenciamento</span></div></div>
         <nav className="nav-scroll" aria-label="Menu principal">
           {GROUPS.map((g) => {
@@ -130,7 +139,7 @@ function Shell({ user }) {
               <div className="nav-group" key={g.label || "top"}>
                 {g.label && <div className="nav-heading">{g.label}</div>}
                 {items.map((k) => (
-                  <button key={k} className={`nav ${page === k ? "active" : ""}`} onClick={() => setPage(k)}>
+                  <button key={k} className={`nav ${page === k ? "active" : ""}`} onClick={() => go(k)}>
                     <span className="nav__label"><NavIcon k={k} />{PAGES[k][0]}</span>
                     {badges[k] > 0 && <span className="count" aria-label={`${badges[k]} aguardando`}>{badges[k] > 99 ? "99+" : badges[k]}</span>}
                   </button>
@@ -145,7 +154,17 @@ function Shell({ user }) {
           <button className="btn sm" onClick={logout}>Sair</button>
         </div>
       </aside>
-      <main className="content"><Current onChanged={refreshCounts} /></main>
+      {open && <div className="scrim" onClick={() => setOpen(false)} />}
+      <div className="main">
+        <div className="topbar">
+          <button type="button" className="icon" aria-label="Abrir menu" aria-controls="menu-principal" aria-expanded={open} onClick={() => setOpen(true)}>
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
+          </button>
+          <strong>{PAGES[page][0]}</strong>
+          {badges.unlinked > 0 || badges.resellers > 0 ? <span className="count" aria-label="Itens aguardando">{(badges.unlinked || 0) + (badges.resellers || 0)}</span> : null}
+        </div>
+        <main className="content"><Current onChanged={refreshCounts} /></main>
+      </div>
     </div>
   );
 }

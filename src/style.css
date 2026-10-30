@@ -156,9 +156,6 @@ a.card.stat.link:focus-visible{outline-offset:3px}
 @media(max-width:700px){
   .row{grid-template-columns:1fr}
   .layout{grid-template-columns:1fr}
-  .sidebar{position:sticky;top:0;z-index:20;height:auto;flex-direction:row;align-items:center;gap:4px;padding:10px 12px;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line-soft)}
-  .sidebar .brand{padding:0 10px 0 2px}.brand span,.sidebar .user{display:none}
-  .nav{width:auto;flex:none;white-space:nowrap}.nav.active::before{display:none}
   .content{padding:20px 16px 40px}h2{font-size:22px}
   .toolbar input,.toolbar select{min-width:0;flex:1 1 100%;max-width:none}
   .modal-body{padding:16px}
@@ -210,9 +207,6 @@ a.card.stat.link:focus-visible{outline-offset:3px}
 td .kind{margin-left:8px}
 
 @media(max-width:700px){
-  .nav-scroll{flex-direction:row;gap:4px;flex:none;margin:0;align-items:center}
-  .nav-group{flex-direction:row;gap:4px}.nav-heading{display:none}
-  .nav-group+.nav-group{padding-left:6px;margin-left:2px;border-left:1px solid var(--line-soft)}
   .mini-stats>div{flex:1 1 140px}
 }
 .btn.kebab{padding:4px 7px;line-height:0}td.actions .btn.kebab{margin-left:0}
@@ -220,3 +214,15 @@ td .kind{margin-left:8px}
 .rowmenu button{background:none;border:0;color:var(--text);text-align:left;font:inherit;font-size:13px;padding:8px 10px;border-radius:6px;cursor:pointer;white-space:nowrap}
 .rowmenu button:hover:not(:disabled),.rowmenu button:focus-visible{background:var(--panel2);outline:none}
 .rowmenu button.danger{color:var(--bad)}.rowmenu button:disabled{opacity:.45;cursor:not-allowed}
+
+/* ---- Menu em gaveta (celular/tablet): o botão ☰ abre e esconde as opções ---- */
+.main{min-width:0}.topbar{display:none}.scrim{display:none}
+@media(max-width:860px){
+  .layout{grid-template-columns:1fr}
+  .sidebar{position:fixed;inset:0 auto 0 0;width:270px;max-width:85vw;height:100vh;height:100dvh;z-index:60;transform:translateX(-100%);transition:transform .2s;box-shadow:none}
+  .sidebar.open{transform:none;box-shadow:0 0 40px rgba(0,0,0,.6)}
+  .scrim{display:block;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:55}
+  .topbar{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line-soft);background:var(--bg-2);position:sticky;top:0;z-index:20}
+  .topbar strong{font-size:16px}.topbar .count{margin-left:auto;background:var(--warn);color:#1a1300;border-radius:999px;font-size:11px;font-weight:800;padding:1px 8px;min-width:22px;text-align:center}
+}
+@media(prefers-reduced-motion:reduce){.sidebar{transition:none}}
