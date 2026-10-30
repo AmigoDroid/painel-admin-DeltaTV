@@ -3,7 +3,7 @@ import { api, getAuth, login, logout } from "./api.js";
 import { UiProvider, Field, useAction, BrandMark } from "./ui.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import Licenses from "./pages/Licenses.jsx";
-import Partners from "./pages/Partners.jsx";
+import Partners, { Resellers } from "./pages/Partners.jsx";
 import Devices from "./pages/Devices.jsx";
 import Unlinked from "./pages/Unlinked.jsx";
 import Sources from "./pages/Sources.jsx";
@@ -17,15 +17,30 @@ import Users from "./pages/Users.jsx";
 import Mail from "./pages/Mail.jsx";
 
 const PAGES = {
-  dashboard: ["Visão geral", Dashboard], licenses: ["Licenças", Licenses], partners: ["Parceiros", Partners], clients: ["Clientes", Clients],
-  devices: ["Dispositivos", Devices], unlinked: ["Sem vínculo", Unlinked], sources: ["Fontes", Sources], billing: ["Financeiro", Billing], pix: ["Pix", Pix], credits: ["Créditos", Credits], users: ["Usuários", Users], mail: ["E-mails", Mail], audit: ["Auditoria", Audit],
+  dashboard: ["Visão geral", Dashboard],
+  licenses: ["Licenças", Licenses], devices: ["Dispositivos", Devices], unlinked: ["Sem vínculo", Unlinked],
+  partners: ["Parceiros", Partners], sources: ["Fontes de conteúdo", Sources],
+  resellers: ["Revendas", Resellers], clients: ["Clientes", Clients], credits: ["Créditos", Credits],
+  billing: ["Financeiro", Billing], pix: ["Pix", Pix],
+  users: ["Usuários", Users], mail: ["E-mails", Mail], audit: ["Auditoria", Audit],
 };
+
+// Menu por área: quem é de conteúdo (Parceiros) fica separado de quem vende licença (Revendas e seus clientes).
+const GROUPS = [
+  { label: null, items: ["dashboard"] },
+  { label: "Licenciamento", items: ["licenses", "devices", "unlinked"] },
+  { label: "Parceiros", items: ["partners", "sources"] },
+  { label: "Revendas", items: ["resellers", "clients", "credits"] },
+  { label: "Financeiro", items: ["billing", "pix"] },
+  { label: "Sistema", items: ["users", "mail", "audit"] },
+];
 
 // Ícones do menu (traço simples, herdam a cor do texto).
 const ICONS = {
   dashboard: <><rect x="3" y="3" width="7.5" height="7.5" rx="2" /><rect x="13.5" y="3" width="7.5" height="7.5" rx="2" /><rect x="3" y="13.5" width="7.5" height="7.5" rx="2" /><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2" /></>,
   licenses: <><circle cx="8" cy="15" r="4" /><path d="M11 12l9-9M16 7l3 3M14 9l2 2" /></>,
   partners: <><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5" /><path d="M16 4.8a3.5 3.5 0 010 6.4M18.5 14.8c1.7.7 2.8 2.3 3 5.2" /></>,
+  resellers: <><path d="M4 9l1.5-5h13L20 9" /><path d="M4 9a2.5 2.5 0 005 0 2.5 2.5 0 005 0 2.5 2.5 0 005 0" /><path d="M5 12v8h14v-8M10 20v-5h4v5" /></>,
   clients: <><circle cx="12" cy="8" r="4" /><path d="M4 21c.8-4 4-6 8-6s7.2 2 8 6" /></>,
   devices: <><rect x="3" y="5" width="18" height="12" rx="2" /><path d="M8 21h8M12 17v4" /></>,
   unlinked: <><path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1" /><path d="M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1" /><path d="M4 4l16 16" /></>,
@@ -86,12 +101,15 @@ function Shell({ user }) {
   }, [user.role]);
   const Current = PAGES[page][1];
 
-  // Contador de dispositivos aguardando vínculo (selo no menu). Falhar aqui nunca atrapalha o painel.
-  const [unlinked, setUnlinked] = useState(null);
-  const refreshUnlinked = () => api("/admin/devices/unlinked", { query: { pageSize: 1 } }).then((r) => setUnlinked(r.meta.total)).catch(() => {});
+  // Selos do menu: dispositivos aguardando vínculo e cadastros de revenda aguardando aprovação. Falhar aqui nunca atrapalha o painel.
+  const [badges, setBadges] = useState({});
+  const refreshCounts = () => {
+    api("/admin/devices/unlinked", { query: { pageSize: 1 } }).then((r) => setBadges((b) => ({ ...b, unlinked: r.meta.total }))).catch(() => {});
+    api("/admin/partners", { query: { status: "pending", pageSize: 1 } }).then((r) => setBadges((b) => ({ ...b, resellers: r.meta.total }))).catch(() => {});
+  };
   useEffect(() => {
-    refreshUnlinked();
-    const t = setInterval(() => { if (!document.hidden) refreshUnlinked(); }, 30000);
+    refreshCounts();
+    const t = setInterval(() => { if (!document.hidden) refreshCounts(); }, 30000);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -99,18 +117,30 @@ function Shell({ user }) {
     <div className="layout">
       <aside className="sidebar">
         <div className="brand"><BrandMark size={32} /><div><strong>DeltaTV</strong><span>Licenciamento</span></div></div>
-        {menu.map(([k, [label]]) => (
-          <button key={k} className={`nav ${page === k ? "active" : ""}`} onClick={() => setPage(k)}>
-            <span className="nav__label"><NavIcon k={k} />{label}</span>{k === "unlinked" && unlinked > 0 && <span className="count" aria-label={`${unlinked} aguardando`}>{unlinked > 99 ? "99+" : unlinked}</span>}
-          </button>
-        ))}
+        <nav className="nav-scroll" aria-label="Menu principal">
+          {GROUPS.map((g) => {
+            const items = g.items.filter(allowed);
+            if (!items.length) return null;
+            return (
+              <div className="nav-group" key={g.label || "top"}>
+                {g.label && <div className="nav-heading">{g.label}</div>}
+                {items.map((k) => (
+                  <button key={k} className={`nav ${page === k ? "active" : ""}`} onClick={() => setPage(k)}>
+                    <span className="nav__label"><NavIcon k={k} />{PAGES[k][0]}</span>
+                    {badges[k] > 0 && <span className="count" aria-label={`${badges[k]} aguardando`}>{badges[k] > 99 ? "99+" : badges[k]}</span>}
+                  </button>
+                ))}
+              </div>
+            );
+          })}
+        </nav>
         <div className="user">
           <span className="avatar" aria-hidden="true">{(user.name || user.email || "?").trim().charAt(0).toUpperCase()}</span>
           <div className="who"><strong>{user.name}</strong><span>{user.email}</span></div>
           <button className="btn sm" onClick={logout}>Sair</button>
         </div>
       </aside>
-      <main className="content"><Current onChanged={refreshUnlinked} /></main>
+      <main className="content"><Current onChanged={refreshCounts} /></main>
     </div>
   );
 }
