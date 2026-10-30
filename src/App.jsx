@@ -15,9 +15,13 @@ import DeviceAccess from "./pages/DeviceAccess.jsx";
 import Clients from "./pages/Clients.jsx";
 import Users from "./pages/Users.jsx";
 import Mail from "./pages/Mail.jsx";
+import WebAccessPage from "./pages/WebAccess.jsx";
+
+const WebAccess = () => <WebAccessPage admin />;
 
 const PAGES = {
   dashboard: ["Visão geral", Dashboard],
+  webaccess: ["Player Web", WebAccess],
   licenses: ["Licenças", Licenses], devices: ["Dispositivos", Devices], unlinked: ["Sem vínculo", Unlinked],
   partners: ["Parceiros", Partners], sources: ["Fontes de conteúdo", Sources],
   resellers: ["Revendas", Resellers], clients: ["Clientes", Clients], credits: ["Créditos", Credits],
@@ -28,7 +32,7 @@ const PAGES = {
 // Menu por área: quem é de conteúdo (Parceiros) fica separado de quem vende licença (Revendas e seus clientes).
 const GROUPS = [
   { label: null, items: ["dashboard"] },
-  { label: "Licenciamento", items: ["licenses", "devices", "unlinked"] },
+  { label: "Licenciamento", items: ["licenses", "devices", "unlinked", "webaccess"] },
   { label: "Parceiros", items: ["partners", "sources"] },
   { label: "Revendas", items: ["resellers", "clients", "credits"] },
   { label: "Financeiro", items: ["billing", "pix"] },
@@ -50,6 +54,7 @@ const ICONS = {
   credits: <><circle cx="12" cy="12" r="9" /><path d="M14.8 9.3c-.5-.9-1.5-1.3-2.8-1.3-1.7 0-2.8.8-2.8 2 0 3 5.6 1.2 5.6 4.2 0 1.2-1.1 2-2.8 2-1.3 0-2.4-.5-2.9-1.4M12 6.5V8m0 8v1.5" /></>,
   users: <path d="M12 3l8 3v6c0 4.5-3.2 8-8 9-4.8-1-8-4.5-8-9V6z" />,
   mail: <><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 7l9 6 9-6" /></>,
+  webaccess: <><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18" /></>,
   audit: <><path d="M8 3h8v3H8z" /><path d="M6 5H5a1 1 0 00-1 1v14a1 1 0 001 1h14a1 1 0 001-1V6a1 1 0 00-1-1h-1M8 12h8M8 16h5" /></>,
 };
 const NavIcon = ({ k }) => (
