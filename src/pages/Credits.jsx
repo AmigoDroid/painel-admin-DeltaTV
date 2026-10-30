@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api.js";
-import { Badge, Empty, Field, LoadError, Modal, Pager, Table, fmtDateTime, fmtMoney, toCents, useAction, useDebounced, useList, useLoad, useUi } from "../ui.jsx";
+import { Badge, Empty, Field, LoadError, Modal, Pager, Table, fmtDateTime, fmtMoney, toCents, useAction, useDebounced, useList, useLoad, useUi, RowMenu } from "../ui.jsx";
 
 const monthsLabel = (m) => `${m} ${m === 1 ? "mês" : "meses"}`;
 const creditsLabel = (n) => `${n} ${Math.abs(n) === 1 ? "crédito" : "créditos"}`;
@@ -60,8 +60,10 @@ function Wallets({ onLedger }) {
           <tr key={w.id}>
             <td>{w.name}</td><td><Badge status={w.status} /></td><td><strong>{w.balance}</strong> <span className="muted">{w.balance === 1 ? "crédito" : "créditos"}</span></td>
             <td className="actions">
-              <button className="btn sm" onClick={() => onLedger(w.id)}>Extrato</button>
-              <button className="btn sm primary" onClick={() => setAdjust(w)}>Ajustar</button>
+              <RowMenu items={[
+                { label: "Extrato", onClick: () => onLedger(w.id) },
+                { label: "Ajustar", onClick: () => setAdjust(w) },
+              ]} />
             </td>
           </tr>))}</tbody>
       </Table>
@@ -125,8 +127,10 @@ function Rates({ data, error, reload }) {
           <tr key={r.id}>
             <td>{r.partnerName}</td><td>{fmtMoney(r.rateCents)}</td>
             <td className="actions">
-              <button className="btn sm" onClick={() => setEdit({ partnerId: r.partnerId, partnerName: r.partnerName, value: brl(r.rateCents), custom: true, locked: true })}>Editar</button>
-              <button className="btn sm danger" onClick={() => remove(r)}>Remover</button>
+              <RowMenu items={[
+                { label: "Editar", onClick: () => setEdit({ partnerId: r.partnerId, partnerName: r.partnerName, value: brl(r.rateCents), custom: true, locked: true }) },
+                { label: "Remover", danger: true, onClick: () => remove(r) },
+              ]} />
             </td>
           </tr>))}</tbody>
       </Table>
@@ -195,8 +199,10 @@ function Prices() {
           <tr key={p.id}>
             <td>{monthsLabel(p.months)}</td><td>{creditsLabel(p.priceCredits)}</td><td>{p.active ? "Sim" : "Não"}</td>
             <td className="actions">
-              <button className="btn sm" onClick={() => setEdit({ months: String(p.months), price: String(p.priceCredits), active: p.active })}>Editar</button>
-              <button className="btn sm danger" onClick={() => remove(p)}>Remover</button>
+              <RowMenu items={[
+                { label: "Editar", onClick: () => setEdit({ months: String(p.months), price: String(p.priceCredits), active: p.active }) },
+                { label: "Remover", danger: true, onClick: () => remove(p) },
+              ]} />
             </td>
           </tr>))}</tbody>
       </Table>

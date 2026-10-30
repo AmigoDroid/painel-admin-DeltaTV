@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { api } from "./api.js";
 
 /* ---------- Formatação (UTC no banco; exibição em America/Sao_Paulo) ---------- */
@@ -292,5 +293,60 @@ export function BrandMark({ size = 28 }) {
       <path d="M16 3.5 29.5 27.5H2.5z" fill="url(#dl-brand-g)" />
       <path d="M13 15.2 20.4 19.6 13 24z" fill="#0a0c1a" />
     </svg>
+  );
+}
+
+/** Menu de 3 pontinhos para as ações da linha (no lugar de uma fileira de botões). Itens: { label, onClick, danger, hidden, disabled, title }. */
+export function RowMenu({ items, label = "Ações" }) {
+  const list = items.filter((i) => i && !i.hidden);
+  const [pos, setPos] = useState(null);
+  const btn = useRef(null);
+  const menu = useRef(null);
+  const close = useCallback(() => setPos(null), []);
+  useEffect(() => {
+    if (!pos) return undefined;
+    const onDown = (e) => { if (!menu.current?.contains(e.target) && !btn.current?.contains(e.target)) close(); };
+    const onKey = (e) => {
+      if (e.key === "Escape") { close(); btn.current?.focus(); }
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        const els = [...(menu.current?.querySelectorAll("button:not(:disabled)") ?? [])];
+        const i = els.indexOf(document.activeElement);
+        els[(i + (e.key === "ArrowDown" ? 1 : -1) + els.length) % els.length]?.focus();
+      }
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    menu.current?.querySelector("button:not(:disabled)")?.focus();
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+    };
+  }, [pos, close]);
+  if (!list.length) return null;
+  const toggle = () => {
+    if (pos) return close();
+    const r = btn.current.getBoundingClientRect();
+    const h = list.length * 36 + 12;
+    const up = r.bottom + h > window.innerHeight && r.top > h; // sem espaço embaixo: abre para cima
+    setPos({ top: up ? r.top - h - 4 : r.bottom + 4, right: Math.max(8, window.innerWidth - r.right) });
+  };
+  return (
+    <>
+      <button ref={btn} type="button" className="btn sm kebab" aria-label={label} aria-haspopup="menu" aria-expanded={!!pos} title={label} onClick={toggle}>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="12" cy="19" r="2" /></svg>
+      </button>
+      {pos && createPortal(
+        <div ref={menu} role="menu" className="rowmenu" style={{ top: pos.top, right: pos.right }}>
+          {list.map((i, n) => (
+            <button key={n} type="button" role="menuitem" className={i.danger ? "danger" : ""} disabled={i.disabled} title={i.title}
+              onClick={() => { close(); i.onClick?.(); }}>{i.label}</button>
+          ))}
+        </div>, document.body)}
+    </>
   );
 }

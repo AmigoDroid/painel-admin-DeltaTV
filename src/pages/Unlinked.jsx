@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api.js";
-import { Empty, OnlineBadge, Pager, PlatformBadge, Table, fmtDateTime, useAction, useDebounced, useList, useUi } from "../ui.jsx";
+import { Empty, OnlineBadge, Pager, PlatformBadge, Table, fmtDateTime, useAction, useDebounced, useList, useUi, RowMenu } from "../ui.jsx";
 import CredentialsModal from "./CredentialsModal.jsx";
 
 const REFRESH_MS = 15000;
@@ -69,9 +69,11 @@ export default function Unlinked({ onChanged }) {
               <td><OnlineBadge online={d.online} lastSeenAt={d.lastSeenAt} /><div className="muted">{fmtDateTime(d.lastSeenAt)}</div></td>
               <td>{fmtDateTime(d.firstSeenAt)}</td>
               <td className="actions" onClick={(e) => e.stopPropagation()}>
-                <button className="btn sm primary" onClick={() => setLinking(d)}>Vincular</button>
-                {!d.previouslyLinked && <button className="btn sm danger" onClick={() => remove(d)}>Excluir</button>}
-              </td>
+              <RowMenu items={[
+                { label: "Vincular", onClick: () => setLinking(d) },
+                { label: "Excluir", hidden: d.previouslyLinked, danger: true, onClick: () => remove(d) },
+              ]} />
+            </td>
             </tr>
           ))}
         </tbody>

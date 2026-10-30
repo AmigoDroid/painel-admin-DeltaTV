@@ -215,3 +215,8 @@ td .kind{margin-left:8px}
   .nav-group+.nav-group{padding-left:6px;margin-left:2px;border-left:1px solid var(--line-soft)}
   .mini-stats>div{flex:1 1 140px}
 }
+.btn.kebab{padding:4px 7px;line-height:0}td.actions .btn.kebab{margin-left:0}
+.rowmenu{position:fixed;z-index:80;min-width:190px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r-ctl);box-shadow:0 18px 40px -12px rgba(0,0,0,.75);padding:6px;display:flex;flex-direction:column;gap:2px}
+.rowmenu button{background:none;border:0;color:var(--text);text-align:left;font:inherit;font-size:13px;padding:8px 10px;border-radius:6px;cursor:pointer;white-space:nowrap}
+.rowmenu button:hover:not(:disabled),.rowmenu button:focus-visible{background:var(--panel2);outline:none}
+.rowmenu button.danger{color:var(--bad)}.rowmenu button:disabled{opacity:.45;cursor:not-allowed}

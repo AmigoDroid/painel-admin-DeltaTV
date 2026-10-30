@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, getAuth } from "../api.js";
-import { Badge, DeliveryBadge, OnlineBadge, PlatformBadge, accessStatus, Empty, Modal, Pager, Table, fmtDateTime, useAction, useDebounced, useList, useUi } from "../ui.jsx";
+import { Badge, DeliveryBadge, OnlineBadge, PlatformBadge, accessStatus, Empty, Modal, Pager, Table, fmtDateTime, useAction, useDebounced, useList, useUi, RowMenu } from "../ui.jsx";
 import CredentialsModal from "./CredentialsModal.jsx";
 import EditDeviceModal from "./EditDeviceModal.jsx";
 import DeviceListsModal from "./DeviceListsModal.jsx";
@@ -57,14 +57,16 @@ export default function Devices({ onChanged }) {
             <td><DeliveryBadge mode={a.deliveryMode} fixed={a.deliveryModeFixed} /></td>
             <td><Badge status={accessStatus(a)} />{a.statusReason && <div className="muted">{a.statusReason}</div>}{a.status === "active" && a.access && !a.access.allowed && <div className="muted">{a.access.message}</div>}</td><td>{fmtDateTime(a.activatedAt)}</td>
             <td className="actions">
-              {a.mac && a.deviceId && <button className="btn sm" onClick={() => setViewing(a)}>Listas</button>}
-              {isSuper && a.status !== "revoked" && <button className="btn sm" onClick={() => setEditing(a)}>Editar</button>}
-              {a.mac && <button className="btn sm" onClick={() => openHistory(a.mac)}>Histórico</button>}
-              {a.status !== "revoked" && a.mac && <button className="btn sm" onClick={() => setAdding(a)}>Adicionar parceiro</button>}
-              {a.status === "active" && <button className="btn sm" onClick={() => change(a, "block", { title: "Bloquear dispositivo", message: `Somente ${a.mac} perde o acesso.`, reason: "required", danger: true })}>Bloquear</button>}
-              {a.status === "blocked" && <button className="btn sm" onClick={() => change(a, "unblock", { title: "Desbloquear", message: a.mac })}>Desbloquear</button>}
-              {a.status === "revoked" && isSuper && <button className="btn sm" onClick={() => change(a, "restore", { title: "Restaurar ativação", message: `Desfaz a remoção de ${a.mac}.` })}>Restaurar</button>}
-              {a.status !== "revoked" && <button className="btn sm danger" onClick={() => change(a, "revoke", { title: "Remover ativação", message: `Somente este vínculo é removido; as outras listas do MAC ${a.mac} continuam.`, reason: "optional", danger: true })}>Remover</button>}
+              <RowMenu items={[
+                { label: "Listas", hidden: !(a.mac && a.deviceId), onClick: () => setViewing(a) },
+                { label: "Editar", hidden: !(isSuper && a.status !== "revoked"), onClick: () => setEditing(a) },
+                { label: "Histórico", hidden: !a.mac, onClick: () => openHistory(a.mac) },
+                { label: "Adicionar parceiro", hidden: !(a.status !== "revoked" && a.mac), onClick: () => setAdding(a) },
+                { label: "Bloquear", hidden: a.status !== "active", onClick: () => change(a, "block", { title: "Bloquear dispositivo", message: `Somente ${a.mac} perde o acesso.`, reason: "required", danger: true }) },
+                { label: "Desbloquear", hidden: a.status !== "blocked", onClick: () => change(a, "unblock", { title: "Desbloquear", message: a.mac }) },
+                { label: "Restaurar", hidden: !(a.status === "revoked" && isSuper), onClick: () => change(a, "restore", { title: "Restaurar ativação", message: `Desfaz a remoção de ${a.mac}.` }) },
+                { label: "Remover", hidden: a.status === "revoked", danger: true, onClick: () => change(a, "revoke", { title: "Remover ativação", message: `Somente este vínculo é removido; as outras listas do MAC ${a.mac} continuam.`, reason: "optional", danger: true }) },
+              ]} />
             </td></tr>))}</tbody></Table>
       <Empty loading={list.loading} error={list.error} count={list.data.length} />
       <Pager meta={list.meta} onPage={list.setPage} />

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api.js";
 import { useBalances, monthsLabel } from "./CodeModal.jsx";
-import { Badge, Empty, Field, Modal, Pager, Table, fmtDate, fmtDateTime, formatMac, useAction, useDebounced, useList, useUi, PasswordInput } from "../ui.jsx";
+import { Badge, Empty, Field, Modal, Pager, Table, fmtDate, fmtDateTime, formatMac, useAction, useDebounced, useList, useUi, PasswordInput, RowMenu } from "../ui.jsx";
 
 /**
  * Acessos ao Player Web. Cada acesso = um código (2 letras + 6 números, ex.: AB123456) que o cliente digita em /player.
@@ -217,7 +217,7 @@ export default function WebAccess({ admin = false }) {
         const m = a.deliveryModes;
         return (
           <tr key={a.id}>
-            <td><strong className="mono">{fmtCode(a.code)}</strong> <button className="btn sm" onClick={() => copy(a.code)}>Copiar</button></td>
+            <td><strong className="mono">{fmtCode(a.code)}</strong></td>
             <td>{a.label || <span className="muted">—</span>}</td>
             {admin && <td>{a.partner?.name || <span className="muted">Admin</span>}</td>}
             <td>{a.listName || a.provider?.name || <span className="muted">{a.configured ? "—" : "sem lista"}</span>}</td>
@@ -226,11 +226,14 @@ export default function WebAccess({ admin = false }) {
             <td>{a.lastLoginAt ? fmtDateTime(a.lastLoginAt) : <span className="muted">nunca</span>}</td>
             <td>{m ? <span title={KINDS.map(([k, l]) => `${l}: ${m[k]}`).join(" · ")}>{chip(m.live)} <span className="muted">ao vivo</span></span> : "—"}</td>
             <td className="actions">
-              {a.status !== "revoked" && <button className="btn sm" onClick={() => setModesFor(a)}>Entrega</button>}{" "}
-              {a.status !== "revoked" && a.license?.id && <button className="btn sm" onClick={() => renew(a)}>Renovar</button>}{" "}
-              {a.status === "active" && <button className="btn sm" onClick={() => act(a, "block", { title: "Bloquear acesso", message: fmtCode(a.code), reason: "required", danger: true })}>Bloquear</button>}
-              {a.status === "blocked" && <button className="btn sm" onClick={() => act(a, "unblock", { title: "Desbloquear", message: fmtCode(a.code) })}>Desbloquear</button>}{" "}
-              {a.status !== "revoked" && <button className="btn sm danger" onClick={() => act(a, "revoke", { title: "Remover acesso", message: `${fmtCode(a.code)} deixa de funcionar.`, danger: true })}>Remover</button>}
+              <RowMenu items={[
+                { label: "Entrega", hidden: a.status === "revoked", onClick: () => setModesFor(a) },
+                { label: "Copiar código", hidden: a.status === "revoked", onClick: () => copy(a.code) },
+                { label: "Renovar", hidden: a.status === "revoked" || !a.license?.id, onClick: () => renew(a) },
+                { label: "Bloquear", hidden: a.status !== "active", onClick: () => act(a, "block", { title: "Bloquear acesso", message: fmtCode(a.code), reason: "required", danger: true }) },
+                { label: "Desbloquear", hidden: a.status !== "blocked", onClick: () => act(a, "unblock", { title: "Desbloquear", message: fmtCode(a.code) }) },
+                { label: "Remover", hidden: a.status === "revoked", danger: true, onClick: () => act(a, "revoke", { title: "Remover acesso", message: `${fmtCode(a.code)} deixa de funcionar.`, danger: true }) },
+              ]} />
             </td>
           </tr>);
       })}</tbody></Table>

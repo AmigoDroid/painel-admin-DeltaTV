@@ -3,7 +3,7 @@ import { api } from "../api.js";
 import CodeModal from "./CodeModal.jsx";
 import MacDevice from "./MacDevice.jsx";
 import { StockPortal } from "./Stock.jsx";
-import { Badge, Empty, Pager, Table, fmtDate, fmtDateTime, fmtMoney, useAction, useDebounced, useList, useUi } from "../ui.jsx";
+import { Badge, Empty, Pager, Table, fmtDate, fmtDateTime, fmtMoney, useAction, useDebounced, useList, useUi, RowMenu } from "../ui.jsx";
 
 // Portal do parceiro: o backend restringe tudo ao parceiro do token (nunca confie neste front).
 export default function PartnerPortal() {
@@ -37,14 +37,21 @@ export default function PartnerPortal() {
       <p className="muted">Para alterar os servidores, fale com a plataforma.</p>
       <h3>Códigos de ativação</h3>
       <div className="actions left"><button className="btn primary" onClick={() => setNewCode(true)}>Novo código</button></div>
-      <Table><thead><tr><th>Código</th><th>Servidor</th><th>Status</th><th>Ativações máx.</th><th /></tr></thead><tbody>{codes.map((c) => <tr key={c.id}><td><strong>{c.code}</strong></td><td>{c.provider?.name || <span className="muted">Qualquer servidor</span>}</td><td>{c.status === "active" ? "Ativo" : "Revogado"}</td><td>{c.maxActivations ?? "∞"}</td><td className="actions">{c.status === "active" && <button className="btn sm danger" onClick={() => revoke(c)}>Revogar</button>}</td></tr>)}</tbody></Table>
+      <Table><thead><tr><th>Código</th><th>Servidor</th><th>Status</th><th>Ativações máx.</th><th /></tr></thead><tbody>{codes.map((c) => <tr key={c.id}><td><strong>{c.code}</strong></td><td>{c.provider?.name || <span className="muted">Qualquer servidor</span>}</td><td>{c.status === "active" ? "Ativo" : "Revogado"}</td><td>{c.maxActivations ?? "∞"}</td><td className="actions">
+              <RowMenu items={[
+                { label: "Revogar", hidden: c.status !== "active", danger: true, onClick: () => revoke(c) },
+              ]} />
+            </td></tr>)}</tbody></Table>
       <h3 style={{ marginTop: 20 }}>Meus dispositivos</h3>
       <div className="toolbar"><input placeholder="Pesquisar por MAC" value={q} onChange={(e) => setQ(e.target.value)} /></div>
       <Table><thead><tr><th>MAC</th><th>Status</th><th>Ativado em</th><th /></tr></thead><tbody>{devices.data.map((a) => (
         <tr key={a.id}><td className="mono">{a.mac || "—"}</td><td><Badge status={a.status} /></td><td>{fmtDateTime(a.activatedAt)}</td><td className="actions">
-          {a.status === "active" && <button className="btn sm" onClick={() => change(a, "block", { title: "Bloquear dispositivo", message: a.mac, reason: "required", danger: true })}>Bloquear</button>}
-          {a.status === "blocked" && <button className="btn sm" onClick={() => change(a, "unblock", { title: "Desbloquear", message: a.mac })}>Desbloquear</button>}
-          {a.status !== "revoked" && <button className="btn sm danger" onClick={() => change(a, "revoke", { title: "Remover ativação", message: a.mac, danger: true })}>Remover</button>}</td></tr>))}</tbody></Table>
+              <RowMenu items={[
+                { label: "Bloquear", hidden: a.status !== "active", onClick: () => change(a, "block", { title: "Bloquear dispositivo", message: a.mac, reason: "required", danger: true }) },
+                { label: "Desbloquear", hidden: a.status !== "blocked", onClick: () => change(a, "unblock", { title: "Desbloquear", message: a.mac }) },
+                { label: "Remover", hidden: a.status === "revoked", danger: true, onClick: () => change(a, "revoke", { title: "Remover ativação", message: a.mac, danger: true }) },
+              ]} />
+            </td></tr>))}</tbody></Table>
       <Empty loading={devices.loading} error={devices.error} count={devices.data.length} /><Pager meta={devices.meta} onPage={devices.setPage} />
       <h3 style={{ marginTop: 20 }}>Mensalidades</h3>
       <Table><thead><tr><th>Competência</th><th>Valor</th><th>Pago</th><th>Vencimento</th><th>Status</th></tr></thead><tbody>{invoices.data.map((i) => <tr key={i.id}><td>{i.competence}</td><td>{fmtMoney(i.amountCents)}</td><td>{fmtMoney(i.paidCents)}</td><td>{fmtDate(i.dueDate)}</td><td><Badge status={i.status} /></td></tr>)}</tbody></Table>

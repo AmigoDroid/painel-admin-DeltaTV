@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { api } from "../api.js";
-import { Badge, Empty, Field, LoadError, Modal, Pager, Table, fmtDateTime, fmtMoney, toCents, useAction, useList, useLoad, useUi } from "../ui.jsx";
+import { Badge, Empty, Field, LoadError, Modal, Pager, Table, fmtDateTime, fmtMoney, toCents, useAction, useList, useLoad, useUi, RowMenu } from "../ui.jsx";
 
 const monthsLabel = (m) => `${m} ${m === 1 ? "mês" : "meses"}`;
 const what = (c) => (c.purpose === "invoice" ? `Mensalidade ${c.invoice?.competence ?? ""}`.trim() : c.purpose === "license" ? `Licença de ${monthsLabel(c.months)} (site) · ${c.mac ?? ""}` : c.purpose === "credit" ? `${c.quantity} crédito(s) (recarga)` : `${c.quantity} licença(s) de ${monthsLabel(c.months)}`);
@@ -82,9 +82,11 @@ function Charges({ provider, onChanged }) {
             <td><ChargeBadge status={c.status} />{c.error && <div className="muted" style={{ maxWidth: 320, fontSize: 12 }}>{c.error}</div>}</td>
             <td>{c.paidAt ? fmtDateTime(c.paidAt) : "—"}</td>
             <td className="actions">
-              {["review", "pending", "expired", "cancelled"].includes(c.status) && c.providerRef && <button className="btn sm" onClick={() => reprocess(c)}>Reconsultar</button>}
-              {c.status === "review" && <button className="btn sm primary" onClick={() => resolve(c)}>Resolver</button>}
-              {provider === "mock" && c.status === "pending" && <button className="btn sm" onClick={() => simulate(c)}>Simular pagamento</button>}
+              <RowMenu items={[
+                { label: "Reconsultar", hidden: !(["review", "pending", "expired", "cancelled"].includes(c.status) && c.providerRef), onClick: () => reprocess(c) },
+                { label: "Resolver", hidden: c.status !== "review", onClick: () => resolve(c) },
+                { label: "Simular pagamento", hidden: !(provider === "mock" && c.status === "pending"), onClick: () => simulate(c) },
+              ]} />
             </td>
           </tr>))}</tbody>
       </Table>
@@ -127,8 +129,10 @@ function Prices() {
           <tr key={p.id}>
             <td>{monthsLabel(p.months)}</td><td>{fmtMoney(p.priceCents)}</td><td>{p.active ? "Sim" : "Não"}</td>
             <td className="actions">
-              <button className="btn sm" onClick={() => setEdit({ months: String(p.months), price: (p.priceCents / 100).toFixed(2).replace(".", ","), active: p.active })}>Editar</button>
-              <button className="btn sm danger" onClick={() => remove(p)}>Remover</button>
+              <RowMenu items={[
+                { label: "Editar", onClick: () => setEdit({ months: String(p.months), price: (p.priceCents / 100).toFixed(2).replace(".", ","), active: p.active }) },
+                { label: "Remover", danger: true, onClick: () => remove(p) },
+              ]} />
             </td>
           </tr>))}</tbody>
       </Table>

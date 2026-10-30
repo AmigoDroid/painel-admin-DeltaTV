@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, getAuth } from "../api.js";
-import { Badge, Empty, Field, Modal, PasswordInput, Pager, Table, fmtDateTime, useAction, useDebounced, useList } from "../ui.jsx";
+import { Badge, Empty, Field, Modal, PasswordInput, Pager, Table, fmtDateTime, useAction, useDebounced, useList, RowMenu } from "../ui.jsx";
 
 /**
  * Usuários da plataforma. superadmin gerencia todos; admin gerencia só os usuários do portal de revendas/parceiros
@@ -39,7 +39,11 @@ export function UsersPanel({ partnerId: fixedPartnerId }) {
             {!fixedPartnerId && <td>{u.partnerName || "—"}</td>}
             <td><Badge status={u.status === "active" ? "active" : "disabled"} label={u.status === "active" ? "Ativo" : "Desativado"} /></td>
             <td>{fmtDateTime(u.createdAt)}</td>
-            <td className="actions"><button className="btn sm" onClick={() => setForm({ user: u })}>Editar</button></td>
+            <td className="actions">
+              <RowMenu items={[
+                { label: "Editar", onClick: () => setForm({ user: u }) },
+              ]} />
+            </td>
           </tr>))}</tbody>
       </Table>
       <Empty loading={list.loading} error={list.error} count={list.data.length} />

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { api } from "../api.js";
-import { Badge, Empty, Field, Modal, Pager, Table, fmtDate, fmtDateTime, fmtMoney, toCents, useAction, useList, useUi } from "../ui.jsx";
+import { Badge, Empty, Field, Modal, Pager, Table, fmtDate, fmtDateTime, fmtMoney, toCents, useAction, useList, useUi, RowMenu } from "../ui.jsx";
 
 export default function Billing() {
   const { confirm, toast } = useUi();
@@ -36,7 +36,12 @@ export default function Billing() {
         <Table><thead><tr><th>Parceiro</th><th>Competência</th><th>Dispositivos</th><th>Valor</th><th>Pago</th><th>Vencimento</th><th>Status</th><th /></tr></thead>
           <tbody>{invoices.data.map((i) => (
             <tr key={i.id}><td>{i.Partner?.name}</td><td>{i.competence}</td><td>{i.deviceCount}</td><td>{fmtMoney(i.amountCents)}</td><td>{fmtMoney(i.paidCents)}</td><td>{fmtDate(i.dueDate)}</td><td><Badge status={i.status} /></td>
-              <td className="actions">{!["paid", "cancelled"].includes(i.status) && <><button className="btn sm primary" onClick={() => setPaying(i)}>Confirmar pagamento</button>{i.paidCents === 0 && <button className="btn sm danger" onClick={() => cancel(i)}>Cancelar</button>}</>}</td></tr>))}</tbody></Table>
+              <td className="actions">
+              <RowMenu items={[
+                { label: "Confirmar pagamento", hidden: ["paid", "cancelled"].includes(i.status), onClick: () => setPaying(i) },
+                { label: "Cancelar", hidden: ["paid", "cancelled"].includes(i.status) || i.paidCents !== 0, danger: true, onClick: () => cancel(i) },
+              ]} />
+            </td></tr>))}</tbody></Table>
         <Empty loading={invoices.loading} error={invoices.error} count={invoices.data.length} /><Pager meta={invoices.meta} onPage={invoices.setPage} /></>}
       {tab === "payments" && <>
         <Table><thead><tr><th>Data</th><th>Parceiro</th><th>Competência</th><th>Valor</th><th>Forma</th><th>Origem</th></tr></thead>

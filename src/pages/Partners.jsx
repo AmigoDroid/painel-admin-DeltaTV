@@ -4,7 +4,7 @@ import { ClientsPanel } from "./Clients.jsx";
 import { UsersPanel } from "./Users.jsx";
 import CodeModal, { CodeEditModal } from "./CodeModal.jsx";
 import { StockAdmin } from "./Stock.jsx";
-import { Badge, DeliveryBadge, accessStatus, Empty, Field, LoadError, Modal, Pager, Table, dateInput, fmtDate, fmtDateTime, fmtMoney, spDateToIso, toCents, useAction, useDebounced, useList, useLoad, useUi } from "../ui.jsx";
+import { Badge, DeliveryBadge, accessStatus, Empty, Field, LoadError, Modal, Pager, Table, dateInput, fmtDate, fmtDateTime, fmtMoney, spDateToIso, toCents, useAction, useDebounced, useList, useLoad, useUi, RowMenu } from "../ui.jsx";
 
 // Mesmo texto gravado pelo back-end no autocadastro de revendedor (ver reseller-signup.service.js).
 const PENDING_REASON = "Aguardando aprovação do cadastro";
@@ -220,25 +220,37 @@ function PartnerDetail({ id, onClose, onChanged }) {
         <div className="actions left"><button className="btn primary" onClick={() => setNewCode(true)}>Novo código</button></div>
         <Table><thead><tr><th>Código</th><th>Servidor</th><th>Rótulo</th>{p.kind !== "content" && <th>Licença do estoque</th>}<th>Status</th><th>Ativações (usadas/limite)</th><th>Expira</th><th /></tr></thead><tbody>
           {p.codes.map((c) => <tr key={c.id}><td><strong>{c.code}</strong></td><td>{c.provider ? <>{c.provider.name}{c.provider.status !== "active" && <> <Badge status="disabled" label="Desativado" /></>}<div className="muted">{c.provider.baseUrl}</div></> : c.status === "active" ? <span className="muted" title="Código antigo: o app testa os servidores da parceria por prioridade. Edite para escolher um servidor.">Qualquer servidor ⚠</span> : "—"}</td><td>{c.label || "—"}</td>{p.kind !== "content" && <td>{c.licenseMonths ? <>{c.licenseMonths} {c.licenseMonths === 1 ? "mês" : "meses"} · <span style={c.stockAvailable === 0 ? { color: "var(--bad)" } : undefined}>{c.stockAvailable} em estoque</span></> : <span className="muted" title="Sem licença: este código não consome estoque.">—</span>}</td>}<td><Badge status={c.status === "active" ? "active" : "revoked"} label={c.status === "active" ? "Ativo" : "Revogado"} /></td><td>{c.activationCount ?? 0} / {c.maxActivations ?? "∞"}</td><td>{fmtDate(c.expiresAt)}</td>
-            <td className="actions">{c.status === "active" && <button className="btn sm" onClick={() => setEditCode(c)}>Editar</button>}{c.status === "active" && <button className="btn sm danger" onClick={() => revokeCode(c)}>Revogar</button>}</td></tr>)}
+            <td className="actions">
+              <RowMenu items={[
+                { label: "Editar", hidden: c.status !== "active", onClick: () => setEditCode(c) },
+                { label: "Revogar", hidden: c.status !== "active", danger: true, onClick: () => revokeCode(c) },
+              ]} />
+            </td></tr>)}
         </tbody></Table></>}
       {cur === "providers" && <>
         <p className="muted">Servidores do provedor desta parceria. O cliente digita código, usuário e senha; o servidor monta a URL da playlist e a valida antes de ativar. Cada código aponta para um servidor (veja a coluna “Códigos”): quem usa o código é validado e atendido por ele. Só códigos antigos sem servidor testam todos, do menor para o maior número de prioridade. O modo de entrega vale para todos os dispositivos ligados ao servidor e muda em até alguns segundos.</p>
         <div className="actions left"><button className="btn primary" onClick={() => setProvForm({})}>Adicionar servidor</button></div>
         <Table><thead><tr><th>Nome</th><th>URL base</th><th>Códigos</th><th>Entrega</th><th>Prior.</th><th>Status</th><th /></tr></thead><tbody>
           {p.providers.map((pr) => <tr key={pr.id}><td>{pr.name}</td><td>{pr.baseUrl}</td><td>{p.codes.filter((c) => c.providerId === pr.id && c.status === "active").map((c) => c.code).join(", ") || "—"}</td><td>{pr.deliveryMode === "proxy" ? "Proxy" : "Redirecionamento"}</td><td>{pr.priority}</td><td><Badge status={pr.status} /></td>
-            <td className="actions"><button className="btn sm" onClick={() => setProvForm(pr)}>Editar</button><button className="btn sm danger" onClick={() => delProvider(pr)}>Excluir</button></td></tr>)}
+            <td className="actions">
+              <RowMenu items={[
+                { label: "Editar", onClick: () => setProvForm(pr) },
+                { label: "Excluir", danger: true, onClick: () => delProvider(pr) },
+              ]} />
+            </td></tr>)}
         </tbody></Table></>}
       {cur === "stock" && p.kind !== "content" && <StockAdmin partnerId={id} />}
       {cur === "clients" && p.kind !== "content" && <ClientsPanel partnerId={id} />}
       {cur === "users" && <UsersPanel partnerId={id} />}
       {cur === "devices" && <Table><thead><tr><th>MAC</th><th>Servidor</th><th>Entrega</th><th>Status</th><th>Ativado em</th><th /></tr></thead><tbody>
         {devices.map((a) => <tr key={a.id}><td>{a.mac}</td><td>{a.provider?.name || "—"}</td><td><DeliveryBadge mode={a.deliveryMode} fixed={a.deliveryModeFixed} /></td><td><Badge status={accessStatus(a)} /></td><td>{fmtDateTime(a.activatedAt)}</td><td className="actions">
-          {a.status === "active" && <button className="btn sm" onClick={() => device(a, "block", { title: "Bloquear dispositivo", message: a.mac, reason: "required", danger: true })}>Bloquear</button>}
-          {a.status === "blocked" && <button className="btn sm" onClick={() => device(a, "unblock", { title: "Desbloquear", message: a.mac })}>Desbloquear</button>}
-          {a.status === "revoked" && role === "superadmin" && <button className="btn sm" onClick={() => device(a, "restore", { title: "Restaurar ativação", message: a.mac })}>Restaurar</button>}
-          {a.status !== "revoked" && <button className="btn sm danger" onClick={() => device(a, "revoke", { title: "Remover ativação", message: a.mac, danger: true })}>Remover</button>}
-        </td></tr>)}</tbody></Table>}
+              <RowMenu items={[
+                { label: "Bloquear", hidden: a.status !== "active", onClick: () => device(a, "block", { title: "Bloquear dispositivo", message: a.mac, reason: "required", danger: true }) },
+                { label: "Desbloquear", hidden: a.status !== "blocked", onClick: () => device(a, "unblock", { title: "Desbloquear", message: a.mac }) },
+                { label: "Restaurar", hidden: !(a.status === "revoked" && role === "superadmin"), onClick: () => device(a, "restore", { title: "Restaurar ativação", message: a.mac }) },
+                { label: "Remover", hidden: a.status === "revoked", danger: true, onClick: () => device(a, "revoke", { title: "Remover ativação", message: a.mac, danger: true }) },
+              ]} />
+            </td></tr>)}</tbody></Table>}
       {cur === "invoices" && <>
         <div className="actions left"><button className="btn" onClick={generate}>Gerar cobrança do mês</button></div>
         <Table><thead><tr><th>Competência</th><th>Dispositivos</th><th>Valor</th><th>Pago</th><th>Vencimento</th><th>Status</th></tr></thead><tbody>

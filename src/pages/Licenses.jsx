@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, getAuth } from "../api.js";
 import { NewPlanInline } from "./Stock.jsx";
-import { Badge, Empty, accessStatus, Field, LoadError, Modal, Pager, SecretCode, Table, fmtDate, fmtDateTime, fmtMoney, toCents, useAction, useDebounced, useList, useLoad, useUi } from "../ui.jsx";
+import { Badge, Empty, accessStatus, Field, LoadError, Modal, Pager, SecretCode, Table, fmtDate, fmtDateTime, fmtMoney, toCents, useAction, useDebounced, useList, useLoad, useUi, RowMenu } from "../ui.jsx";
 
 const STATUSES = [["", "Todos os status"], ["active", "Ativas"], ["pending", "Pendentes"], ["expired", "Expiradas"], ["suspended", "Suspensas"], ["blocked", "Bloqueadas"], ["cancelled", "Canceladas"]];
 
@@ -131,11 +131,13 @@ function LicenseDetail({ id, onClose, onChanged }) {
           {l.Activations.map((a) => (
             <tr key={a.id}><td>{a.mac}</td><td><Badge status={accessStatus(a)} />{a.statusReason && <span className="muted"> {a.statusReason}</span>}{a.status === "active" && a.access && !a.access.allowed && <div className="muted">{a.access.message}</div>}</td><td>{a.viaPartner ? `Código de revenda${a.Partner?.name ? ` · ${a.Partner.name}` : ""}` : "Licença individual"}</td><td>{fmtDateTime(a.activatedAt)}</td>
               <td className="actions">
-                {a.status === "active" && <button className="btn sm" onClick={() => device(a.id, "block", { title: "Bloquear dispositivo", message: `Somente ${a.mac} perde o acesso.`, reason: "required", danger: true })}>Bloquear</button>}
-                {a.status === "blocked" && <button className="btn sm" onClick={() => device(a.id, "unblock", { title: "Desbloquear", message: a.mac })}>Desbloquear</button>}
-                {a.status === "revoked" && isSuper && <button className="btn sm" onClick={() => device(a.id, "restore", { title: "Restaurar ativação", message: `Desfaz a remoção de ${a.mac}.` })}>Restaurar</button>}
-                {a.status !== "revoked" && <button className="btn sm danger" onClick={() => device(a.id, "revoke", { title: "Remover ativação", message: `Remove somente este vínculo; as outras listas do MAC ${a.mac} continuam.`, reason: "optional", danger: true })}>Remover</button>}
-              </td></tr>
+              <RowMenu items={[
+                { label: "Bloquear", hidden: a.status !== "active", onClick: () => device(a.id, "block", { title: "Bloquear dispositivo", message: `Somente ${a.mac} perde o acesso.`, reason: "required", danger: true }) },
+                { label: "Desbloquear", hidden: a.status !== "blocked", onClick: () => device(a.id, "unblock", { title: "Desbloquear", message: a.mac }) },
+                { label: "Restaurar", hidden: !(a.status === "revoked" && isSuper), onClick: () => device(a.id, "restore", { title: "Restaurar ativação", message: `Desfaz a remoção de ${a.mac}.` }) },
+                { label: "Remover", hidden: a.status === "revoked", danger: true, onClick: () => device(a.id, "revoke", { title: "Remover ativação", message: `Remove somente este vínculo; as outras listas do MAC ${a.mac} continuam.`, reason: "optional", danger: true }) },
+              ]} />
+            </td></tr>
           ))}
         </tbody></Table>
       )}

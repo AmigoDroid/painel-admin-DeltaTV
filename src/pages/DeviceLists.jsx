@@ -1,4 +1,4 @@
-import { Badge, Table, fmtDateTime } from "../ui.jsx";
+import { Badge, Table, fmtDateTime, RowMenu } from "../ui.jsx";
 
 // Estados de UMA lista (ativação) do dispositivo, como o servidor devolve em `activations[].status`.
 export const STATE = {
@@ -44,7 +44,11 @@ export default function DeviceLists({ device, onRemove }) {
                 {!l.allowed && l.message && <div className="muted">{l.message}</div>}
               </td>
               <td>{l.expiresAt ? fmtDateTime(l.expiresAt) : "—"}</td>
-              <td className="actions">{onRemove && <button className="btn sm danger" onClick={() => onRemove(l)}>Remover</button>}</td>
+              <td className="actions">
+              <RowMenu items={onRemove ? [
+                { label: "Remover", danger: true, onClick: () => onRemove(l) },
+              ] : []} />
+            </td>
             </tr>
           ))}
         </tbody>

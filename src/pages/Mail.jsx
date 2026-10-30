@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api.js";
-import { Badge, Empty, Field, Modal, Pager, Table, fmtDateTime, useAction, useList, useLoad, useUi } from "../ui.jsx";
+import { Badge, Empty, Field, Modal, Pager, Table, fmtDateTime, useAction, useList, useLoad, useUi, RowMenu } from "../ui.jsx";
 
 /**
  * E-mails para revendas e clientes. O envio entra numa fila no servidor (ritmo limitado pelo SMTP configurado no .env);
@@ -125,7 +125,11 @@ export default function Mail() {
               {m.pending > 0 && <div className="muted" style={{ fontSize: 12 }}>{m.pending} na fila</div>}
               {m.failed > 0 && <div style={{ fontSize: 12, color: "var(--bad)" }}>{m.failed} falha(s)</div>}
             </td>
-            <td className="actions"><button className="btn sm" onClick={() => setOpen(m.id)}>Detalhes</button></td>
+            <td className="actions">
+              <RowMenu items={[
+                { label: "Detalhes", onClick: () => setOpen(m.id) },
+              ]} />
+            </td>
           </tr>
         ))}</tbody>
       </Table>

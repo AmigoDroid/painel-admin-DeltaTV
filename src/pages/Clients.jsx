@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, getAuth } from "../api.js";
-import { Badge, Empty, Field, Modal, Pager, Table, fmtDate, fmtMoney, formatMac, toCents, useAction, useDebounced, useList, useLoad, useUi } from "../ui.jsx";
+import { Badge, Empty, Field, Modal, Pager, Table, fmtDate, fmtMoney, formatMac, toCents, useAction, useDebounced, useList, useLoad, useUi, RowMenu } from "../ui.jsx";
 
 /**
  * Clientes das revendas (ficha por MAC: nome, telefone, endereço, valor e vencimento).
@@ -80,9 +80,14 @@ export function ClientsPanel({ partnerId: fixedPartnerId }) {
             <td>{c.priceCents != null ? fmtMoney(c.priceCents) : "—"}</td>
             <td><DueBadge c={c} /></td>
             <td>{c.device ? <><Badge status={c.device.status} />{c.device.licenseExpiresAt && <div className="muted">licença até {fmtDate(c.device.licenseExpiresAt)}</div>}</> : <span className="muted">Só cadastro</span>}</td>
-            <td className="actions">{canWrite && (c.clientId
-              ? <><button className="btn sm" onClick={() => setForm({ client: c })}>Editar</button><button className="btn sm danger" onClick={() => remove(c)}>Excluir</button></>
-              : <button className="btn sm" onClick={() => setForm({ prefill: { partnerId: c.partnerId, mac: c.mac } })}>Cadastrar</button>)}</td>
+            <td className="actions">
+              <RowMenu items={!canWrite ? [] : c.clientId ? [
+                { label: "Editar", onClick: () => setForm({ client: c }) },
+                { label: "Excluir", danger: true, onClick: () => remove(c) },
+              ] : [
+                { label: "Cadastrar", onClick: () => setForm({ prefill: { partnerId: c.partnerId, mac: c.mac } }) },
+              ]} />
+            </td>
           </tr>))}</tbody>
       </Table>
       <Empty loading={list.loading} error={list.error} count={list.data.length} />

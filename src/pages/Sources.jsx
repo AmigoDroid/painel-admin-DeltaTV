@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api.js";
-import { Badge, Empty, Field, LoadError, Modal, Pager, Table, useAction, useList, useUi } from "../ui.jsx";
+import { Badge, Empty, Field, LoadError, Modal, Pager, Table, useAction, useList, useUi, RowMenu } from "../ui.jsx";
 
 export default function Sources() {
   const list = useList("/admin/sources", {});
@@ -91,7 +91,11 @@ function SourceDetail({ id, onClose, onChanged }) {
       {s.kind === "catalog" && <><h3>Canais</h3>
         <div className="row"><Field label="Nome"><input value={ch.name} onChange={(e) => setCh({ ...ch, name: e.target.value })} /></Field><Field label="URL de reprodução"><input value={ch.streamUrl} onChange={(e) => setCh({ ...ch, streamUrl: e.target.value })} /></Field></div>
         <div className="actions left"><select style={{ width: "auto" }} value={ch.kind} onChange={(e) => setCh({ ...ch, kind: e.target.value })}><option value="live">Canal ao vivo</option><option value="movie">Filme</option><option value="series">Série</option></select><button className="btn primary" disabled={!ch.name || !ch.streamUrl} onClick={addChannel}>Adicionar canal</button></div>
-        <Table><thead><tr><th>Nome</th><th>Tipo</th><th>Status</th><th /></tr></thead><tbody>{channels.map((c) => <tr key={c.id}><td>{c.name}</td><td>{c.kind}</td><td><Badge status={c.status} /></td><td className="actions"><button className="btn sm danger" onClick={() => delChannel(c)}>Excluir</button></td></tr>)}</tbody></Table></>}
+        <Table><thead><tr><th>Nome</th><th>Tipo</th><th>Status</th><th /></tr></thead><tbody>{channels.map((c) => <tr key={c.id}><td>{c.name}</td><td>{c.kind}</td><td><Badge status={c.status} /></td><td className="actions">
+              <RowMenu items={[
+                { label: "Excluir", danger: true, onClick: () => delChannel(c) },
+              ]} />
+            </td></tr>)}</tbody></Table></>}
       {editing && <SourceForm source={s} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); load(); onChanged(); }} />}
     </Modal>
   );
