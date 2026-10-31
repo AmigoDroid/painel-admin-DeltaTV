@@ -65,6 +65,28 @@ export async function api(path, opts = {}, retry = true) {
   }
 }
 
+// Envio de arquivo grande (corpo cru, com barra de progresso): fetch não informa progresso de upload, então usa XMLHttpRequest.
+// Devolve { promise, abort }. Quem chama renova a sessão antes (uma chamada normal a api()) para o token não vencer no início.
+export function uploadFile(path, file, { query, onProgress } = {}) {
+  const url = new URL(`${API}/api/v1${path}`);
+  Object.entries(query || {}).forEach(([k, v]) => { if (v !== "" && v != null) url.searchParams.set(k, v); });
+  const xhr = new XMLHttpRequest();
+  const promise = new Promise((resolve, reject) => {
+    xhr.open("POST", url);
+    if (auth?.accessToken) xhr.setRequestHeader("Authorization", `Bearer ${auth.accessToken}`);
+    xhr.setRequestHeader("Content-Type", "application/octet-stream");
+    xhr.upload.onprogress = (e) => { if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100)); };
+    xhr.onload = () => {
+      let data = null; try { data = JSON.parse(xhr.responseText); } catch { /* sem corpo */ }
+      if (xhr.status >= 200 && xhr.status < 300) resolve(data); else reject(new ApiError(xhr.status, data));
+    };
+    xhr.onerror = () => reject(new ApiError(0, { code: "NETWORK", message: "O envio foi interrompido. Verifique a conexão e tente novamente." }));
+    xhr.onabort = () => reject(Object.assign(new Error("aborted"), { aborted: true }));
+    xhr.send(file);
+  });
+  return { promise, abort: () => xhr.abort() };
+}
+
 export async function login(email, password) {
   const d = await raw("/auth/login", { method: "POST", body: { email, password, audience: "admin" } });
   save({ accessToken: d.accessToken, refreshToken: d.refreshToken, user: d.user });
