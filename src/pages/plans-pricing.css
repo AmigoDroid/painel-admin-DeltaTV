@@ -17,3 +17,5 @@
 .pricing-check{display:flex;align-items:center;gap:9px}
 .pricing-success{color:var(--ok,#4bbd8b)}
 @media(max-width:700px){.pricing-tabs{display:flex;width:100%}.pricing-tabs .tab{flex:1 1 100%;font-size:12px;white-space:normal;padding:10px 8px}.pricing-page .toolbar>*{max-width:100%;width:100%}}
+
+.pricing-plan-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:auto}.pricing-plan-actions .btn{flex:1 1 auto}.pricing-feature-options{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));gap:12px;padding:14px;background:var(--panel2);border:1px solid var(--line-soft);border-radius:12px}

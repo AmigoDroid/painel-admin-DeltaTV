@@ -5,12 +5,6 @@ import ContentContract from "./ContentContract.jsx";
 import ServicePlan from "./ServicePlan.jsx";
 import "./plans-pricing.css";
 
-const TIERS = [
-  { id: "reseller_basic", label: "Revenda Básico", badge: "Essencial", urls: "1 URL", failover: "Não", priority: "Não", alerts: "Não", history: "Básico" },
-  { id: "partner_professional", label: "Parceiro Profissional", badge: "Profissional", urls: "4 URLs", failover: "Sim", priority: "Manual", alerts: "Sim", history: "Resumido" },
-  { id: "partner_premium", label: "Parceiro Premium", badge: "Premium", urls: "8 URLs", failover: "Sim", priority: "Automática", alerts: "Sim", history: "Detalhado" },
-];
-const TIER_NAMES = Object.fromEntries(TIERS.map((t) => [t.id, t.label]));
 const BILLING_NAMES = { none: "Sem mensalidade", fixed: "Mensalidade fixa", per_device: "Por dispositivo", tiered: "Por faixa" };
 const CONTRACT_NAMES = { legacy: "Regras anteriores", credits: "Pré-pago por créditos", fixed_unlimited: "Valor fixo · ilimitado", fixed_limited: "Valor fixo · limitado" };
 const money = (n) => fmtMoney(n ?? 0);
@@ -113,7 +107,7 @@ function ContractList() {
       <Table><thead><tr><th>Cadastro</th><th>Plano de recursos</th><th>Modalidade</th><th>Valor negociado</th><th>Limite contratado</th><th>Ações</th></tr></thead>
       <tbody>{result.data.map((p) => <tr key={p.id}>
         <td><strong>{p.name}</strong><div className="muted">{p.slug} · {p.kind === "reseller" ? "Revenda" : p.kind === "both" ? "Parceiro + revenda" : "Parceiro"}</div></td>
-        <td><strong>{TIER_NAMES[p.tier] || p.tier}</strong><div className="muted">{p.features.maxServers} URL(s)/código</div></td>
+        <td><strong>{p.tierName || p.tier}</strong><div className="muted">{p.features.maxServers} URL(s)/código</div></td>
         <td>{p.contractMode && p.contractMode !== "legacy" ? CONTRACT_NAMES[p.contractMode] : BILLING_NAMES[p.billingModel] || "—"}</td>
         <td><strong>{contractPrice(p)}</strong></td>
         <td>{p.contractMode === "fixed_limited" ? `${p.activationLimit ?? "—"} ativações` : p.contractMode === "fixed_unlimited" ? "Ilimitadas" : p.deviceLimit != null ? `${p.deviceLimit} dispositivos` : "Conforme contrato"}</td>
@@ -123,6 +117,99 @@ function ContractList() {
       {result.meta.totalPages > 1 && <Pager meta={result.meta} onPage={setPage} />}
     </>}
     {selected && <ContractModal partner={selected} onClose={() => { setSelected(null); reload(); }} reload={reload} />}
+  </>;
+}
+
+const blankPlan = () => ({key:"",name:"",description:"",audience:"content",monthlyPriceCents:null,
+  maxServers:1,autoFailover:false,autoPriority:false,emailAlerts:false,detailedHistory:false,
+  sortOrder:100,active:true});
+function CatalogEditor({plan,onClose,onSaved}) {
+  const isNew = !plan?.key;
+  const [data,setData]=useState(plan||blankPlan());
+  const [price,setPrice]=useState(data.monthlyPriceCents == null ? "" : (data.monthlyPriceCents/100).toFixed(2).replace(".",","));
+  const [error,setError]=useState(""),[busy,setBusy]=useState(false);
+  const set=(k,v)=>setData(d=>({...d,[k]:v,...(k==="autoFailover"&&!v?{autoPriority:false}:{})}));
+  const submit=async(e)=>{e.preventDefault();setError("");
+    const cents = price.trim() ? toCents(price) : null;
+    if(price.trim() && (cents == null || cents>100000000)) return setError("Informe um preço válido em reais.");
+    setBusy(true);
+    try {
+      const payload={name:data.name.trim(),description:data.description.trim(),audience:data.audience,
+        monthlyPriceCents:cents,maxServers:Number(data.maxServers),autoFailover:!!data.autoFailover,
+        autoPriority:!!data.autoPriority,emailAlerts:!!data.emailAlerts,detailedHistory:!!data.detailedHistory,
+        sortOrder:Number(data.sortOrder)};
+      if(isNew) await api("/admin/service-plans",{method:"POST",body:{key:data.key.trim(),...payload}});
+      else await api(`/admin/service-plans/${encodeURIComponent(plan.key)}`,{method:"PUT",body:{...payload,active:!!data.active}});
+      onSaved();onClose();
+    }catch(err){setError(err.message)}finally{setBusy(false)};
+  };
+  return <Modal wide title={isNew?"Criar plano de recursos":`Editar plano · ${plan.name}`} onClose={onClose}>
+    <form className="pricing-editor" onSubmit={submit}>
+      <p className="muted">Os recursos são aplicados pelo backend. O preço de referência não altera automaticamente os contratos existentes.</p>
+      <div className="pricing-form-grid">
+        <Field label="Identificador interno"><input required maxLength={32} disabled={!isNew} pattern="[a-z][a-z0-9_]{2,31}" value={data.key} onChange={e=>set("key",e.target.value.toLowerCase())} placeholder="ex.: parceiro_gold" /></Field>
+        <Field label="Nome do plano"><input required minLength={3} maxLength={120} value={data.name} onChange={e=>set("name",e.target.value)} /></Field>
+      </div>
+      <Field label="Descrição"><textarea maxLength={500} rows={2} value={data.description} onChange={e=>set("description",e.target.value)}/></Field>
+      <div className="pricing-form-grid">
+        <Field label="Disponível para"><select value={data.audience} onChange={e=>set("audience",e.target.value)}><option value="content">Parceiros de conteúdo</option><option value="reseller">Revendas</option><option value="both">Ambos</option></select></Field>
+        <Field label="Preço mensal de referência (R$)"><input inputMode="decimal" value={price} onChange={e=>setPrice(e.target.value)} placeholder="Opcional; ex.: 99,90"/></Field>
+        <Field label="Máximo de URLs por código"><input type="number" min="1" max="8" required value={data.maxServers} onChange={e=>set("maxServers",e.target.value)}/></Field>
+        <Field label="Ordem de exibição"><input type="number" min="0" max="9999" required value={data.sortOrder} onChange={e=>set("sortOrder",e.target.value)}/></Field>
+      </div>
+      <div className="pricing-feature-options">
+        {[["autoFailover","Failover automático"],["autoPriority","Prioridade por desempenho"],["emailAlerts","Alertas por e-mail"],["detailedHistory","Histórico detalhado"]].map(([id,label])=><label key={id} className="pricing-check"><input type="checkbox" checked={!!data[id]} disabled={id==="autoPriority"&&!data.autoFailover} onChange={e=>set(id,e.target.checked)}/>{label}</label>)}
+        {!isNew&&!plan.system&&<label className="pricing-check"><input type="checkbox" checked={!!data.active} onChange={e=>set("active",e.target.checked)}/> Plano disponível para novas atribuições</label>}
+      </div>
+      {error&&<p className="error" role="alert">{error}</p>}
+      <div className="actions"><button className="btn" type="button" disabled={busy} onClick={onClose}>Cancelar</button><button className="btn primary" type="submit" disabled={busy}>{busy?"Salvando…":"Salvar plano"}</button></div>
+    </form>
+  </Modal>;
+}
+function CatalogPlans(){
+  const [plans,setPlans]=useState([]),[loading,setLoading]=useState(true),[error,setError]=useState("");
+  const [editing,setEditing]=useState(null),[deleting,setDeleting]=useState(null),[busy,setBusy]=useState(false),[revision,setRevision]=useState(0);
+  const reload=()=>setRevision(r=>r+1);
+  useEffect(()=>{let ignore=false;setLoading(true);
+    api("/admin/service-plans").then(r=>{if(!ignore){setPlans(r.data||[]);setError("")}})
+      .catch(e=>{if(!ignore)setError(e.message)}).finally(()=>{if(!ignore)setLoading(false)});
+    return()=>{ignore=true};
+  },[revision]);
+  const remove=async()=>{setBusy(true);setError("");try{
+    await api(`/admin/service-plans/${encodeURIComponent(deleting.key)}`,{method:"DELETE"});setDeleting(null);reload();
+  }catch(e){setError(e.message);setDeleting(null)}finally{setBusy(false)}};
+  return <>
+    <div className="pricing-info">Crie, personalize, duplique ou exclua planos técnicos. O valor é uma <strong>referência comercial</strong>; contratos e cobranças atuais continuam negociados individualmente.</div>
+    <div className="toolbar"><button className="btn primary" type="button" onClick={()=>setEditing(blankPlan())}>+ Criar novo plano</button><button className="btn" type="button" disabled={loading} onClick={reload}>Atualizar</button></div>
+    {error&&<p className="error" role="alert">{error}</p>}
+    {loading&&<p className="muted">Carregando planos…</p>}
+    <div className="pricing-tier-grid">{plans.map(p=><article key={p.key} className="pricing-tier card">
+      <div className="pricing-tier-label">{p.system?"Plano padrão":p.active?"Personalizado":"Desativado"}</div>
+      <h3>{p.name}</h3>
+      <p className="muted">{p.description||"Sem descrição"}</p>
+      <div className="pricing-tier-big">{p.maxServers} {p.maxServers===1?"URL":"URLs"}</div>
+      <dl>
+        <div><dt>Preço de referência</dt><dd>{p.monthlyPriceCents==null?"Negociável":`${money(p.monthlyPriceCents)} / mês`}</dd></div>
+        <div><dt>Disponível para</dt><dd>{p.audience==="content"?"Parceiros":p.audience==="reseller"?"Revendas":"Ambos"}</dd></div>
+        <div><dt>Failover</dt><dd>{p.autoFailover?"Sim":"Não"}</dd></div>
+        <div><dt>Prioridade automática</dt><dd>{p.autoPriority?"Sim":"Não"}</dd></div>
+        <div><dt>Alertas por e-mail</dt><dd>{p.emailAlerts?"Sim":"Não"}</dd></div>
+        <div><dt>Histórico detalhado</dt><dd>{p.detailedHistory?"Sim":"Não"}</dd></div>
+        <div><dt>Cadastros vinculados</dt><dd>{p.assignedCount}</dd></div>
+      </dl>
+      <div className="pricing-plan-actions">
+        <button className="btn sm primary" type="button" onClick={()=>setEditing(p)}>Editar</button>
+        <button className="btn sm" type="button" onClick={()=>setEditing({...p,key:"",name:`${p.name} · Cópia`,system:false,active:true})}>Duplicar</button>
+        {!p.system&&<button className="btn sm" type="button" onClick={()=>setDeleting(p)}>Excluir</button>}
+      </div>
+    </article>)}</div>
+    {!loading&&!plans.length&&<p className="muted">Nenhum plano cadastrado.</p>}
+    {editing&&<CatalogEditor key={editing.key||editing.name} plan={editing} onClose={()=>setEditing(null)} onSaved={reload}/>}
+    {deleting&&<Modal title="Excluir plano" onClose={()=>setDeleting(null)}>
+      <p>Excluir <strong>{deleting.name}</strong> permanentemente?</p>
+      <p className="muted">{deleting.assignedCount?`Este plano possui ${deleting.assignedCount} cadastro(s) vinculado(s). Reatribua os parceiros antes de excluir. Você pode desativá-lo na edição.`:"Esta ação não poderá ser desfeita."}</p>
+      <div className="actions"><button className="btn" onClick={()=>setDeleting(null)}>Cancelar</button><button className="btn primary" disabled={busy||deleting.assignedCount>0} onClick={remove}>Confirmar exclusão</button></div>
+    </Modal>}
   </>;
 }
 
@@ -176,13 +263,7 @@ export default function PlansAndPricing() {
         <button key={id} type="button" className={`tab ${tab === id ? "active" : ""}`} onClick={() => setTab(id)}>{label}</button>)}
     </div>
     {tab === "contracts" && <ContractList />}
-    {tab === "tiers" && <>
-      <div className="pricing-info">Os planos definem <strong>recursos técnicos</strong>; não há preço fixo obrigatório por plano. A mensalidade ou os créditos são negociados para cada parceiro na aba Contratos e mensalidades.</div>
-      <div className="pricing-tier-grid">{TIERS.map((t) => <article key={t.id} className="pricing-tier card"><div className="pricing-tier-label">{t.badge}</div><h3>{t.label}</h3><div className="pricing-tier-big">{t.urls}</div><p className="muted">Máximo por código, antes das exceções negociadas</p>
-        <dl><div><dt>Failover</dt><dd>{t.failover}</dd></div><div><dt>Prioridade</dt><dd>{t.priority}</dd></div><div><dt>Alertas por e-mail</dt><dd>{t.alerts}</dd></div><div><dt>Histórico</dt><dd>{t.history}</dd></div></dl>
-        <button className="btn" type="button" onClick={() => setTab("contracts")}>Configurar por parceiro</button>
-      </article>)}</div>
-    </>}
+    {tab === "tiers" && <CatalogPlans />}
     {tab === "prices" && <LicensePrices />}
   </div>;
 }
