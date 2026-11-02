@@ -5,12 +5,13 @@ import "./server-monitor.css";
 const STATES = [
   { key: "total", label: "Total", icon: "◉" },
   { key: "healthy", label: "Saudáveis", icon: "●" },
+  { key: "slow", label: "Lentos", icon: "◑" },
   { key: "suspect", label: "Instáveis", icon: "◐" },
   { key: "down", label: "Indisponíveis", icon: "●" },
   { key: "unknown", label: "Sem medição", icon: "○" },
   { key: "disabled", label: "Desativados", icon: "—" },
 ];
-const STATUS = { healthy: "Saudável", suspect: "Instável / lento", down: "Indisponível", unknown: "Sem medição recente", disabled: "Desativado" };
+const STATUS = { healthy: "Saudável", slow: "Lento", suspect: "Instável / lento", down: "Indisponível", unknown: "Sem medição recente", disabled: "Desativado" };
 const date = (value) => value ? new Date(value).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "Nunca";
 const host = (value) => { try { return new URL(value).host; } catch { return "Endereço indisponível"; } };
 

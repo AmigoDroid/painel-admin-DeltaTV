@@ -37,7 +37,7 @@ function PartnersList({ scope, onChanged }) {
   const cfg = SCOPES[scope];
   const [q, setQ] = useState("");
   const dq = useDebounced(q);
-  const list = useList("/admin/partners", { q: "", status: "", pageSize: 100 });
+  const list = useList("/admin/partners", { q: "", status: "", kind: scope, pageSize: 50 });
   const [liveIds, setLiveIds] = useState(null);
   // Horário de desconexão recebido em tempo real; não requer leitura no banco.
   const [disconnectedAt, setDisconnectedAt] = useState({});
@@ -97,7 +97,7 @@ function PartnersList({ scope, onChanged }) {
       </div>
       {rows.length > 0 && (
         <div className="mini-stats">
-          <div><strong>{rows.length}</strong><span>listados</span></div>
+          <div><strong>{list.meta?.total ?? rows.length}</strong><span>cadastrados</span></div>
           <div><strong>{count((p) => p.effectiveStatus === "active")}</strong><span>ativos</span></div>
           <div><strong>{rows.filter((p) => liveIds ? liveIds.has(p.id) : p.online).length}</strong><span>online agora (na página)</span></div>
           {pending > 0 && <div className="warn"><strong>{pending}</strong><span>aguardando aprovação</span></div>}

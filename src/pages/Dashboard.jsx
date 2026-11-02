@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { api, getAuth } from "../api.js";
-import { isPending } from "./Partners.jsx";
 import { Badge, Table, fmtDate, fmtDateTime, fmtMoney } from "../ui.jsx";
 
 /* Ícones de traço simples, no mesmo estilo do menu. */
@@ -65,7 +64,6 @@ export default function Dashboard() {
   const [d, setD] = useState(null);
   const [error, setError] = useState("");
   const [presence, setPresence] = useState(null);
-  const [parts, setParts] = useState(null);
   const user = getAuth()?.user;
 
   useEffect(() => {
@@ -73,14 +71,13 @@ export default function Dashboard() {
     const refresh = () => {
       if (document.hidden) return;
       api("/admin/dashboard").then((v) => { setD(v); setError(""); }).catch((e) => setError(e.message));
-      api("/admin/partners", { query: { pageSize: 100 } }).then(setParts).catch(() => {});
       // A contagem online é entregue pelo WebSocket; a consulta é só para carga inicial/reconexão.
       api("/admin/devices/presence").then(setPresence).catch(() => {});
     };
     const changed = (event) => {
       const msg = event?.detail;
       // Não refaz todas as requisições quando muda apenas a presença.
-      if (msg?.type === "device-presence" || msg?.type === "partner-presence") return;
+      if (msg?.type === "device-presence" || msg?.type === "partner-presence" || msg?.topic === "server-health" || msg?.topic === "system-metrics") return;
       clearTimeout(timer);
       timer = setTimeout(refresh, 300);
     };
@@ -130,14 +127,13 @@ export default function Dashboard() {
   if (error) return <p className="error">{error}</p>;
   if (!d) return <p className="muted">Carregando…</p>;
 
-  const rows = parts?.data ?? [];
-  const split = !!parts && parts.meta.total <= rows.length; // lista completa -> dá para separar com segurança
-  const active = (p) => p.effectiveStatus === "active";
-  const partnersActive = rows.filter((p) => p.kind !== "reseller" && active(p)).length;
-  const partnersOff = rows.filter((p) => p.kind !== "reseller" && !active(p)).length;
-  const resellersActive = rows.filter((p) => p.kind !== "content" && active(p)).length;
-  const resellersOff = rows.filter((p) => p.kind !== "content" && !active(p) && !isPending(p)).length;
-  const pendingSignups = rows.filter(isPending).length;
+  const breakdown = d.partnerBreakdown;
+  const split = !!breakdown;
+  const partnersActive = breakdown?.content?.active ?? 0;
+  const partnersOff = breakdown?.content?.inactive ?? 0;
+  const resellersActive = breakdown?.reseller?.active ?? 0;
+  const resellersOff = breakdown?.reseller?.inactive ?? 0;
+  const pendingSignups = breakdown?.pendingSignups ?? 0;
 
   const overdue = d.billing.pending.overdueCount;
   const attention = [

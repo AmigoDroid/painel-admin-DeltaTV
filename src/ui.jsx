@@ -209,7 +209,15 @@ export function useList(path, initial = {}) {
   useEffect(() => { reload(); }, [reload]);
   useEffect(() => {
     let timer;
-    const onChange = () => { clearTimeout(timer); timer = setTimeout(() => { if (!document.hidden) reload(); }, 300); };
+    const onChange = (event) => {
+      const msg = event?.detail;
+      if (msg?.type === "partner-presence" || msg?.type === "device-presence") return;
+      const section = path.split("/").filter(Boolean)[1];
+      const topic = msg?.topic;
+      if (msg?.type === "changed" && topic && topic !== "data" && topic !== section &&
+          !(section === "app-downloads" && topic === "downloads")) return;
+      clearTimeout(timer); timer = setTimeout(() => { if (!document.hidden) reload(); }, 300);
+    };
     window.addEventListener("realtime-change", onChange);
     window.addEventListener("realtime-ready", onChange);
     return () => { clearTimeout(timer); window.removeEventListener("realtime-change", onChange); window.removeEventListener("realtime-ready", onChange); };
@@ -283,7 +291,11 @@ export function useLoad(fn, deps) {
   useEffect(() => { setState({ data: null, error: "" }); load(); }, deps);
   useEffect(() => {
     let timer;
-    const onChange = () => { clearTimeout(timer); timer = setTimeout(() => { if (!document.hidden) load(); }, 350); };
+    const onChange = (event) => {
+      const msg = event?.detail;
+      if (msg?.type === "partner-presence" || msg?.type === "device-presence" || msg?.topic === "server-health") return;
+      clearTimeout(timer); timer = setTimeout(() => { if (!document.hidden) load(); }, 350);
+    };
     window.addEventListener("realtime-change", onChange);
     window.addEventListener("realtime-ready", onChange);
     return () => { clearTimeout(timer); window.removeEventListener("realtime-change", onChange); window.removeEventListener("realtime-ready", onChange); };

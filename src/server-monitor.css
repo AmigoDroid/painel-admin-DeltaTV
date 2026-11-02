@@ -20,3 +20,6 @@
 .srv-bottom{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-top:17px}.srv-footnote{font-size:11px;color:var(--muted,#b2bdd3);line-height:1.5}.srv-pagination{display:flex;gap:8px}.srv-note{margin:15px 4px 0}.srv-empty{margin:0;padding:38px 12px;text-align:center;color:var(--muted,#b2bdd3);font-size:13px}
 @media(max-width:730px){.srv-hero{align-items:flex-start;padding:18px;flex-direction:column}.srv-monitor .srv-refresh{width:100%}.srv-summary{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.srv-metric{padding:12px}.srv-list{padding:13px}.srv-toolbar,.srv-filters{align-items:stretch;flex-direction:column;width:100%}.srv-search,.srv-search input,.srv-filters select{width:100%;max-width:none}.srv-grid{grid-template-columns:minmax(0,1fr)}.srv-state{max-width:100%}}
 @media(max-width:360px){.srv-metric-label{font-size:11px}.srv-item{padding:12px}.srv-item-head{align-items:stretch}}
+
+/* Origem alcançável, mas com latência acima do limite: não confundir com queda. */
+.srv-state-slow, .srv-slow { color: #aa7618; }
