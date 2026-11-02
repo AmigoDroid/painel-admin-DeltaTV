@@ -20,7 +20,7 @@ export default function ContentContract({partnerId}){
   if(form.licensePolicy==="partner_only"&&!window.confirm("Quando o parceiro perder o vínculo/for bloqueado, as ativações dependentes não terão acesso. Licenças independentes não serão removidas. Confirmar?"))return;
   setBusy(true);setInfo("");setError("");try{await api(`/admin/partners/${partnerId}/commercial`,{method:"PUT",body:{
    mode:form.mode,fixedFeeCents,activationLimit,licensePolicy:form.licensePolicy,
-   creditsPerActivation:Number(form.creditsPerActivation),autoPriority:form.autoPriority}});setInfo("Condições salvas e auditadas.");await load()}catch(e){setError(e.message)}finally{setBusy(false)};
+   creditsPerActivation:Number(form.creditsPerActivation),autoPriority:form.autoPriority,allowWebIssuance:!!form.allowWebIssuance}});setInfo("Condições salvas e auditadas.");await load()}catch(e){setError(e.message)}finally{setBusy(false)};
  };
  const adjust=async e=>{e.preventDefault();if(!window.confirm(`Ajustar a carteira em ${delta} crédito(s)?`))return;
   setBusy(true);setInfo("");setError("");try{await api(`/admin/partners/${partnerId}/commercial/credits`,{method:"POST",body:{delta:Number(delta),note}});setInfo("Créditos ajustados. Consulte também o extrato da carteira.");setDelta("");setNote("");await load()}catch(e){setError(e.message)}finally{setBusy(false)};
@@ -39,6 +39,8 @@ export default function ContentContract({partnerId}){
    <label>Política de licença<select value={form.licensePolicy} onChange={e=>setForm({...form,licensePolicy:e.target.value})}>
     <option value="standard">Padrão · manter licenças independentes</option><option value="partner_only">Dependente da parceria · acesso condicionado ao parceiro</option></select></label>
    <label style={{display:"flex",gap:10,alignItems:"center"}}><input type="checkbox" checked={!!form.autoPriority} onChange={e=>setForm({...form,autoPriority:e.target.checked})}/> Prioridade automática por latência/saúde</label>
+   <label style={{display:"flex",gap:10,alignItems:"center"}}><input type="checkbox" checked={!!form.allowWebIssuance} onChange={e=>setForm({...form,allowWebIssuance:e.target.checked})}/> Permitir que revendas emitam Player Web usando códigos autorizados deste parceiro</label>
+   <div className="muted">A habilitação também exige ativação explícita por código no portal do parceiro. Nenhuma revenda é vinculada obrigatoriamente.</div>
    <div className="muted">Nas modalidades fixas, o valor mensal é aplicado ao faturamento já existente. Em créditos, o faturamento mensal é desligado para evitar duplicidade.</div>
    <button className="btn primary" disabled={busy}>Salvar condições comerciais</button>
   </form>
