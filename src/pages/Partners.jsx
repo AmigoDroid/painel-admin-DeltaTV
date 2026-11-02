@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { offlineDuration } from "../presence-time.js";
 import { api, getAuth } from "../api.js";
 import { ClientsPanel } from "./Clients.jsx";
 import { UsersPanel } from "./Users.jsx";
@@ -37,10 +38,34 @@ function PartnersList({ scope, onChanged }) {
   const dq = useDebounced(q);
   const list = useList("/admin/partners", { q: "", status: "", pageSize: 100 });
   const [liveIds, setLiveIds] = useState(null);
+  // Horário de desconexão recebido em tempo real; não requer leitura no banco.
+  const [disconnectedAt, setDisconnectedAt] = useState({});
+  const [clock, setClock] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setClock(Date.now()), 30_000);
+    return () => clearInterval(timer);
+  }, []);
   useEffect(() => {
     const refresh = () => api("/admin/partners/presence/live").then((v) => setLiveIds(new Set(v.onlinePartnerIds))).catch(() => {});
     const change = (ev) => {
       if (ev?.detail?.type === "partner-presence") {
+        const { partnerId, online, lastDisconnectedAt } = ev.detail;
+        if (partnerId) {
+          setDisconnectedAt((prev) => {
+            if (online) {
+              if (!(partnerId in prev)) return prev;
+              const next = { ...prev };
+              delete next[partnerId];
+              return next;
+            }
+            // Limita o histórico temporário no navegador; os demais tempos vêm do banco.
+            const next = { ...prev, [partnerId]: lastDisconnectedAt || new Date().toISOString() };
+            const keys = Object.keys(next);
+            for (const id of keys.slice(0, Math.max(0, keys.length - 2000))) delete next[id];
+            return next;
+          });
+        }
+        setClock(Date.now());
         setLiveIds((old) => {
           if (!old) { refresh(); return old; }
           const copy = new Set(old);
@@ -90,7 +115,14 @@ function PartnersList({ scope, onChanged }) {
           <tr key={p.id} className="click" onClick={() => setOpenId(p.id)}>
             <td><strong>{p.name}</strong><div className="muted">{p.slug}{p.kind === "both" && <span className="kind both">{cfg.also}</span>}</div></td>
             <td>{isPending(p) ? <Badge status="pending" label="Novo cadastro" /> : <Badge status={p.effectiveStatus} />}</td>
-            <td><span title={p.lastPortalActivityAt ? `Última atividade: ${fmtDateTime(p.lastPortalActivityAt)}` : "Sem atividade registrada"} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span style={{ width: 9, height: 9, borderRadius: "50%", background: (liveIds ? liveIds.has(p.id) : p.online) ? "#18a56b" : "#9099a7", display: "inline-block" }} />{(liveIds ? liveIds.has(p.id) : p.online) ? "Online" : "Offline"}</span></td>
+            <td>
+              <PortalPresence
+                online={liveIds ? liveIds.has(p.id) : p.online}
+                lastActivityAt={p.lastPortalActivityAt}
+                disconnectedAt={disconnectedAt[p.id]}
+                now={clock}
+              />
+            </td>
             <td>{MODELS[p.billingModel]}</td><td>{p.deviceCount}{p.deviceLimit != null ? `/${p.deviceLimit}` : ""}</td><td>{fmtDate(p.endsAt)}</td>
           </tr>))}</tbody>
       </Table>
@@ -99,6 +131,30 @@ function PartnersList({ scope, onChanged }) {
       {creating && <PartnerForm scope={scope} onClose={() => setCreating(false)} onSaved={() => { setCreating(false); changed(); }} />}
       {openId && <PartnerDetail id={openId} onClose={() => setOpenId(null)} onChanged={changed} />}
     </>
+  );
+}
+
+function PortalPresence({ online, lastActivityAt, disconnectedAt, now }) {
+  // Em caso de reconexão perdida, a última atividade persistida pode ser mais nova que o evento local.
+  const eventTime = disconnectedAt ? new Date(disconnectedAt).getTime() : 0;
+  const activityTime = lastActivityAt ? new Date(lastActivityAt).getTime() : 0;
+  const since = disconnectedAt && eventTime >= activityTime ? disconnectedAt : lastActivityAt;
+  const duration = offlineDuration(since, now);
+  const tooltip = online
+    ? "Conectado ao portal agora"
+    : disconnectedAt
+      ? `Desconectado em: ${fmtDateTime(disconnectedAt)}`
+      : lastActivityAt
+        ? `Tempo aproximado desde a última atividade: ${fmtDateTime(lastActivityAt)}`
+        : "Nenhuma atividade registrada para esta conta";
+  return (
+    <span className="partner-portal-presence" title={tooltip}>
+      <span className={`partner-portal-dot ${online ? "connected" : "disconnected"}`} aria-hidden="true" />
+      <span className="partner-portal-info">
+        <strong>{online ? "Online" : "Offline"}</strong>
+        {!online && <small>{duration || "Sem atividade registrada"}</small>}
+      </span>
+    </span>
   );
 }
 
