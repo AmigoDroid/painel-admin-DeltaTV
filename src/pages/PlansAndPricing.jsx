@@ -107,7 +107,7 @@ function ContractList() {
       <Table><thead><tr><th>Cadastro</th><th>Plano de recursos</th><th>Modalidade</th><th>Valor negociado</th><th>Limite contratado</th><th>Ações</th></tr></thead>
       <tbody>{result.data.map((p) => <tr key={p.id}>
         <td><strong>{p.name}</strong><div className="muted">{p.slug} · {p.kind === "reseller" ? "Revenda" : p.kind === "both" ? "Parceiro + revenda" : "Parceiro"}</div></td>
-        <td><strong>{p.tierName || p.tier}</strong><div className="muted">{p.features.maxServers} URL(s)/código</div></td>
+        <td><strong>{p.tierName || p.tier}</strong><div className="muted">{p.features.maxServers == null ? "URLs ilimitadas por código" : `${p.features.maxServers} URL(s) por código`}</div></td>
         <td>{p.contractMode && p.contractMode !== "legacy" ? CONTRACT_NAMES[p.contractMode] : BILLING_NAMES[p.billingModel] || "—"}</td>
         <td><strong>{contractPrice(p)}</strong></td>
         <td>{p.contractMode === "fixed_limited" ? `${p.activationLimit ?? "—"} ativações` : p.contractMode === "fixed_unlimited" ? "Ilimitadas" : p.deviceLimit != null ? `${p.deviceLimit} dispositivos` : "Conforme contrato"}</td>
@@ -135,7 +135,7 @@ function CatalogEditor({plan,onClose,onSaved}) {
     setBusy(true);
     try {
       const payload={name:data.name.trim(),description:data.description.trim(),audience:data.audience,
-        monthlyPriceCents:cents,maxServers:Number(data.maxServers),autoFailover:!!data.autoFailover,
+        monthlyPriceCents:cents,maxServers:data.maxServers == null ? null : Number(data.maxServers),autoFailover:!!data.autoFailover,
         autoPriority:!!data.autoPriority,emailAlerts:!!data.emailAlerts,detailedHistory:!!data.detailedHistory,
         sortOrder:Number(data.sortOrder)};
       if(isNew) await api("/admin/service-plans",{method:"POST",body:{key:data.key.trim(),...payload}});
@@ -154,7 +154,10 @@ function CatalogEditor({plan,onClose,onSaved}) {
       <div className="pricing-form-grid">
         <Field label="Disponível para"><select value={data.audience} onChange={e=>set("audience",e.target.value)}><option value="content">Parceiros de conteúdo</option><option value="reseller">Revendas</option><option value="both">Ambos</option></select></Field>
         <Field label="Preço mensal de referência (R$)"><input inputMode="decimal" value={price} onChange={e=>setPrice(e.target.value)} placeholder="Opcional; ex.: 99,90"/></Field>
-        <Field label="Máximo de URLs por código"><input type="number" min="1" max="8" required value={data.maxServers} onChange={e=>set("maxServers",e.target.value)}/></Field>
+        <Field label="URLs por código">
+          <label className="pricing-check"><input type="checkbox" checked={data.maxServers == null} onChange={e=>set("maxServers",e.target.checked ? null : 1)}/> Sem limite de URLs</label>
+          {data.maxServers != null && <input type="number" min="1" step="1" required value={data.maxServers} onChange={e=>set("maxServers",e.target.value)}/>}
+        </Field>
         <Field label="Ordem de exibição"><input type="number" min="0" max="9999" required value={data.sortOrder} onChange={e=>set("sortOrder",e.target.value)}/></Field>
       </div>
       <div className="pricing-feature-options">
@@ -187,7 +190,7 @@ function CatalogPlans(){
       <div className="pricing-tier-label">{p.system?"Plano padrão":p.active?"Personalizado":"Desativado"}</div>
       <h3>{p.name}</h3>
       <p className="muted">{p.description||"Sem descrição"}</p>
-      <div className="pricing-tier-big">{p.maxServers} {p.maxServers===1?"URL":"URLs"}</div>
+      <div className="pricing-tier-big">{p.maxServers == null ? "Ilimitadas" : `${p.maxServers} ${p.maxServers===1?"URL":"URLs"}`}</div>
       <dl>
         <div><dt>Preço de referência</dt><dd>{p.monthlyPriceCents==null?"Negociável":`${money(p.monthlyPriceCents)} / mês`}</dd></div>
         <div><dt>Disponível para</dt><dd>{p.audience==="content"?"Parceiros":p.audience==="reseller"?"Revendas":"Ambos"}</dd></div>
