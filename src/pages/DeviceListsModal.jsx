@@ -13,11 +13,14 @@ export default function DeviceListsModal({ device, onClose, onChanged }) {
   const { confirm } = useUi();
   const run = useAction();
   const [state, setState] = useState(null);
+  const [attribution, setAttribution] = useState(null);
   const base = `/admin/devices/registrations/${device.deviceId}`;
 
   const load = async () => {
     const d = await run(() => api(base));
     if (d && d !== true) setState(d);
+    const attrs = await run(() => api(`${base}/attribution`));
+    if (attrs && attrs !== true) setAttribution(attrs);
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [device.deviceId]);
 
@@ -46,6 +49,16 @@ export default function DeviceListsModal({ device, onClose, onChanged }) {
       {!state ? <p className="muted">Carregando…</p> : (
         <>
           <DeviceLists device={state} onRemove={remove} />
+          <h4>Quem ativou e configurou</h4>
+          {attribution?.activations?.map(item => (
+            <section className="card" key={item.activationId} style={{padding:14, marginBottom:12, overflowWrap:"anywhere"}}>
+              <strong>{item.listName || `Ativação ${item.activationId.slice(0,8)}`}</strong>
+              <div>Ativou: <strong>{item.activatedBy?.name || "Não identificado no histórico"}</strong></div>
+              <div>Adicionou/alterou a lista: <strong>{item.listAddedBy?.name || "Não identificado no histórico"}</strong></div>
+              <div>Última alteração: <strong>{item.lastChangedBy?.name || "Sem registro"}</strong></div>
+              <div className="muted">{item.listAddedBy?.at ? new Date(item.listAddedBy.at).toLocaleString("pt-BR") : "Sem data de autoria registrada"}</div>
+            </section>
+          ))}
           <ConfigureForm device={state} onSubmit={submit} />
         </>
       )}

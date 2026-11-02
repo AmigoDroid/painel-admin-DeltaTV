@@ -47,19 +47,15 @@ export default function EditDeviceModal({ device, onClose, onDone }) {
             <option value="proxy">Proxy</option>
           </select>
         </Field>
-        {device.hasOwnList || !device.partnerId ? (
-          <>
-            <Field label="Nome da lista"><input value={name} onChange={(e) => setName(e.target.value)} maxLength={160} disabled={removeList} /></Field>
-            <Field label="Novo link da lista (M3U)" hint="Deixe em branco para manter o link atual. O servidor extrai servidor, usuário e senha do link.">
-              <input value={url} onChange={(e) => setUrl(e.target.value)} type="url" autoComplete="off" spellCheck={false} disabled={removeList} placeholder="http://servidor:8080/get.php?username=…&password=…" />
-            </Field>
-            {device.hasOwnList && device.partnerId && (
-              <label className="check"><input type="checkbox" checked={removeList} onChange={(e) => setRemoveList(e.target.checked)} /> Remover a lista própria (volta a usar o provedor da parceria)</label>
-            )}
-          </>
-        ) : (
-          <p className="muted">Dispositivo de parceria sem lista própria: para trocar o acesso use “Adicionar parceiro”.</p>
-        )}
+        <>
+          <Field label="Nome da lista própria"><input value={name} onChange={(e) => setName(e.target.value)} maxLength={160} disabled={removeList} /></Field>
+          <Field label="Novo link da lista (M3U)" hint="Se houver uma lista de parceria, esta lista própria terá prioridade. Deixe vazio para manter a configuração atual.">
+            <input value={url} onChange={(e) => setUrl(e.target.value)} type="url" autoComplete="off" spellCheck={false} disabled={removeList} placeholder="https://servidor/get.php?username=…&password=…" />
+          </Field>
+          {device.hasOwnList && (
+            <label className="check"><input type="checkbox" checked={removeList} onChange={(e) => setRemoveList(e.target.checked)} /> Remover a lista própria (mantém a ativação e eventuais parcerias)</label>
+          )}
+        </>
         <div className="actions">
           <button type="button" className="btn" onClick={onClose}>Cancelar</button>
           <button className="btn primary" disabled={busy}>{busy ? "Salvando…" : "Salvar"}</button>

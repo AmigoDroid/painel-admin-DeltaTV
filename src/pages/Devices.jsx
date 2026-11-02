@@ -59,7 +59,7 @@ export default function Devices({ onChanged }) {
             <td className="actions">
               <RowMenu items={[
                 { label: "Listas", hidden: !(a.mac && a.deviceId), onClick: () => setViewing(a) },
-                { label: "Editar", hidden: !(isSuper && a.status !== "revoked"), onClick: () => setEditing(a) },
+                { label: "Editar", hidden: !isSuper, onClick: () => setEditing(a) },
                 { label: "Histórico", hidden: !a.mac, onClick: () => openHistory(a.mac) },
                 { label: "Adicionar parceiro", hidden: !(a.status !== "revoked" && a.mac), onClick: () => setAdding(a) },
                 { label: "Bloquear", hidden: a.status !== "active", onClick: () => change(a, "block", { title: "Bloquear dispositivo", message: `Somente ${a.mac} perde o acesso.`, reason: "required", danger: true }) },
