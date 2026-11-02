@@ -345,9 +345,13 @@ export function RowMenu({ items, label = "Ações" }) {
   const toggle = () => {
     if (pos) return close();
     const r = btn.current.getBoundingClientRect();
-    const h = list.length * 36 + 12;
-    const up = r.bottom + h > window.innerHeight && r.top > h; // sem espaço embaixo: abre para cima
-    setPos({ top: up ? r.top - h - 4 : r.bottom + 4, right: Math.max(8, window.innerWidth - r.right) });
+    const narrow = window.matchMedia("(max-width: 700px)").matches;
+    if (narrow) { setPos({ mobile: true }); return; }
+    const h = Math.min(list.length * 42 + 12, window.innerHeight - 24);
+    const up = r.bottom + h > window.innerHeight && r.top > h;
+    const width = Math.min(240, window.innerWidth - 24);
+    const left = Math.max(12, Math.min(r.right - width, window.innerWidth - width - 12));
+    setPos({ top: Math.max(12, up ? r.top - h - 4 : Math.min(r.bottom + 4, window.innerHeight - h - 12)), left });
   };
   return (
     <>
@@ -355,12 +359,16 @@ export function RowMenu({ items, label = "Ações" }) {
         <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="12" cy="19" r="2" /></svg>
       </button>
       {pos && createPortal(
-        <div ref={menu} role="menu" className="rowmenu" style={{ top: pos.top, right: pos.right }}>
-          {list.map((i, n) => (
-            <button key={n} type="button" role="menuitem" className={i.danger ? "danger" : ""} disabled={i.disabled} title={i.title}
-              onClick={() => { close(); i.onClick?.(); }}>{i.label}</button>
-          ))}
-        </div>, document.body)}
+        <>
+          {pos.mobile && <button type="button" className="rowmenu-backdrop" aria-label="Fechar ações" onClick={close} />}
+          <div ref={menu} role="menu" aria-label={label} className={`rowmenu${pos.mobile ? " rowmenu-mobile" : ""}`} style={pos.mobile ? undefined : { top: pos.top, left: pos.left }}>
+            {pos.mobile && <div className="rowmenu-heading">{label}<button type="button" onClick={close} aria-label="Fechar menu">✕</button></div>}
+            {list.map((i, n) => (
+              <button key={n} type="button" role="menuitem" className={i.danger ? "danger" : ""} disabled={i.disabled} title={i.title}
+                onClick={() => { close(); i.onClick?.(); }}>{i.label}</button>
+            ))}
+          </div>
+        </>, document.body)}
     </>
   );
 }

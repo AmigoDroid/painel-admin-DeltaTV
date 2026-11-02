@@ -340,3 +340,17 @@ pre,code,.mono{overflow-wrap:anywhere;word-break:break-word}
 .login-history-details {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 12px;margin-top:16px}
 .login-history-details > div {min-width:0;overflow-wrap:anywhere}.login-history-details small {display:block;opacity:.7;margin-bottom:3px}.login-history-details b {font-size:13px;font-weight:600}
 @media(max-width:480px) {.login-history-details {grid-template-columns:minmax(0,1fr)} }
+
+/* Ações sempre legíveis no celular: menu fora do cartão, com largura da janela. */
+.rowmenu{max-height:calc(100dvh - 24px);overflow-y:auto;overscroll-behavior:contain}
+@media(max-width:700px){
+ .rowmenu-backdrop{position:fixed;inset:0;z-index:110;border:0;background:rgba(0,0,0,.62);cursor:pointer}
+ .rowmenu.rowmenu-mobile{position:fixed;z-index:111;top:auto;left:12px;right:12px;bottom:max(12px, env(safe-area-inset-bottom));width:auto;min-width:0;max-width:none;max-height:min(78dvh,620px);overflow-y:auto;padding:10px;border-radius:18px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+ .rowmenu-mobile .rowmenu-heading{display:flex;align-items:center;justify-content:space-between;padding:8px 10px 12px;color:var(--text);font-size:15px;font-weight:800;border-bottom:1px solid var(--line-soft);margin-bottom:4px}
+ .rowmenu-mobile .rowmenu-heading button{padding:4px 10px;border:0;background:transparent;color:var(--text);font-size:20px}
+ .rowmenu-mobile>button[role=menuitem]{padding:12px 14px;min-height:44px;font-size:14px;white-space:normal}
+ .table-wrap tbody td.actions{display:flex;justify-content:flex-end;min-height:48px;padding:12px 0 2px;margin-top:3px}
+ .table-wrap tbody td.actions::before{content:"AÇÕES";display:block;width:auto;flex-basis:auto;flex:1;align-self:center}
+ .table-wrap tbody td.actions .btn.kebab{min-height:38px;min-width:44px;border-radius:10px}
+ .table-wrap tbody td{min-width:0}
+}
