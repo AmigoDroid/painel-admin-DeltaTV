@@ -4,6 +4,7 @@ import { ClientsPanel } from "./Clients.jsx";
 import { UsersPanel } from "./Users.jsx";
 import CodeModal, { CodeEditModal } from "./CodeModal.jsx";
 import { StockAdmin } from "./Stock.jsx";
+import ContentContract from "./ContentContract.jsx";
 import { Badge, DeliveryBadge, accessStatus, Empty, Field, LoadError, Modal, Pager, Table, dateInput, fmtDate, fmtDateTime, fmtMoney, spDateToIso, toCents, useAction, useDebounced, useList, useLoad, useUi, RowMenu } from "../ui.jsx";
 
 // Mesmo texto gravado pelo back-end no autocadastro de revendedor (ver reseller-signup.service.js).
@@ -190,6 +191,7 @@ function PartnerDetail({ id, onClose, onChanged }) {
   const what = p.kind === "content" ? "parceria" : "revenda";
   const tabList = [
     ...(p.kind !== "content" ? [["stock", "Estoque de licenças"], ["clients", "Clientes"]] : []),
+    ...(p.kind !== "reseller" ? [["commercial", "Contrato de conteúdo"]] : []),
     ["codes", "Códigos"], ["providers", "Servidores IPTV"], ["devices", "Dispositivos"],
     ...(p.billingModel !== "none" || p.invoices.length ? [["invoices", "Mensalidades"]] : []),
     ...(["superadmin", "admin"].includes(role) ? [["users", "Usuários do portal"]] : []),
@@ -238,6 +240,7 @@ function PartnerDetail({ id, onClose, onChanged }) {
         {p.status !== "cancelled" && <button className="btn danger" onClick={() => act("cancel", { title: `Cancelar ${what}`, message: "Os dispositivos perdem o acesso. Só o superadmin pode reativar depois.", reason: "required", danger: true })}>Cancelar</button>}
       </div>
       <div className="tabs">{tabList.map(([k, n]) => <button key={k} className={`tab ${cur === k ? "active" : ""}`} onClick={() => setTab(k)}>{n}</button>)}</div>
+      {cur === "commercial" && <ContentContract partnerId={id} />}
       {cur === "codes" && <>
         <div className="actions left"><button className="btn primary" onClick={() => setNewCode(true)}>Novo código</button></div>
         <Table><thead><tr><th>Código</th><th>Servidor</th><th>Rótulo</th>{p.kind !== "content" && <th>Licença do estoque</th>}<th>Status</th><th>Ativações (usadas/limite)</th><th>Expira</th><th /></tr></thead><tbody>
