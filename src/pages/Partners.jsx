@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import AdminDeleteModal from "./AdminDeleteModal.jsx";
 import { offlineDuration } from "../presence-time.js";
 import { api, getAuth } from "../api.js";
 import { ClientsPanel } from "./Clients.jsx";
@@ -239,6 +240,7 @@ function PartnerDetail({ id, onClose, onChanged }) {
   const [editCode, setEditCode] = useState(null);
   const [provForm, setProvForm] = useState(null);
   const [editing, setEditing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const role = getAuth()?.user?.role;
   const { data: p, error, reload: load, setData: setP } = useLoad(() => api(`/admin/partners/${id}`), [id]);
   const loadDevices = () => api(`/admin/partners/${id}/devices`, { query: { pageSize: 100 } }).then((r) => setDevices(r.data)).catch(() => {});
@@ -292,6 +294,7 @@ function PartnerDetail({ id, onClose, onChanged }) {
       </dl>
       <div className="actions left">
         <button className="btn" onClick={() => setEditing(true)}>Editar condições</button>
+        {role === "superadmin" && <button className="btn danger" onClick={() => setDeleting(true)}>Excluir revenda / parceiro</button>}
         {p.status === "active" && <button className="btn" onClick={() => act("suspend", { title: `Suspender ${what}`, message: "Todos os dispositivos vinculados perdem o acesso até a reativação.", reason: "required", danger: true, confirmLabel: "Suspender" })}>Suspender</button>}
         {["active", "suspended"].includes(p.status) && <button className="btn danger" onClick={() => act("block", { title: `Bloquear ${what}`, message: "Todos os dispositivos da parceria perdem o acesso, independentemente do código usado.", reason: "required", danger: true, confirmLabel: "Bloquear" })}>Bloquear</button>}
         {(["suspended", "blocked"].includes(p.status) || (role === "superadmin" && p.status === "cancelled")) && <button className="btn primary" onClick={() => act("reactivate", isPending(p) ? { title: "Aprovar cadastro", message: "O revendedor poderá usar o portal imediatamente.", confirmLabel: "Aprovar" } : { title: `Reativar ${what}`, message: "Os dispositivos elegíveis recuperam o acesso." })}>{isPending(p) ? "Aprovar cadastro" : "Reativar"}</button>}
@@ -343,6 +346,7 @@ function PartnerDetail({ id, onClose, onChanged }) {
       {newCode && <CodeModal checkPath="/admin/partners/codes/check" createPath={`/admin/partners/${id}/codes`} balancesPath={`/admin/partners/${id}/stock`} kind={p.kind} providers={p.providers} onClose={() => setNewCode(false)} onCreated={() => { setNewCode(false); load(); }} />}
       {editCode && <CodeEditModal partnerId={id} code={editCode} kind={p.kind} providers={p.providers} onClose={() => setEditCode(null)} onSaved={() => { setEditCode(null); load(); }} />}
       {provForm && <ProviderForm partnerId={id} provider={provForm.id ? provForm : null} onClose={() => setProvForm(null)} onSaved={() => { setProvForm(null); load(); }} />}
+      {deleting && <AdminDeleteModal type="partner" id={id} onClose={() => setDeleting(false)} onDone={() => { setDeleting(false); onClose(); onChanged?.(); }} />}
       {editing && <PartnerForm partner={p} scope={p.kind === "content" ? "content" : "reseller"} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); load(); onChanged(); }} />}
     </Modal>
   );

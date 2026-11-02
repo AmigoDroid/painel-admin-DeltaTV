@@ -4,6 +4,7 @@ import { Badge, DeliveryBadge, OnlineBadge, PlatformBadge, accessStatus, Empty, 
 import CredentialsModal from "./CredentialsModal.jsx";
 import EditDeviceModal from "./EditDeviceModal.jsx";
 import DeviceListsModal from "./DeviceListsModal.jsx";
+import AdminDeleteModal from "./AdminDeleteModal.jsx";
 
 const REFRESH_MS = 20000;
 
@@ -14,6 +15,7 @@ export default function Devices({ onChanged }) {
   const dq = useDebounced(q);
   const list = useList("/admin/devices", { q: "", status: "", online: "" });
   const [history, setHistory] = useState(null);
+  const [deleting, setDeleting] = useState(null);
   const [registering, setRegistering] = useState(false);
   const [editing, setEditing] = useState(null); // ativação em edição (só superadmin)
   const [viewing, setViewing] = useState(null); // linha do MAC cujas listas estão abertas (sem precisar da chave da TV)
@@ -22,7 +24,7 @@ export default function Devices({ onChanged }) {
   useEffect(() => { list.filter({ q: dq }); /* eslint-disable-next-line */ }, [dq]);
 
   // Atualização automática da presença: pausa com a aba escondida ou com janela aberta (não atrapalha quem está editando).
-  const busy = registering || editing || viewing || adding || history;
+  const busy = registering || editing || viewing || adding || history || deleting;
   useEffect(() => {
     if (busy) return undefined;
     const t = setInterval(() => { if (!document.hidden) list.reload(); }, REFRESH_MS);
@@ -66,6 +68,8 @@ export default function Devices({ onChanged }) {
                 { label: "Desbloquear", hidden: a.status !== "blocked", onClick: () => change(a, "unblock", { title: "Desbloquear", message: a.mac }) },
                 { label: "Restaurar", hidden: !(a.status === "revoked" && isSuper), onClick: () => change(a, "restore", { title: "Restaurar ativação", message: `Desfaz a remoção de ${a.mac}.` }) },
                 { label: "Remover", hidden: a.status === "revoked", danger: true, onClick: () => change(a, "revoke", { title: "Remover ativação", message: `Somente este vínculo é removido; as outras listas do MAC ${a.mac} continuam.`, reason: "optional", danger: true }) },
+                { label: "Excluir ativação definitivamente", hidden: !isSuper, danger: true, onClick: () => setDeleting({ type: "activation", id: a.id }) },
+                { label: "Excluir aparelho e todas as ativações", hidden: !isSuper || !a.deviceId, danger: true, onClick: () => setDeleting({ type: "device", id: a.deviceId }) },
               ]} />
             </td></tr>))}</tbody></Table>
       <Empty loading={list.loading} error={list.error} count={list.data.length} />
@@ -94,6 +98,7 @@ export default function Devices({ onChanged }) {
       {editing && (
         <EditDeviceModal device={editing} onClose={() => setEditing(null)} onDone={() => { setEditing(null); list.reload(); onChanged?.(); }} />
       )}
+      {deleting && <AdminDeleteModal type={deleting.type} id={deleting.id} onClose={() => setDeleting(null)} onDone={() => { setDeleting(null); list.reload(); onChanged?.(); }} />}
       {history && (
         <Modal title={`Histórico de ${history.device.mac}`} onClose={() => setHistory(null)} wide>
           <h4>Ativações</h4>
