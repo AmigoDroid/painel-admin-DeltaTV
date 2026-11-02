@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { api, getAuth, login, logout } from "./api.js";
 import { UiProvider, Field, useAction, BrandMark } from "./ui.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
+import ServerMonitor from "./pages/ServerMonitor.jsx";
 import Licenses from "./pages/Licenses.jsx";
 import Partners, { Resellers } from "./pages/Partners.jsx";
 import Devices from "./pages/Devices.jsx";
@@ -27,7 +28,7 @@ const PAGES = {
   dashboard: ["Visão geral", Dashboard],
   webaccess: ["Player Web", WebAccess],
   licenses: ["Licenças", Licenses], devices: ["Dispositivos", Devices], unlinked: ["Sem vínculo", Unlinked],
-  partners: ["Parceiros", Partners], sources: ["Fontes de conteúdo", Sources],
+  partners: ["Parceiros", Partners], servermonitor: ["Monitoramento", ServerMonitor], sources: ["Fontes de conteúdo", Sources],
   resellers: ["Revendas", Resellers], clients: ["Clientes", Clients], credits: ["Créditos", Credits], downloads: ["Downloads e links", Downloads],
   billing: ["Financeiro", Billing], pix: ["Pix", Pix],
   users: ["Usuários", Users], loginhistory: ["Histórico de login", LoginHistory], notifications: ["Notificações", Notifications], mail: ["E-mails", Mail], audit: ["Auditoria", Audit],
@@ -37,7 +38,7 @@ const PAGES = {
 const GROUPS = [
   { label: null, items: ["dashboard"] },
   { label: "Licenciamento", items: ["licenses", "devices", "unlinked", "webaccess"] },
-  { label: "Parceiros", items: ["partners", "sources"] },
+  { label: "Parceiros", items: ["partners", "servermonitor", "sources"] },
   { label: "Revendas", items: ["resellers", "clients", "credits", "downloads"] },
   { label: "Financeiro", items: ["billing", "pix"] },
   { label: "Sistema", items: ["users", "loginhistory", "notifications", "mail", "audit"] },
@@ -48,6 +49,7 @@ const ICONS = {
   dashboard: <><rect x="3" y="3" width="7.5" height="7.5" rx="2" /><rect x="13.5" y="3" width="7.5" height="7.5" rx="2" /><rect x="3" y="13.5" width="7.5" height="7.5" rx="2" /><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2" /></>,
   licenses: <><circle cx="8" cy="15" r="4" /><path d="M11 12l9-9M16 7l3 3M14 9l2 2" /></>,
   partners: <><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5" /><path d="M16 4.8a3.5 3.5 0 010 6.4M18.5 14.8c1.7.7 2.8 2.3 3 5.2" /></>,
+  servermonitor: <><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M6 14h3l2-5 3 8 2-4h2"/></>,
   resellers: <><path d="M4 9l1.5-5h13L20 9" /><path d="M4 9a2.5 2.5 0 005 0 2.5 2.5 0 005 0 2.5 2.5 0 005 0" /><path d="M5 12v8h14v-8M10 20v-5h4v5" /></>,
   clients: <><circle cx="12" cy="8" r="4" /><path d="M4 21c.8-4 4-6 8-6s7.2 2 8 6" /></>,
   devices: <><rect x="3" y="5" width="18" height="12" rx="2" /><path d="M8 21h8M12 17v4" /></>,
