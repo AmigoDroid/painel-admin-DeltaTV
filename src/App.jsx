@@ -4,6 +4,7 @@ import { api, getAuth, login, logout } from "./api.js";
 import { UiProvider, Field, useAction, BrandMark } from "./ui.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import ServerMonitor from "./pages/ServerMonitor.jsx";
+import VpsMonitor from "./pages/VpsMonitor.jsx";
 import Licenses from "./pages/Licenses.jsx";
 import Partners, { Resellers } from "./pages/Partners.jsx";
 import Devices from "./pages/Devices.jsx";
@@ -25,7 +26,7 @@ import Downloads from "./pages/Downloads.jsx";
 const WebAccess = () => <WebAccessPage admin />;
 
 const PAGES = {
-  dashboard: ["Visão geral", Dashboard],
+  dashboard: ["Visão geral", Dashboard], vpsmonitor: ["Servidor / VPS", VpsMonitor],
   webaccess: ["Player Web", WebAccess],
   licenses: ["Licenças", Licenses], devices: ["Dispositivos", Devices], unlinked: ["Sem vínculo", Unlinked],
   partners: ["Parceiros", Partners], servermonitor: ["Monitoramento", ServerMonitor], sources: ["Fontes de conteúdo", Sources],
@@ -41,12 +42,13 @@ const GROUPS = [
   { label: "Parceiros", items: ["partners", "servermonitor", "sources"] },
   { label: "Revendas", items: ["resellers", "clients", "credits", "downloads"] },
   { label: "Financeiro", items: ["billing", "pix"] },
-  { label: "Sistema", items: ["users", "loginhistory", "notifications", "mail", "audit"] },
+  { label: "Sistema", items: ["vpsmonitor", "users", "loginhistory", "notifications", "mail", "audit"] },
 ];
 
 // Ícones do menu (traço simples, herdam a cor do texto).
 const ICONS = {
   dashboard: <><rect x="3" y="3" width="7.5" height="7.5" rx="2" /><rect x="13.5" y="3" width="7.5" height="7.5" rx="2" /><rect x="3" y="13.5" width="7.5" height="7.5" rx="2" /><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2" /></>,
+  vpsmonitor: <><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h10M7 13h4m3 0h3M7 17h10"/></>,
   licenses: <><circle cx="8" cy="15" r="4" /><path d="M11 12l9-9M16 7l3 3M14 9l2 2" /></>,
   partners: <><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5" /><path d="M16 4.8a3.5 3.5 0 010 6.4M18.5 14.8c1.7.7 2.8 2.3 3 5.2" /></>,
   servermonitor: <><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M6 14h3l2-5 3 8 2-4h2"/></>,
@@ -130,7 +132,7 @@ function UserMenu({ user }) {
 
 function Shell({ user }) {
   // Itens do menu são conveniência: cada rota é protegida por permissão no backend.
-  const hidden = (k) => (user.role === "support" && k === "audit") || ((k === "users" || k === "loginhistory" || k === "mail" || k === "notifications") && user.role !== "superadmin");
+  const hidden = (k) => (k === "vpsmonitor" && user.role !== "superadmin") || (user.role === "support" && k === "audit") || ((k === "users" || k === "loginhistory" || k === "mail" || k === "notifications") && user.role !== "superadmin");
   const menu = Object.entries(PAGES).filter(([k]) => !hidden(k));
   const allowed = (h) => menu.some(([k]) => k === h);
   const fromHash = () => (allowed(location.hash.slice(1)) ? location.hash.slice(1) : "dashboard");
