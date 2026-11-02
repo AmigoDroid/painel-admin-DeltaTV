@@ -24,20 +24,20 @@ export default function Notifications() {
   }, [audience, search, searchPage]);
   const toggle = (p) => setSelected(v => v.some(x => x.id === p.id) ? v.filter(x => x.id !== p.id) : [...v, { id:p.id, name:p.name }]);
   async function submit(e) {
-    e.preventDefault(); if (!window.confirm(`Enviar esta notificação para ${audience === "all" ? "todas as revendas" : selected.length + " revenda(s)"}?`)) return;
+    e.preventDefault(); if (!window.confirm(`Enviar esta notificação para ${audience === "all" ? "todas as revendas" : audience === "content" ? "todos os parceiros de conteúdo" : selected.length + " destinatário(s)"}?`)) return;
     setBusy(true); setError(""); setInfo("");
     try { const r = await api("/admin/notifications/send", { method: "POST", body: { audience, partnerIds: selected.map(p => p.id), title, message, severity } });
-      setInfo(`Notificação enviada para ${r.sent} revenda(s).`); setTitle(""); setMessage(""); setPage(1); setOpenId(null); refresh(1);
+      setInfo(`Notificação enviada para ${r.sent} destinatário(s).`); setTitle(""); setMessage(""); setPage(1); setOpenId(null); refresh(1);
     } catch(e) { setError(e.message); } finally { setBusy(false); }
   }
-  return <div><div className="page-head"><h2>Notificações às revendas</h2></div><p className="muted">Os avisos ficam salvos, inclusive para revendas offline.</p>
+  return <div><div className="page-head"><h2>Notificações às revendas e parceiros de conteúdo</h2></div><p className="muted">Os avisos ficam salvos, inclusive para contas offline.</p>
   <form className="card" onSubmit={submit} style={{ padding: 20, display: "grid", gap: 12 }}>
-    <label>Destinatários<select value={audience} onChange={e => setAudience(e.target.value)}><option value="all">Todas as revendas</option><option value="selected">Revendas específicas</option></select></label>
-    {audience === "selected" && <section aria-label="Selecionar revendas" style={{ display:"grid",gap:12,minWidth:0 }}>
-      <label>Buscar revenda por nome, código ou email<input type="search" value={search} onChange={e => { setSearch(e.target.value); setSearchPage(1); }} placeholder="Digite para buscar entre todas as revendas" /></label>
+    <label>Destinatários<select value={audience} onChange={e => setAudience(e.target.value)}><option value="all">Todas as revendas</option><option value="content">Todos os parceiros de conteúdo</option><option value="selected">Selecionar destinatários ou parceiros</option></select></label>
+    {audience === "selected" && <section aria-label="Selecionar destinatários" style={{ display:"grid",gap:12,minWidth:0 }}>
+      <label>Buscar parceiro ou revenda por nome, código ou email<input type="search" value={search} onChange={e => { setSearch(e.target.value); setSearchPage(1); }} placeholder="Digite para buscar entre todas as revendas" /></label>
       <div aria-live="polite"><strong>{selected.length} selecionada(s)</strong>{selected.length > 0 && <button type="button" className="btn sm" style={{marginLeft:12}} onClick={() => setSelected([])}>Limpar seleção</button>}</div>
       {selected.length > 0 && <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>{selected.map(p => <button key={p.id} type="button" className="btn sm" onClick={() => toggle(p)} title="Remover destinatário">{p.name} ×</button>)}</div>}
-      <div className="card" style={{padding:12,display:"grid",gap:8}}>{searchBusy && <small>Pesquisando…</small>}{partners.map(p => <label key={p.id} style={{display:"flex",alignItems:"center",gap:10,padding:8,overflowWrap:"anywhere"}}><input type="checkbox" checked={selected.some(x => x.id === p.id)} onChange={() => toggle(p)}/><span><b>{p.name}</b><small className="muted" style={{display:"block"}}>{p.slug} · {p.status}</small></span></label>)}{!searchBusy && !partners.length && <p className="muted">Nenhuma revenda encontrada.</p>}</div>
+      <div className="card" style={{padding:12,display:"grid",gap:8}}>{searchBusy && <small>Pesquisando…</small>}{partners.map(p => <label key={p.id} style={{display:"flex",alignItems:"center",gap:10,padding:8,overflowWrap:"anywhere"}}><input type="checkbox" checked={selected.some(x => x.id === p.id)} onChange={() => toggle(p)}/><span><b>{p.name}</b><small className="muted" style={{display:"block"}}>{p.slug} · {p.status}</small></span></label>)}{!searchBusy && !partners.length && <p className="muted">Nenhum destinatário encontrado.</p>}</div>
       <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}><button type="button" className="btn" disabled={searchPage<=1} onClick={() => setSearchPage(v=>v-1)}>Anterior</button><small>Página {searchPage} de {searchPages}</small><button type="button" className="btn" disabled={searchPage>=searchPages} onClick={() => setSearchPage(v=>v+1)}>Próxima</button></div>
     </section>}
     <label>Prioridade<select value={severity} onChange={e => setSeverity(e.target.value)}><option value="info">Informativa</option><option value="important">Importante</option><option value="warning">Atenção</option></select></label>
