@@ -34,9 +34,29 @@ function PartnersList({ scope, onChanged }) {
   const [q, setQ] = useState("");
   const dq = useDebounced(q);
   const list = useList("/admin/partners", { q: "", status: "", pageSize: 100 });
+  const [liveIds, setLiveIds] = useState(null);
+  useEffect(() => {
+    const refresh = () => api("/admin/partners/presence/live").then((v) => setLiveIds(new Set(v.onlinePartnerIds))).catch(() => {});
+    const change = (ev) => {
+      if (ev?.detail?.type === "partner-presence") {
+        setLiveIds((old) => {
+          if (!old) { refresh(); return old; }
+          const copy = new Set(old);
+          if (ev.detail.online) copy.add(ev.detail.partnerId); else copy.delete(ev.detail.partnerId);
+          return copy;
+        });
+      } else refresh();
+    };
+    refresh();
+    const timer = setInterval(refresh, 30000);
+    window.addEventListener("realtime-change", change);
+    window.addEventListener("realtime-ready", change);
+    return () => { clearInterval(timer); window.removeEventListener("realtime-change", change); window.removeEventListener("realtime-ready", change); };
+  }, []);
   const [creating, setCreating] = useState(false);
   const [openId, setOpenId] = useState(null);
   useEffect(() => { list.filter({ q: dq }); /* eslint-disable-next-line */ }, [dq]);
+  useEffect(() => { const timer = setInterval(() => list.reload(), 60_000); return () => clearInterval(timer); }, [list.reload]);
   const rows = list.data.filter((p) => cfg.kinds.includes(p.kind));
   const changed = () => { list.reload(); onChanged?.(); };
   const count = (fn) => rows.filter(fn).length;
@@ -51,6 +71,7 @@ function PartnersList({ scope, onChanged }) {
         <div className="mini-stats">
           <div><strong>{rows.length}</strong><span>listados</span></div>
           <div><strong>{count((p) => p.effectiveStatus === "active")}</strong><span>ativos</span></div>
+          <div><strong>{rows.filter((p) => liveIds ? liveIds.has(p.id) : p.online).length}</strong><span>online agora (na página)</span></div>
           {pending > 0 && <div className="warn"><strong>{pending}</strong><span>aguardando aprovação</span></div>}
           <div><strong>{count((p) => ["suspended", "blocked"].includes(p.effectiveStatus) && !isPending(p))}</strong><span>suspensos ou bloqueados</span></div>
         </div>
@@ -62,11 +83,12 @@ function PartnersList({ scope, onChanged }) {
         </select>
       </div>
       <Table>
-        <thead><tr><th>{scope === "reseller" ? "Revenda" : "Parceiro"}</th><th>Status</th><th>{cfg.billing}</th><th>Dispositivos</th><th>Término</th></tr></thead>
+        <thead><tr><th>{scope === "reseller" ? "Revenda" : "Parceiro"}</th><th>Status</th><th>Portal</th><th>{cfg.billing}</th><th>Dispositivos</th><th>Término</th></tr></thead>
         <tbody>{rows.map((p) => (
           <tr key={p.id} className="click" onClick={() => setOpenId(p.id)}>
             <td><strong>{p.name}</strong><div className="muted">{p.slug}{p.kind === "both" && <span className="kind both">{cfg.also}</span>}</div></td>
             <td>{isPending(p) ? <Badge status="pending" label="Novo cadastro" /> : <Badge status={p.effectiveStatus} />}</td>
+            <td><span title={p.lastPortalActivityAt ? `Última atividade: ${fmtDateTime(p.lastPortalActivityAt)}` : "Sem atividade registrada"} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span style={{ width: 9, height: 9, borderRadius: "50%", background: (liveIds ? liveIds.has(p.id) : p.online) ? "#18a56b" : "#9099a7", display: "inline-block" }} />{(liveIds ? liveIds.has(p.id) : p.online) ? "Online" : "Offline"}</span></td>
             <td>{MODELS[p.billingModel]}</td><td>{p.deviceCount}{p.deviceLimit != null ? `/${p.deviceLimit}` : ""}</td><td>{fmtDate(p.endsAt)}</td>
           </tr>))}</tbody>
       </Table>

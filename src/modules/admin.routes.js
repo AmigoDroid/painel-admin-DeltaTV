@@ -1,0 +1,37 @@
+import { Router } from "express";
+import { adminNotificationRoutes } from "./notifications/notification.routes.js";
+import { authenticate } from "../middleware/authenticate.js";
+import licenses from "./licenses/license.routes.js";
+import partners from "./partners/partner.routes.js";
+import devices from "./devices/device.routes.js";
+import billing from "./billing/billing.routes.js";
+import sources from "./sources/sources.routes.js";
+import audit from "./audit/audit.routes.js";
+import dashboard from "./dashboard/dashboard.routes.js";
+import { adminRouter as pix } from "./pix/pix.routes.js";
+import { adminRouter as credits } from "./credits/credit.routes.js";
+import users from "./users/users.routes.js";
+import clients from "./clients/client.admin.routes.js";
+import mail from "./mail/mail.routes.js";
+import { adminRouter as webAccess } from "./web/web.routes.js";
+import { adminRouter as appDownloads } from "./downloads/download.routes.js";
+
+// Tudo em /api/v1/admin exige autenticação; cada rota exige a permissão correspondente.
+const router = Router();
+router.use(authenticate);
+router.use("/notifications", adminNotificationRoutes);
+router.use("/licenses", licenses);
+router.use("/partners", partners);
+router.use("/devices", devices);
+router.use("/billing", billing);
+router.use("/sources", sources);
+router.use("/audit", audit);
+router.use("/dashboard", dashboard);
+router.use("/users", users);
+router.use("/clients", clients);
+router.use("/pix", pix);
+router.use("/credits", credits);
+router.use("/mail", mail);
+router.use("/web-access", webAccess);
+router.use("/app-downloads", appDownloads);
+export default router;

@@ -68,15 +68,63 @@ export default function Dashboard() {
   const [parts, setParts] = useState(null);
   const user = getAuth()?.user;
 
-  useEffect(() => { api("/admin/dashboard").then(setD).catch((e) => setError(e.message)); }, []);
-  // Parceiros x revendas: o resumo do servidor soma os dois, então separamos pela lista (falhar aqui não atrapalha o painel).
-  useEffect(() => { api("/admin/partners", { query: { pageSize: 100 } }).then(setParts).catch(() => {}); }, []);
-  // Só a contagem de online é atualizada em tempo quase real (consulta leve); o resto do painel não é recarregado.
   useEffect(() => {
-    const load = () => { if (!document.hidden) api("/admin/devices/presence").then(setPresence).catch(() => {}); };
-    load();
-    const t = setInterval(load, 20000);
-    return () => clearInterval(t);
+    let timer;
+    const refresh = () => {
+      if (document.hidden) return;
+      api("/admin/dashboard").then((v) => { setD(v); setError(""); }).catch((e) => setError(e.message));
+      api("/admin/partners", { query: { pageSize: 100 } }).then(setParts).catch(() => {});
+      // A contagem online é entregue pelo WebSocket; a consulta é só para carga inicial/reconexão.
+      api("/admin/devices/presence").then(setPresence).catch(() => {});
+    };
+    const changed = (event) => {
+      const msg = event?.detail;
+      // Não refaz todas as requisições quando muda apenas a presença.
+      if (msg?.type === "device-presence" || msg?.type === "partner-presence") return;
+      clearTimeout(timer);
+      timer = setTimeout(refresh, 300);
+    };
+    refresh();
+    const polling = setInterval(refresh, 60000); // recuperação quando o socket está indisponível
+    window.addEventListener("realtime-change", changed);
+    window.addEventListener("realtime-ready", changed);
+    document.addEventListener("visibilitychange", changed);
+    return () => {
+      clearTimeout(timer); clearInterval(polling);
+      window.removeEventListener("realtime-change", changed);
+      window.removeEventListener("realtime-ready", changed);
+      document.removeEventListener("visibilitychange", changed);
+    };
+  }, []);
+  // Atualização imediata: o evento transporta a contagem calculada no backend.
+  useEffect(() => {
+    const received = (ev) => {
+      const msg = ev?.detail;
+      if (msg?.type === "device-presence" && Number.isInteger(msg.online) && msg.online >= 0) {
+        setPresence({ online: msg.online, windowSeconds: msg.windowSeconds });
+      }
+    };
+    window.addEventListener("realtime-change", received);
+    return () => window.removeEventListener("realtime-change", received);
+  }, []);
+  const [livePartners, setLivePartners] = useState(null);
+  useEffect(() => {
+    const refresh = () => api("/admin/partners/presence/live").then(setLivePartners).catch(() => {});
+    const changed = (ev) => {
+      if (ev?.detail?.type === "partner-presence") {
+        setLivePartners((previous) => {
+          if (!previous) { refresh(); return previous; }
+          const ids = new Set(previous.onlinePartnerIds);
+          if (ev.detail.online) ids.add(ev.detail.partnerId); else ids.delete(ev.detail.partnerId);
+          return { onlinePartnerIds: [...ids], onlineCount: ids.size };
+        });
+      } else refresh();
+    };
+    refresh();
+    const timer = setInterval(refresh, 60000); // recuperação de eventuais mensagens perdidas
+    window.addEventListener("realtime-change", changed);
+    window.addEventListener("realtime-ready", changed);
+    return () => { clearInterval(timer); window.removeEventListener("realtime-change", changed); window.removeEventListener("realtime-ready", changed); };
   }, []);
 
   if (error) return <p className="error">{error}</p>;
@@ -130,6 +178,7 @@ export default function Dashboard() {
 
       <Section title="Parceiros e revendas" hint="Cada um com a sua tela no menu">
         <div className="grid cards">
+          <Stat icon="store" tone="ok" label="Revendas online" value={livePartners?.onlineCount ?? "—"} hint="Portais conectados agora" href="#resellers" />
           {split ? (
             <>
               <Stat icon="users" label="Parceiros ativos" value={partnersActive} hint={partnersOff ? `${partnersOff} inativo(s)` : "Provedores de conteúdo"} href="#partners" />

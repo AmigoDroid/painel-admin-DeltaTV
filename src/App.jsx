@@ -1,3 +1,4 @@
+import { connectRealtime } from "./realtime.js";
 import { useEffect, useRef, useState } from "react";
 import { api, getAuth, login, logout } from "./api.js";
 import { UiProvider, Field, useAction, BrandMark } from "./ui.jsx";
@@ -14,7 +15,9 @@ import Audit from "./pages/Audit.jsx";
 import DeviceAccess from "./pages/DeviceAccess.jsx";
 import Clients from "./pages/Clients.jsx";
 import Users from "./pages/Users.jsx";
+import LoginHistory from "./pages/LoginHistory.jsx";
 import Mail from "./pages/Mail.jsx";
+import Notifications from "./pages/Notifications.jsx";
 import WebAccessPage from "./pages/WebAccess.jsx";
 import Downloads from "./pages/Downloads.jsx";
 
@@ -27,7 +30,7 @@ const PAGES = {
   partners: ["Parceiros", Partners], sources: ["Fontes de conteúdo", Sources],
   resellers: ["Revendas", Resellers], clients: ["Clientes", Clients], credits: ["Créditos", Credits], downloads: ["Downloads e links", Downloads],
   billing: ["Financeiro", Billing], pix: ["Pix", Pix],
-  users: ["Usuários", Users], mail: ["E-mails", Mail], audit: ["Auditoria", Audit],
+  users: ["Usuários", Users], loginhistory: ["Histórico de login", LoginHistory], notifications: ["Notificações", Notifications], mail: ["E-mails", Mail], audit: ["Auditoria", Audit],
 };
 
 // Menu por área: quem é de conteúdo (Parceiros) fica separado de quem vende licença (Revendas e seus clientes).
@@ -37,7 +40,7 @@ const GROUPS = [
   { label: "Parceiros", items: ["partners", "sources"] },
   { label: "Revendas", items: ["resellers", "clients", "credits", "downloads"] },
   { label: "Financeiro", items: ["billing", "pix"] },
-  { label: "Sistema", items: ["users", "mail", "audit"] },
+  { label: "Sistema", items: ["users", "loginhistory", "notifications", "mail", "audit"] },
 ];
 
 // Ícones do menu (traço simples, herdam a cor do texto).
@@ -54,6 +57,8 @@ const ICONS = {
   pix: <><path d="M12 2.8l9.2 9.2-9.2 9.2L2.8 12z" /><path d="M12 8l4 4-4 4-4-4z" /></>,
   credits: <><circle cx="12" cy="12" r="9" /><path d="M14.8 9.3c-.5-.9-1.5-1.3-2.8-1.3-1.7 0-2.8.8-2.8 2 0 3 5.6 1.2 5.6 4.2 0 1.2-1.1 2-2.8 2-1.3 0-2.4-.5-2.9-1.4M12 6.5V8m0 8v1.5" /></>,
   users: <path d="M12 3l8 3v6c0 4.5-3.2 8-8 9-4.8-1-8-4.5-8-9V6z" />,
+  loginhistory: <><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/></>,
+  notifications: <><path d="M18 8a6 6 0 00-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></>,
   mail: <><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 7l9 6 9-6" /></>,
   downloads: <><path d="M12 3v12M7 10.5l5 5 5-5" /><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" /></>,
   webaccess: <><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18" /></>,
@@ -123,7 +128,7 @@ function UserMenu({ user }) {
 
 function Shell({ user }) {
   // Itens do menu são conveniência: cada rota é protegida por permissão no backend.
-  const hidden = (k) => (user.role === "support" && k === "audit") || ((k === "users" || k === "mail") && user.role !== "superadmin");
+  const hidden = (k) => (user.role === "support" && k === "audit") || ((k === "users" || k === "loginhistory" || k === "mail" || k === "notifications") && user.role !== "superadmin");
   const menu = Object.entries(PAGES).filter(([k]) => !hidden(k));
   const allowed = (h) => menu.some(([k]) => k === h);
   const fromHash = () => (allowed(location.hash.slice(1)) ? location.hash.slice(1) : "dashboard");
@@ -137,6 +142,27 @@ function Shell({ user }) {
     return () => window.removeEventListener("hashchange", onHash);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user.role]);
+  // Tabelas responsivas: reaproveita os títulos das colunas sem alterar os dados nem os componentes.
+  useEffect(() => {
+    const labelTables = () => {
+      document.querySelectorAll(".table-wrap table").forEach((table) => {
+        const headers = Array.from(table.querySelectorAll("thead tr:last-child th")).map((th) => th.textContent.trim());
+        if (!headers.length) return;
+        table.querySelectorAll("tbody tr").forEach((tr) => {
+          const cells = Array.from(tr.children).filter((el) => el.matches("td"));
+          if (cells.length !== headers.length) return; // não inventar rótulos em linhas combinadas
+          cells.forEach((td, i) => {
+            const label = headers[i] || (td.classList.contains("actions") ? "Ações" : "Detalhe");
+            if (td.dataset.label !== label) td.dataset.label = label;
+          });
+        });
+      });
+    };
+    labelTables();
+    const observer = new MutationObserver(labelTables);
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, []);
   const Current = PAGES[page][1];
   const go = (k) => { setPage(k); setOpen(false); window.scrollTo(0, 0); };
   // Esc fecha a gaveta; ao voltar para tela grande ela não fica "aberta" escondida.
@@ -162,7 +188,7 @@ function Shell({ user }) {
   return (
     <div className="layout">
       <aside className={`sidebar ${open ? "open" : ""}`} id="menu-principal">
-        <div className="brand"><BrandMark size={32} /><div><strong>DeltaTV</strong><span>Licenciamento</span></div></div>
+        <div className="brand"><BrandMark size={32} /><div><strong>DeltaTV</strong><span>Administração</span></div><button type="button" className="sidebar-close" aria-label="Fechar menu" onClick={() => setOpen(false)}>×</button></div>
         <nav className="nav-scroll" aria-label="Menu principal">
           {GROUPS.map((g) => {
             const items = g.items.filter(allowed);
@@ -198,6 +224,7 @@ function Shell({ user }) {
 }
 
 export default function App() {
+  useEffect(() => connectRealtime(), []);
   const [auth, setAuth] = useState(getAuth());
   useEffect(() => {
     const h = () => setAuth(getAuth());

@@ -1,0 +1,195 @@
+import { Op } from "sequelize";
+import {
+  sequelize, License, Plan, Customer, Activation, Payment, Renewal, Device, Partner,
+} from "../../db/models/index.js";
+import { AppError, notFound } from "../../shared/errors.js";
+import { audit } from "../../shared/audit.js";
+import { generateCode, hashCode } from "../../shared/crypto.js";
+import { addLicenseMonthsUTC } from "../../shared/dates.js";
+import { pageOf, paged } from "../../shared/pagination.js";
+import { effectiveLicenseStatus, evaluateAccess } from "../access/access.policy.js";
+import { clearMirrorAuth } from "../mirror/mirror.cache.js";
+
+const DEVICE_COUNT = `(SELECT count(*) FROM activations a WHERE (a.license_id = "License".id OR a.granted_license_id = "License".id) AND a.status <> 'revoked')`;
+
+const out = (l) => {
+  const j = l.toJSON();
+  delete j.codeHash;
+  j.effectiveStatus = effectiveLicenseStatus(l);
+  j.deviceCount = Number(j.deviceCount ?? 0);
+  // Aparelhos ligados direto (licenseId) + os ativados pelo código do revendedor (grantedLicenseId), numa lista só.
+  if (j.Activations || j.GrantedActivations) {
+    const byId = new Map();
+    for (const a of [...(j.Activations ?? []), ...(j.GrantedActivations ?? [])]) {
+      // Acesso REAL de cada aparelho: o status da ativação sozinho diz "ativo" mesmo com a licença cancelada.
+      const d = evaluateAccess({ activation: a, license: l });
+      byId.set(a.id, { ...a, viaPartner: !!a.partnerId && a.licenseId == null, access: { allowed: d.allowed, code: d.code, message: d.message } });
+    }
+    j.Activations = [...byId.values()].sort((x, y) => new Date(y.activatedAt) - new Date(x.activatedAt));
+    delete j.GrantedActivations;
+  }
+  return j;
+};
+
+export async function listLicenses({ q, status, planId, expiringInDays, page, pageSize }) {
+  const where = {};
+  const now = new Date();
+  if (status === "expired") Object.assign(where, { status: "active", expiresAt: { [Op.lte]: now } });
+  else if (status === "active") Object.assign(where, { status: "active", expiresAt: { [Op.gt]: now } });
+  else if (status) where.status = status;
+  if (planId) where.planId = planId;
+  // Combina com o filtro de status (ex.: "expiradas" + "vence em 7 dias" = nenhuma), em vez de sobrescrevê-lo.
+  if (expiringInDays) where.expiresAt = { ...where.expiresAt, [Op.between]: [now, new Date(now.getTime() + expiringInDays * 86400000)] };
+  if (q) {
+    where[Op.or] = [
+      { "$Customer.name$": { [Op.iLike]: `%${q}%` } },
+      { "$Customer.email$": { [Op.iLike]: `%${q}%` } },
+      { codeLast4: q.toUpperCase() },
+    ];
+  }
+  const { rows, count } = await License.findAndCountAll({
+    where,
+    attributes: { include: [[sequelize.literal(DEVICE_COUNT), "deviceCount"]] },
+    include: [{ model: Customer }, { model: Plan, attributes: ["id", "name", "durationMonths"] }],
+    order: [["createdAt", "DESC"]], ...pageOf({ page, pageSize }), distinct: true, subQuery: false,
+  });
+  return paged(rows.map(out), count, { page, pageSize });
+}
+
+export async function getLicense(id) {
+  const l = await License.findByPk(id, {
+    attributes: { include: [[sequelize.literal(DEVICE_COUNT), "deviceCount"]] },
+    include: [
+      { model: Customer }, { model: Plan },
+      { model: Partner, as: "Owner", attributes: ["id", "name"], required: false },
+      { model: Activation, include: [Device] },
+      { model: Activation, as: "GrantedActivations", include: [Device, { model: Partner, attributes: ["id", "name"] }], required: false },
+      { model: Renewal, include: [Plan] },
+      { model: Payment },
+    ],
+    order: [[Activation, "activatedAt", "DESC"], [Renewal, "createdAt", "DESC"], [Payment, "paidAt", "DESC"]],
+  });
+  if (!l) throw notFound("Licença");
+  return out(l);
+}
+
+export async function createLicense(input, actor) {
+  return sequelize.transaction(async (t) => {
+    const plan = await Plan.findByPk(input.planId, { transaction: t });
+    if (!plan || !plan.active) throw new AppError(422, "INVALID_PLAN", "Plano inválido ou inativo.");
+    const customer = input.customer ? await Customer.create(input.customer, { transaction: t }) : null;
+    const code = generateCode("LIC");
+    const pending = input.startOnFirstActivation === true;
+    const startsAt = input.startsAt ? new Date(input.startsAt) : new Date();
+    const license = await License.create(
+      {
+        codeHash: hashCode(code), codeLast4: code.slice(-4), planId: plan.id, customerId: customer?.id ?? null,
+        status: pending ? "pending" : "active",
+        startsAt: pending ? null : startsAt,
+        expiresAt: pending ? null : addLicenseMonthsUTC(startsAt, plan.durationMonths),
+        maxDevices: input.maxDevices ?? plan.maxDevices, notes: input.notes ?? null, createdBy: actor.id,
+      },
+      { transaction: t },
+    );
+    if (input.payment) {
+      await Payment.create(
+        { licenseId: license.id, amountCents: input.payment.amountCents, method: input.payment.method ?? null,
+          provider: "manual", providerRef: input.payment.reference ?? null, origin: "admin", confirmedBy: actor.id, note: input.payment.note ?? null },
+        { transaction: t },
+      );
+    }
+    await audit({ actor, action: "license.create", entityType: "license", entityId: license.id, metadata: { planId: plan.id, pending }, transaction: t });
+    // O código em texto puro é devolvido UMA vez; o banco guarda apenas o hash.
+    return { license: out(license), code };
+  });
+}
+
+export async function updateLicense(id, input, actor) {
+  return sequelize.transaction(async (t) => {
+    const l = await License.findByPk(id, { transaction: t, lock: t.LOCK.UPDATE });
+    if (!l) throw notFound("Licença");
+    if (input.maxDevices !== undefined) {
+      const used = await Activation.count({ where: { licenseId: id, status: { [Op.ne]: "revoked" } }, transaction: t });
+      if (input.maxDevices < used && actor?.role !== "superadmin") throw new AppError(409, "LIMIT_BELOW_USAGE", `Existem ${used} dispositivos vinculados; remova ativações antes de reduzir o limite.`);
+      l.maxDevices = input.maxDevices;
+    }
+    if (input.notes !== undefined) l.notes = input.notes;
+    await l.save({ transaction: t });
+    if (input.customer) {
+      if (l.customerId) await Customer.update(input.customer, { where: { id: l.customerId }, transaction: t });
+      else {
+        const customer = await Customer.create(input.customer, { transaction: t });
+        await l.update({ customerId: customer.id }, { transaction: t });
+      }
+    }
+    await audit({ actor, action: "license.update", entityType: "license", entityId: id, metadata: input, transaction: t });
+    return l;
+  });
+}
+
+const TRANSITIONS = {
+  suspend: { from: ["active"], to: "suspended" },
+  block: { from: ["active", "suspended"], to: "blocked", reason: true },
+  // Superadmin (force) também reativa licença CANCELADA.
+  reactivate: { from: ["suspended", "blocked"], forceFrom: ["cancelled"], to: "active" },
+  cancel: { from: ["pending", "active", "suspended", "blocked"], to: "cancelled", reason: true },
+};
+
+/** Alterar o status afeta TODOS os dispositivos da licença na próxima requisição (gate no backend). */
+export async function changeLicenseStatus(id, action, { reason, force = false }, actor) {
+  const rule = TRANSITIONS[action];
+  const changed = await sequelize.transaction(async (t) => {
+    const l = await License.findByPk(id, { transaction: t, lock: t.LOCK.UPDATE });
+    if (!l) throw notFound("Licença");
+    if (!rule.from.includes(l.status) && !(force && rule.forceFrom?.includes(l.status))) {
+      if (rule.forceFrom?.includes(l.status)) throw new AppError(403, "SUPERADMIN_ONLY", "Somente o superadmin pode reativar uma licença cancelada.");
+      throw new AppError(409, "INVALID_STATE", `Não é possível '${action}' uma licença '${l.status}'.`);
+    }
+    if (rule.reason && !reason) throw new AppError(422, "REASON_REQUIRED", "Informe o motivo.");
+    const previous = l.status;
+    // Licença que nunca iniciou (sem startsAt) volta como "pending"; senão ficaria "active" sem nunca liberar acesso.
+    const to = action === "reactivate" && !l.startsAt ? "pending" : rule.to;
+    await l.update({ status: to, statusReason: action === "reactivate" ? null : reason ?? null }, { transaction: t });
+    await audit({ actor, action: `license.${action}`, entityType: "license", entityId: id, metadata: { from: previous, to, reason, ...(previous === "cancelled" ? { forced: true } : {}) }, transaction: t });
+    return l;
+  });
+  clearMirrorAuth(); // afeta todos os dispositivos da licença
+  return changed;
+}
+
+export async function renewLicense(id, input, actor) {
+  const renewed = await sequelize.transaction(async (t) => {
+    const l = await License.findByPk(id, { transaction: t, lock: t.LOCK.UPDATE });
+    if (!l) throw notFound("Licença");
+    if (["cancelled", "blocked"].includes(l.status) && actor?.role !== "superadmin") {
+      throw new AppError(409, "NOT_RENEWABLE", "Reative a licença antes de renovar (canceladas não podem ser renovadas).");
+    }
+    const plan = await Plan.findByPk(input.planId ?? l.planId, { transaction: t });
+    if (!plan || !plan.active) throw new AppError(422, "INVALID_PLAN", "Plano inválido ou inativo.");
+    const now = new Date();
+    const previous = l.expiresAt;
+    // Renovar antes do vencimento soma ao saldo; depois do vencimento, conta a partir de agora.
+    const base = l.expiresAt && l.expiresAt > now ? l.expiresAt : now;
+    const next = addLicenseMonthsUTC(base, plan.durationMonths);
+    await l.update(
+      {
+        planId: plan.id, expiresAt: next, startsAt: l.startsAt ?? now,
+        status: l.status === "pending" || (actor?.role === "superadmin" && ["cancelled", "blocked"].includes(l.status)) ? "active" : l.status,
+        ...(input.planId ? { maxDevices: plan.maxDevices } : {}),
+      },
+      { transaction: t },
+    );
+    const payment = input.payment
+      ? await Payment.create(
+          { licenseId: l.id, amountCents: input.payment.amountCents, method: input.payment.method ?? null,
+            provider: "manual", providerRef: input.payment.reference ?? null, origin: "admin", confirmedBy: actor.id, note: input.payment.note ?? null },
+          { transaction: t },
+        )
+      : null;
+    await Renewal.create({ licenseId: l.id, planId: plan.id, previousExpiresAt: previous, newExpiresAt: next, paymentId: payment?.id ?? null, createdBy: actor.id }, { transaction: t });
+    await audit({ actor, action: "license.renew", entityType: "license", entityId: id, metadata: { planId: plan.id, from: previous, to: next }, transaction: t });
+    return l;
+  });
+  clearMirrorAuth();
+  return renewed;
+}

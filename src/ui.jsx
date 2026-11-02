@@ -207,6 +207,13 @@ export function useList(path, initial = {}) {
   }, [path, key]);
 
   useEffect(() => { reload(); }, [reload]);
+  useEffect(() => {
+    let timer;
+    const onChange = () => { clearTimeout(timer); timer = setTimeout(() => { if (!document.hidden) reload(); }, 300); };
+    window.addEventListener("realtime-change", onChange);
+    window.addEventListener("realtime-ready", onChange);
+    return () => { clearTimeout(timer); window.removeEventListener("realtime-change", onChange); window.removeEventListener("realtime-ready", onChange); };
+  }, [reload]);
   return {
     ...state, params, reload,
     filter: (p) => setParams((prev) => ({ ...prev, ...p, page: 1 })),
@@ -274,6 +281,13 @@ export function useLoad(fn, deps) {
   }, []);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { setState({ data: null, error: "" }); load(); }, deps);
+  useEffect(() => {
+    let timer;
+    const onChange = () => { clearTimeout(timer); timer = setTimeout(() => { if (!document.hidden) load(); }, 350); };
+    window.addEventListener("realtime-change", onChange);
+    window.addEventListener("realtime-ready", onChange);
+    return () => { clearTimeout(timer); window.removeEventListener("realtime-change", onChange); window.removeEventListener("realtime-ready", onChange); };
+  }, [load]);
   return { ...state, reload: load, setData: (data) => setState({ data, error: "" }) };
 }
 
