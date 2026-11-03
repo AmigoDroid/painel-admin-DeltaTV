@@ -21,14 +21,7 @@ export const fmtMoney = (cents) =>
  * Valor em reais digitado -> centavos. Aceita "10", "10,5", "10.50", "1.234,56", "R$ 1.234,56". Devolve null se não for número
  * (antes virava NaN -> null no JSON, e "1.234,56" não era entendido).
  */
-export function toCents(input) {
-  let s = String(input ?? "").replace(/R\$|\s/g, "");
-  if (!s) return null;
-  if (s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");          // 1.234,56 -> 1234.56
-  else if (/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, "");        // 1.234 (milhar) -> 1234
-  if (!/^\d+(\.\d+)?$/.test(s)) return null;
-  return Math.round(Number(s) * 100);
-}
+export { toCents } from "./money.js";
 // Datas de calendário no fuso de São Paulo (UTC-3 fixo desde 2019), o mesmo usado na exibição (fmtDate).
 const SP_DATE = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" });
 export const dateInput = (v) => (v ? SP_DATE.format(new Date(v)) : "");
@@ -192,13 +185,17 @@ export function useList(path, initial = {}) {
   const [params, setParams] = useState({ page: 1, ...initial });
   const [state, setState] = useState({ loading: true, data: [], meta: null, error: "" });
   const seq = useRef(0);
+  const request = useRef(null);
   const key = JSON.stringify(params);
 
   const reload = useCallback(async () => {
     const my = ++seq.current;
+    request.current?.abort();
+    const controller = new AbortController();
+    request.current = controller;
     setState((s) => ({ ...s, loading: true, error: "" }));
     try {
-      const r = await api(path, { query: params });
+      const r = await api(path, { query: params, signal: controller.signal });
       if (my === seq.current) setState({ loading: false, data: r.data, meta: r.meta, error: "" });
     } catch (e) {
       if (my === seq.current) setState({ loading: false, data: [], meta: null, error: e.message });
@@ -206,7 +203,7 @@ export function useList(path, initial = {}) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path, key]);
 
-  useEffect(() => { reload(); }, [reload]);
+  useEffect(() => { reload(); return () => { ++seq.current; request.current?.abort(); }; }, [reload]);
   useEffect(() => {
     let timer;
     const onChange = (event) => {
@@ -281,14 +278,16 @@ export function PasswordInput({ value, onChange, ...rest }) {
  */
 export function useLoad(fn, deps) {
   const [state, setState] = useState({ data: null, error: "" });
+  const sequence = useRef(0);
   const fnRef = useRef(fn);
   fnRef.current = fn;
   const load = useCallback(async () => {
-    try { setState({ data: await fnRef.current(), error: "" }); }
-    catch (e) { setState((s) => ({ ...s, error: e.message })); }
+    const current = ++sequence.current;
+    try { const data = await fnRef.current(); if (current === sequence.current) setState({ data, error: "" }); }
+    catch (e) { if (current === sequence.current) setState((s) => ({ ...s, error: e.message })); }
   }, []);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { setState({ data: null, error: "" }); load(); }, deps);
+  useEffect(() => { setState({ data: null, error: "" }); load(); return () => { ++sequence.current; }; }, deps);
   useEffect(() => {
     let timer;
     const onChange = (event) => {

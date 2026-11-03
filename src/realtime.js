@@ -1,4 +1,4 @@
-import { getAuth } from "./api.js";
+import { getAuth, ensureAccessToken } from "./api.js";
 const API = import.meta.env.VITE_API_URL || "http://localhost:3000";
 // O painel pode montar antes de o WebSocket ser inicializado (React effects).
 // Guardar a intenção fora da conexão evita perder a assinatura da tela.
@@ -10,16 +10,26 @@ export function setSystemMetricsSubscription(enabled) {
 }
 // Socket autenticado por mensagem (nunca por query string ou localStorage compartilhado).
 export function connectRealtime() {
-  let socket, retry, beat, startup, stopped = false, delay = 1000;
+  let socket, retry, beat, startup, stopped = false, delay = 1000, generation = 0;
   let isReady = false;
   const notifyStatus = (connected) => window.dispatchEvent(new CustomEvent("realtime-status", { detail: { connected } }));
   const subscribeSystemMetrics = () => {
     if (isReady && socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: "system-metrics-subscribe", enabled: systemMetricsWanted }));
   };
   setActiveSubscription = subscribeSystemMetrics;
-  function closeSocket() { isReady = false; notifyStatus(false); clearInterval(beat); if (socket) { socket.onclose = null; socket.close(); socket = null; } }
-  function connect() {
+  function closeSocket() { generation++; isReady = false; notifyStatus(false); clearInterval(beat); if (socket) { socket.onclose = null; socket.close(); socket = null; } }
+  async function connect() {
     if (stopped || !getAuth()?.accessToken) return;
+    const attempt = generation;
+    try { await ensureAccessToken(); }
+    catch {
+      if (!stopped && attempt === generation && getAuth()?.accessToken) {
+        retry = setTimeout(connect, delay);
+        delay = Math.min(delay * 2, 30000);
+      }
+      return;
+    }
+    if (stopped || attempt !== generation || !getAuth()?.accessToken) return;
     const url = new URL("/ws", API); url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
     try { socket = new WebSocket(url); } catch (err) { console.warn("[realtime] Falha ao abrir WebSocket:", err); retry = setTimeout(connect, delay); return; }
     socket.onopen = () => socket.send(JSON.stringify({ type: "auth", token: getAuth()?.accessToken }));
