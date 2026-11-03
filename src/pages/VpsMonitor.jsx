@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api.js";
 import { setSystemMetricsSubscription } from "../realtime.js";
 import "../vps-monitor.css";
+import VpsNetwork from "./VpsNetwork.jsx";
+import { mbps } from "../network-format.js";
 
 function size(bytes) {
   if (bytes == null || !Number.isFinite(Number(bytes))) return "—";
@@ -50,12 +52,14 @@ export default function VpsMonitor() {
 
   const push = useCallback((data, source) => {
     if (!data?.sampledAt) return;
+    const at = Date.parse(data.sampledAt);
+    if (!Number.isFinite(at) || (lastId.current && at < Date.parse(lastId.current))) return;
     setMetrics(data);
     setError("");
     if (source === "ws") { wsLast.current = Date.now(); setWsUpdated(wsLast.current); }
     if (lastId.current !== data.sampledAt) {
       lastId.current = data.sampledAt;
-      setHistory((old) => [...old.slice(-23), { cpu: data.cpu?.percent, memory: percent(data.memory?.used, data.memory?.total) }]);
+      setHistory((old) => [...old.filter(row => row.at >= at - 120000).slice(-119), { at, cpu: data.cpu?.percent, memory: percent(data.memory?.used, data.memory?.total), receiveMbps: mbps(data.network?.receiveBytesPerSecond), sendMbps: mbps(data.network?.sendBytesPerSecond) }]);
     }
   }, []);
   const refresh = useCallback(async () => {
@@ -99,7 +103,7 @@ export default function VpsMonitor() {
 
   return <div className="vps-page">
     <div className="page-head vps-heading">
-      <div><h2>Monitoramento da VPS</h2><p className="muted">CPU, memória, armazenamento e processo da API no próprio servidor.</p></div>
+      <div><h2>Monitoramento da VPS</h2><p className="muted">CPU, memória, armazenamento, tráfego de rede e processo da API.</p></div>
       <div className="vps-actions"><span className={`badge ${live ? "ok" : "info"}`}>{live ? "Ao vivo · WebSocket" : "API · sincronização"}</span><button className="btn sm" type="button" onClick={refresh}>Atualizar agora</button></div>
     </div>
     {error && <div className="vps-error" role="alert">{error} {metrics && "Exibindo a última medição recebida."}</div>}
@@ -115,6 +119,7 @@ export default function VpsMonitor() {
         <Trend values={history.map((v) => v.cpu)} label="Histórico de CPU" />
         <Trend values={history.map((v) => v.memory)} label="Histórico de RAM" />
       </div>
+      <VpsNetwork network={metrics.network} transmission={metrics.transmission} history={history}/>
       <div className="card vps-details">
         <div><h3>Processo Node.js (API)</h3><p className="muted">Consumo do processo que executa o backend; não inclui Nginx ou PostgreSQL.</p></div>
         <div className="vps-detail-grid">
