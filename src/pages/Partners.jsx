@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import AdminDeleteModal from "./AdminDeleteModal.jsx";
+import PartnerPreRegistrations from "./PartnerPreRegistrations.jsx";
 import { offlineDuration } from "../presence-time.js";
 import { api, getAuth } from "../api.js";
 import { ClientsPanel } from "./Clients.jsx";
@@ -104,6 +105,7 @@ function PartnersList({ scope, onChanged }) {
           <div><strong>{count((p) => ["suspended", "blocked"].includes(p.effectiveStatus) && !isPending(p))}</strong><span>suspensos ou bloqueados</span></div>
         </div>
       )}
+      {scope === "content" && <PartnerPreRegistrations />}
       <div className="toolbar">
         <input placeholder={cfg.search} value={q} onChange={(e) => setQ(e.target.value)} />
         <select value={list.params.status} onChange={(e) => list.filter({ status: e.target.value })}>

@@ -363,3 +363,14 @@ pre,code,.mono{overflow-wrap:anywhere;word-break:break-word}
 .partner-portal-info{display:flex;flex-direction:column;gap:2px;min-width:0;line-height:1.3}
 .partner-portal-info strong{font-size:13px;font-weight:700}
 .partner-portal-info small{font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+
+/* Pré-cadastro por convite — responsivo e sem overflow horizontal */
+.partner-invite-section{margin:20px 0 24px;padding:20px;border:1px solid var(--border,#2b3a59);border-radius:16px;background:var(--panel,#121d31)}
+.partner-invite-header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:15px}
+.partner-invite-header h3{margin:0 0 6px}.partner-invite-header p{margin:0;line-height:1.5}
+.partner-invite-list{display:grid;gap:9px}.partner-invite-item{padding:13px 15px;border:1px solid #34435f;border-radius:12px;display:flex;justify-content:space-between;gap:15px;align-items:center;min-width:0}
+.partner-invite-person{display:grid;gap:4px;min-width:0}.partner-invite-person span,.partner-invite-person small{overflow-wrap:anywhere;color:#93a8c9}
+.partner-invite-side{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.partner-invite-actions{display:flex;gap:6px;flex-wrap:wrap}.partner-invite-actions .btn{font-size:12px;padding:9px 12px}
+.partner-invite-check{display:flex;align-items:center;gap:10px;margin:18px 0;cursor:pointer;line-height:1.5}.partner-invite-check input{width:18px;height:18px;flex-shrink:0;accent-color:#7662ef}
+@media(max-width:650px){.partner-invite-item{align-items:stretch;flex-direction:column}.partner-invite-side{justify-content:space-between}.partner-invite-header>.btn{width:100%}}
