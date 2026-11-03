@@ -31,11 +31,13 @@ function ModesEditor({ value, onChange, readOnly = false }) {
 }
 
 function ModesModal({ item, base, readOnly, onClose, onSaved }) {
+  readOnly = readOnly || item.gatewayManaged;
   const run = useAction();
   const [modes, setModes] = useState({ ...DEFAULTS, ...(item.deliveryModes || {}) });
   const save = async (body, msg) => { if (await run(() => api(`${base}/${item.id}`, { method: "PATCH", body }), msg)) onSaved(); };
   return (
     <Modal title={`Entrega · ${fmtCode(item.code)}`} onClose={onClose}>
+      {item.gatewayManaged && <p className="muted">Entrega HTTPS gerenciada pela plataforma: mídia pelo Nginx e playlists pela API.</p>}
       <ModesEditor value={modes} onChange={setModes} readOnly={readOnly} />
       <div className="actions">
         {readOnly ? <button className="btn primary" onClick={onClose}>Fechar</button> : (
@@ -204,7 +206,7 @@ export default function WebAccess({ admin = false }) {
 
   return (
     <>
-      <p className="muted">Cada código libera o Player Web (no navegador) para um cliente, com lista, licença e prazo próprios. Ao vivo passa pelo servidor (proxy); catálogo, filmes e séries vão direto ao provedor (redirect). Você pode mudar isso por acesso (botão Entrega).</p>
+      <p className="muted">Cada código libera o Player Web para um cliente, com lista, licença e prazo próprios. Consulte o botão Entrega para ver como esse acesso recebe o conteúdo.</p>
       <div className="actions left"><button className="btn primary" onClick={() => setCreating(true)}>Novo acesso web</button></div>
       <div className="section-head">
         <input placeholder="Buscar por nome ou código" aria-label="Buscar" value={q} onChange={(e) => setQ(e.target.value)} />
