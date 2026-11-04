@@ -30,20 +30,31 @@ function ModesEditor({ value, onChange, readOnly = false }) {
   );
 }
 
+function WebHttpsOption({ value, onChange, readOnly = false }) {
+  return <div className="field">
+    <label className="partner-invite-check"><input type="checkbox" checked={value} disabled={readOnly} onChange={event => onChange(event.target.checked)} />
+      <span>Usar HTTPS automaticamente nas URLs do parceiro</span></label>
+    <small>Converte http:// para https:// apenas neste acesso do Player Web. URLs HTTPS e portas personalizadas são preservadas. O servidor do parceiro precisa oferecer HTTPS com certificado válido.</small>
+    {readOnly && <small className="muted">Esta opção é controlada pela administração.</small>}
+  </div>;
+}
+
 function ModesModal({ item, base, readOnly, onClose, onSaved }) {
-  readOnly = readOnly || item.gatewayManaged;
+  const modesReadOnly = readOnly || item.gatewayManaged;
   const run = useAction();
   const [modes, setModes] = useState({ ...DEFAULTS, ...(item.deliveryModes || {}) });
+  const [webAutoHttps, setWebAutoHttps] = useState(item.webAutoHttps !== false);
   const save = async (body, msg) => { if (await run(() => api(`${base}/${item.id}`, { method: "PATCH", body }), msg)) onSaved(); };
   return (
     <Modal title={`Entrega · ${fmtCode(item.code)}`} onClose={onClose}>
       {item.gatewayManaged && <p className="muted">Entrega HTTPS gerenciada pela plataforma: mídia pelo Nginx e playlists pela API.</p>}
-      <ModesEditor value={modes} onChange={setModes} readOnly={readOnly} />
+      <ModesEditor value={modes} onChange={setModes} readOnly={modesReadOnly} />
+      <WebHttpsOption value={webAutoHttps} onChange={setWebAutoHttps} readOnly={readOnly} />
       <div className="actions">
         {readOnly ? <button className="btn primary" onClick={onClose}>Fechar</button> : (
           <>
-            <button className="btn" onClick={() => save({ deliveryModes: null }, "Voltou ao padrão.")}>Restaurar padrão</button>
-            <button className="btn primary" onClick={() => save({ deliveryModes: modes }, "Modo de entrega salvo.")}>Salvar</button>
+            <button className="btn" disabled={modesReadOnly} onClick={() => save({ deliveryModes: null }, "Voltou ao padrão.")}>Restaurar entrega padrão</button>
+            <button className="btn primary" onClick={() => save({ ...(!modesReadOnly ? { deliveryModes: modes } : {}), webAutoHttps }, "Configurações do Player Web salvas.")}>Salvar</button>
           </>
         )}
       </div>
@@ -56,6 +67,7 @@ function CreateModal({ admin, base, onClose, onCreated }) {
   const [partners, setPartners] = useState([]);
   const [partnerId, setPartnerId] = useState("");
   const [useStock, setUseStock] = useState(true);
+  const [webAutoHttps, setWebAutoHttps] = useState(true);
   const [label, setLabel] = useState("");
   const [source, setSource] = useState("mac"); // mac | partner | playlist
   const [mac, setMac] = useState("");
@@ -92,7 +104,7 @@ function CreateModal({ admin, base, onClose, onCreated }) {
     if (source === "mac") Object.assign(body, { mac, activationId });
     else if (source === "partner") body.config = { mode: "partner", code: f.code, username: f.username, password: f.password };
     else body.config = { mode: "playlist", name: f.name, url: f.url };
-    if (admin) Object.assign(body, { partnerId: partnerId || undefined, useStock: partnerId ? useStock : false });
+    if (admin) Object.assign(body, { webAutoHttps, partnerId: partnerId || undefined, useStock: partnerId ? useStock : false });
     setBusy(true);
     const r = await run(() => api(base, { method: "POST", body }), "Acesso web criado.");
     setBusy(false);
@@ -155,6 +167,7 @@ function CreateModal({ admin, base, onClose, onCreated }) {
         </Field>
       )}
       <ModesEditor value={modes} onChange={setModes} />
+      {admin && source !== "playlist" && <WebHttpsOption value={webAutoHttps} onChange={setWebAutoHttps} />}
       <div className="actions">
         <button className="btn" onClick={onClose}>Cancelar</button>
         <button className="btn primary" disabled={!ready || busy} onClick={submit}>{busy ? "Gerando…" : "Gerar código"}</button>
