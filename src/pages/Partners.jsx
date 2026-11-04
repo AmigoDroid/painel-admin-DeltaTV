@@ -82,6 +82,7 @@ function PartnersList({ scope, onChanged }) {
     window.addEventListener("realtime-ready", change);
     return () => { clearInterval(timer); window.removeEventListener("realtime-change", change); window.removeEventListener("realtime-ready", change); };
   }, []);
+  const [inviteRevision, setInviteRevision] = useState(0);
   const [creating, setCreating] = useState(false);
   const [openId, setOpenId] = useState(null);
   useEffect(() => { list.filter({ q: dq }); /* eslint-disable-next-line */ }, [dq]);
@@ -93,7 +94,7 @@ function PartnersList({ scope, onChanged }) {
     return () => { window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", refresh); };
   }, [list.reload]);
   const rows = list.data.filter((p) => cfg.kinds.includes(p.kind));
-  const changed = () => { list.reload(); onChanged?.(); };
+  const changed = () => { list.reload(); setInviteRevision(value => value + 1); onChanged?.(); };
   const count = (fn) => rows.filter(fn).length;
   const pending = count(isPending);
   return (
@@ -111,7 +112,7 @@ function PartnersList({ scope, onChanged }) {
           <div><strong>{count((p) => ["suspended", "blocked"].includes(p.effectiveStatus) && !isPending(p))}</strong><span>suspensos ou bloqueados</span></div>
         </div>
       )}
-      {scope === "content" && <PartnerPreRegistrations onOpenPartner={setOpenId} onRefresh={list.reload} />}
+      {scope === "content" && <PartnerPreRegistrations onOpenPartner={setOpenId} onRefresh={list.reload} refreshKey={inviteRevision} />}
       <div className="toolbar">
         <button type="button" className="btn" onClick={list.reload} disabled={list.loading}>Atualizar lista</button>
         <input placeholder={cfg.search} value={q} onChange={(e) => setQ(e.target.value)} />
@@ -310,7 +311,7 @@ function PartnerDetail({ id, onClose, onChanged }) {
         {p.status !== "cancelled" && <button className="btn danger" onClick={() => act("cancel", { title: `Cancelar ${what}`, message: "Os dispositivos perdem o acesso. Só o superadmin pode reativar depois.", reason: "required", danger: true })}>Cancelar</button>}
       </div>
       <div className="tabs">{tabList.map(([k, n]) => <button key={k} className={`tab ${cur === k ? "active" : ""}`} onClick={() => setTab(k)}>{n}</button>)}</div>
-      {cur === "commercial" && <ContentContract partnerId={id} />}
+      {cur === "commercial" && <ContentContract partnerId={id} onSaved={() => { load(); onChanged(); }} />}
       {cur === "service-plan" && <ServicePlan partnerId={id} />}
       {cur === "codes" && <>
         <div className="actions left"><button className="btn primary" onClick={() => setNewCode(true)}>Novo código</button></div>

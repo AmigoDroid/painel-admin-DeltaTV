@@ -8,7 +8,7 @@ const OPTIONS=[
  ["fixed_unlimited","Mensalidade fixa · ativações ilimitadas"],
  ["fixed_limited","Mensalidade fixa · limite de ativações"],
 ];
-export default function ContentContract({partnerId}){
+export default function ContentContract({partnerId,onSaved}){
  const [data,setData]=useState(null),[form,setForm]=useState(null),[error,setError]=useState(""),[info,setInfo]=useState(""),[busy,setBusy]=useState(false),[delta,setDelta]=useState(""),[note,setNote]=useState("");
  const load=async()=>{try{const r=await api(`/admin/partners/${partnerId}/commercial`);setData(r);setForm({
   ...r.terms,fixedFeeReais:(r.terms.fixedFeeCents/100).toFixed(2),activationLimit:r.terms.activationLimit??""});setError("")}catch(e){setError(e.message)}};
@@ -20,7 +20,7 @@ export default function ContentContract({partnerId}){
   if(form.licensePolicy==="partner_only"&&!window.confirm("Quando o parceiro perder o vínculo/for bloqueado, as ativações dependentes não terão acesso. Licenças independentes não serão removidas. Confirmar?"))return;
   setBusy(true);setInfo("");setError("");try{await api(`/admin/partners/${partnerId}/commercial`,{method:"PUT",body:{
    mode:form.mode,fixedFeeCents,activationLimit,licensePolicy:form.licensePolicy,
-   creditsPerActivation:Number(form.creditsPerActivation),autoPriority:form.autoPriority,allowWebIssuance:!!form.allowWebIssuance}});setInfo("Condições salvas e auditadas.");await load()}catch(e){setError(e.message)}finally{setBusy(false)};
+   creditsPerActivation:Number(form.creditsPerActivation),autoPriority:form.autoPriority,allowWebIssuance:!!form.allowWebIssuance}});setInfo("Condições salvas e auditadas.");onSaved?.();await load()}catch(e){setError(e.message)}finally{setBusy(false)};
  };
  const adjust=async e=>{e.preventDefault();if(!window.confirm(`Ajustar a carteira em ${delta} crédito(s)?`))return;
   setBusy(true);setInfo("");setError("");try{await api(`/admin/partners/${partnerId}/commercial/credits`,{method:"POST",body:{delta:Number(delta),note}});setInfo("Créditos ajustados. Consulte também o extrato da carteira.");setDelta("");setNote("");await load()}catch(e){setError(e.message)}finally{setBusy(false)};

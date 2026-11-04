@@ -1,10 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api.js";
-import { Field, Modal, fmtDateTime, useUi } from "../ui.jsx";
+import { Field, Modal, Pager, fmtDateTime, useUi } from "../ui.jsx";
 
-const STATUS = { draft: "Aguardando envio", invited: "Convite enviado", completed: "Cadastro concluído", cancelled: "Cancelado" };
-export default function PartnerPreRegistrations({ onOpenPartner, onRefresh }) {
+const STATUS = { draft: "Aguardando envio", invited: "Convite enviado", completed: "Aguardando configuração", cancelled: "Cancelado" };
+export default function PartnerPreRegistrations({ onOpenPartner, onRefresh, refreshKey }) {
   const { toast, confirm } = useUi();
+  const [managerOpen, setManagerOpen] = useState(false);
+  const [view, setView] = useState("pending");
+  const [page, setPage] = useState(1);
+  const [meta, setMeta] = useState(null);
+  const [summary, setSummary] = useState({ pending: 0, history: 0, ready: 0 });
   const [items, setItems] = useState([]);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -16,12 +21,16 @@ export default function PartnerPreRegistrations({ onOpenPartner, onRefresh }) {
   const sequence = useRef(0);
   const load = useCallback(async () => {
     const current = ++sequence.current;
+    setLoading(true);
     try {
-      const r = await api("/admin/partners/pre-registrations");
-      if (current === sequence.current) { setItems(r.data || []); setError(""); }
+      const r = await api("/admin/partners/pre-registrations", { query: { view, page, pageSize: 8 } });
+      if (current === sequence.current) {
+        if (page > (r.meta?.totalPages || 1)) { setPage(r.meta?.totalPages || 1); return; }
+        setItems(r.data || []); setMeta(r.meta); setSummary(r.summary); setError("");
+      }
     } catch (e) { if (current === sequence.current) setError(e.message); }
     finally { if (current === sequence.current) setLoading(false); }
-  }, []);
+  }, [view, page]);
   useEffect(() => {
     load();
     const refresh = (event) => {
@@ -43,7 +52,7 @@ export default function PartnerPreRegistrations({ onOpenPartner, onRefresh }) {
       window.removeEventListener("realtime-change", refresh);
       window.removeEventListener("realtime-ready", refresh);
     };
-  }, [load]);
+  }, [load, refreshKey]);
   const submit = async (event) => {
     event.preventDefault(); if (busy) return;
     setBusy(true);
@@ -51,6 +60,7 @@ export default function PartnerPreRegistrations({ onOpenPartner, onRefresh }) {
       const r = await api("/admin/partners/pre-registrations", { method: "POST", body: { name: name.trim(), email: email.trim().toLowerCase(), sendEmail } });
       toast(r.warning || (r.emailSent ? "Pré-cadastro salvo. Convite enviado por e-mail." : "Pré-cadastro salvo, sem enviar e-mail."), r.warning ? "bad" : "ok");
       setOpen(false); setName(""); setEmail(""); setSendEmail(false);
+      setView("pending"); setPage(1); setManagerOpen(true);
       await load();
     } catch (e) { toast(e.message, "bad"); }
     finally { setBusy(false); }
@@ -73,31 +83,63 @@ export default function PartnerPreRegistrations({ onOpenPartner, onRefresh }) {
     } catch (e) { toast(e.message, "bad"); }
     finally { setBusy(false); }
   };
-  return <section className="partner-invite-section">
-    <div className="partner-invite-header">
-      <div><h3>Pré-cadastro de parceiros</h3><p className="muted">Envie um convite para que o parceiro defina a própria senha. Sem criar uma conta antes da confirmação.</p></div>
-      <div className="actions">
-        <button className="btn" type="button" onClick={() => { load(); onRefresh?.(); }}>Atualizar</button>
-        <button className="btn primary" type="button" onClick={() => setOpen(true)}>+ Pré-cadastro</button>
-      </div>
+  const finish = async (item) => {
+    if (busy) return; setBusy(true);
+    try {
+      await api(`/admin/partners/pre-registrations/${item.id}/finish`, { method: "POST" });
+      toast("Configuração concluída. O parceiro continua disponível na lista de parceiros.");
+      await load(); onRefresh?.();
+    } catch (e) { toast(e.message, "bad"); }
+    finally { setBusy(false); }
+  };
+  const openPartner = (id) => { setManagerOpen(false); onOpenPartner(id); };
+  return <section className="partner-onboarding">
+    <div className="partner-onboarding-copy">
+      <strong>Convites e pré-cadastros <span className="badge info">{summary.pending}</span></strong>
+      <span className="muted">{loading && !meta ? "Carregando pendências…" : summary.pending
+        ? `${summary.pending} pendente(s) · ${summary.ready} aguardando configuração`
+        : "Nenhum pré-cadastro pendente"}</span>
+      {error && <span className="error" role="alert">{error}</span>}
     </div>
-    {error && <p className="muted" role="alert">{error} <button type="button" className="btn" onClick={load}>Tentar novamente</button></p>}
-    {loading ? <p className="muted">Carregando convites…</p> : items.length ? <div className="partner-invite-list">
-      {items.map((item) => {
-        const expired = item.status === "invited" && item.expiresAt && new Date(item.expiresAt).getTime() <= Date.now();
-        return <div className="partner-invite-item" key={item.id}>
-          <div className="partner-invite-person"><strong>{item.name}</strong><span>{item.email}</span><small>Criado em {fmtDateTime(item.createdAt)}{item.emailSentAt ? ` · E-mail enviado ${fmtDateTime(item.emailSentAt)}` : ""}</small></div>
-          <div className="partner-invite-side">
-            <span className={`badge ${item.status === "completed" ? "ok" : item.status === "cancelled" ? "muted" : expired ? "warn" : "info"}`}>{expired ? "Convite expirado" : STATUS[item.status] || item.status}</span>
-            {item.status === "completed" && item.completedPartnerId && <button type="button" className="btn primary" onClick={() => onOpenPartner(item.completedPartnerId)}>Configurar parceria</button>}
-            {!["completed", "cancelled"].includes(item.status) && <div className="partner-invite-actions">
-              <button type="button" className="btn" disabled={busy} onClick={() => send(item)}>{item.emailSentAt ? "Reenviar" : "Enviar convite"}</button>
-              <button type="button" className="btn" disabled={busy} onClick={() => cancel(item)}>Cancelar</button>
-            </div>}
-          </div>
-        </div>;
-      })}
-    </div> : <p className="muted">Nenhum pré-cadastro realizado.</p>}
+    <div className="partner-onboarding-actions">
+      <button className="btn" type="button" onClick={() => { setView("pending"); setPage(1); setManagerOpen(true); load(); }}>Gerenciar convites</button>
+      <button className="btn" type="button" onClick={() => setOpen(true)}>+ Pré-cadastro</button>
+    </div>
+    {managerOpen && <Modal title="Convites e pré-cadastros" onClose={() => setManagerOpen(false)} wide>
+      <p className="muted">Após salvar as condições ou o contrato, a parceria sai das pendências e permanece na lista de parceiros.</p>
+      <div className="partner-invite-header">
+        <div className="tabs" role="tablist" aria-label="Situação dos pré-cadastros">
+          <button type="button" role="tab" aria-selected={view === "pending"} className={`tab ${view === "pending" ? "active" : ""}`} onClick={() => { setView("pending"); setPage(1); }}>Pendentes ({summary.pending})</button>
+          <button type="button" role="tab" aria-selected={view === "history"} className={`tab ${view === "history" ? "active" : ""}`} onClick={() => { setView("history"); setPage(1); }}>Histórico ({summary.history})</button>
+        </div>
+        <button className="btn" type="button" disabled={loading} onClick={() => { load(); onRefresh?.(); }}>Atualizar</button>
+      </div>
+      {error && <p className="error" role="alert">{error}</p>}
+      <div className="partner-invite-scroll" aria-busy={loading}>
+      {loading ? <p className="muted">Carregando convites…</p> : items.length ? <div className="partner-invite-list">
+        {items.map((item) => {
+          const expired = item.status === "invited" && item.expiresAt && new Date(item.expiresAt).getTime() <= Date.now();
+          return <div className="partner-invite-item" key={item.id}>
+            <div className="partner-invite-person"><strong>{item.name}</strong><span>{item.email}</span>
+              <small>{item.configuredAt ? `Configurado em ${fmtDateTime(item.configuredAt)}` : `Criado em ${fmtDateTime(item.createdAt)}`}</small>
+            </div>
+            <div className="partner-invite-side">
+              <span className={`badge ${item.configuredAt ? "ok" : item.status === "cancelled" ? "muted" : item.status === "completed" || expired ? "warn" : "info"}`}>{item.configuredAt ? "Configurado" : expired ? "Convite expirado" : STATUS[item.status] || item.status}</span>
+              {item.status === "completed" && item.completedPartnerId && <div className="partner-invite-actions">
+                <button type="button" className="btn primary" onClick={() => openPartner(item.completedPartnerId)}>{item.configuredAt ? "Abrir parceria" : "Configurar parceria"}</button>
+                {!item.configuredAt && <button type="button" className="btn" disabled={busy} onClick={() => finish(item)}>Concluir configuração</button>}
+              </div>}
+              {!["completed", "cancelled"].includes(item.status) && <div className="partner-invite-actions">
+                <button type="button" className="btn" disabled={busy} onClick={() => send(item)}>{item.emailSentAt ? "Reenviar" : "Enviar convite"}</button>
+                <button type="button" className="btn" disabled={busy} onClick={() => cancel(item)}>Cancelar</button>
+              </div>}
+            </div>
+          </div>;
+        })}
+      </div> : <div className="partner-invite-empty"><strong>{view === "pending" ? "Tudo em dia" : "Histórico vazio"}</strong><p className="muted">{view === "pending" ? "Nenhum convite ou configuração pendente. Os parceiros configurados estão na lista principal." : "Os pré-cadastros configurados e cancelados aparecerão aqui."}</p></div>}
+      </div>
+      {!loading && meta?.totalPages > 1 && <Pager meta={meta} onPage={setPage} />}
+    </Modal>}
     {open && <Modal title="Pré-cadastrar parceiro" onClose={() => !busy && setOpen(false)}>
       <form onSubmit={submit}>
         <Field label="Nome do responsável"><input autoFocus required minLength={2} maxLength={160} value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome completo" /></Field>
