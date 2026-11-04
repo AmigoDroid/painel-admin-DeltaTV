@@ -25,7 +25,7 @@ const SCOPES = {
   content: {
     title: "Parceiros", sub: "Provedores de conteúdo: servidores IPTV, códigos de ativação e mensalidade.",
     kinds: ["content", "both"], defaultKind: "content", newLabel: "Novo parceiro", noun: "parceiro", saved: "Parceiro salvo.",
-    search: "Buscar parceiro por nome ou identificador", also: "também é revenda", billing: "Modelo",
+    search: "Buscar por empresa, responsável, e-mail ou identificador", also: "também é revenda", billing: "Modelo",
   },
   reseller: {
     title: "Revendas", sub: "Quem compra licenças, mantém estoque e atende os clientes finais por MAC.",
@@ -86,6 +86,12 @@ function PartnersList({ scope, onChanged }) {
   const [openId, setOpenId] = useState(null);
   useEffect(() => { list.filter({ q: dq }); /* eslint-disable-next-line */ }, [dq]);
   useEffect(() => { const timer = setInterval(() => list.reload(), 60_000); return () => clearInterval(timer); }, [list.reload]);
+  useEffect(() => {
+    const refresh = () => { if (!document.hidden) list.reload(); };
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => { window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", refresh); };
+  }, [list.reload]);
   const rows = list.data.filter((p) => cfg.kinds.includes(p.kind));
   const changed = () => { list.reload(); onChanged?.(); };
   const count = (fn) => rows.filter(fn).length;
@@ -105,8 +111,9 @@ function PartnersList({ scope, onChanged }) {
           <div><strong>{count((p) => ["suspended", "blocked"].includes(p.effectiveStatus) && !isPending(p))}</strong><span>suspensos ou bloqueados</span></div>
         </div>
       )}
-      {scope === "content" && <PartnerPreRegistrations />}
+      {scope === "content" && <PartnerPreRegistrations onOpenPartner={setOpenId} onRefresh={list.reload} />}
       <div className="toolbar">
+        <button type="button" className="btn" onClick={list.reload} disabled={list.loading}>Atualizar lista</button>
         <input placeholder={cfg.search} value={q} onChange={(e) => setQ(e.target.value)} />
         <select value={list.params.status} onChange={(e) => list.filter({ status: e.target.value })}>
           <option value="">Todos os status</option><option value="pending">Aguardando aprovação</option><option value="active">Ativos</option><option value="expired">Expirados</option><option value="suspended">Suspensos</option><option value="blocked">Bloqueados</option><option value="cancelled">Cancelados</option>

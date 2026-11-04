@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api.js";
 import { Field, Modal, fmtDateTime, useUi } from "../ui.jsx";
 
 const STATUS = { draft: "Aguardando envio", invited: "Convite enviado", completed: "Cadastro concluído", cancelled: "Cancelado" };
-export default function PartnerPreRegistrations() {
+export default function PartnerPreRegistrations({ onOpenPartner, onRefresh }) {
   const { toast, confirm } = useUi();
   const [items, setItems] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -13,11 +13,37 @@ export default function PartnerPreRegistrations() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [sendEmail, setSendEmail] = useState(false);
+  const sequence = useRef(0);
   const load = useCallback(async () => {
-    try { const r = await api("/admin/partners/pre-registrations"); setItems(r.data || []); setError(""); }
-    catch (e) { setError(e.message); } finally { setLoading(false); }
+    const current = ++sequence.current;
+    try {
+      const r = await api("/admin/partners/pre-registrations");
+      if (current === sequence.current) { setItems(r.data || []); setError(""); }
+    } catch (e) { if (current === sequence.current) setError(e.message); }
+    finally { if (current === sequence.current) setLoading(false); }
   }, []);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    const refresh = (event) => {
+      const message = event?.detail;
+      if (document.hidden || (event?.type === "realtime-change" &&
+        (message?.type !== "changed" || !["partners", "data"].includes(message.topic)))) return;
+      load();
+    };
+    const timer = setInterval(refresh, 60_000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    window.addEventListener("realtime-change", refresh);
+    window.addEventListener("realtime-ready", refresh);
+    return () => {
+      ++sequence.current;
+      clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("realtime-change", refresh);
+      window.removeEventListener("realtime-ready", refresh);
+    };
+  }, [load]);
   const submit = async (event) => {
     event.preventDefault(); if (busy) return;
     setBusy(true);
@@ -50,7 +76,10 @@ export default function PartnerPreRegistrations() {
   return <section className="partner-invite-section">
     <div className="partner-invite-header">
       <div><h3>Pré-cadastro de parceiros</h3><p className="muted">Envie um convite para que o parceiro defina a própria senha. Sem criar uma conta antes da confirmação.</p></div>
-      <button className="btn primary" type="button" onClick={() => setOpen(true)}>+ Pré-cadastro</button>
+      <div className="actions">
+        <button className="btn" type="button" onClick={() => { load(); onRefresh?.(); }}>Atualizar</button>
+        <button className="btn primary" type="button" onClick={() => setOpen(true)}>+ Pré-cadastro</button>
+      </div>
     </div>
     {error && <p className="muted" role="alert">{error} <button type="button" className="btn" onClick={load}>Tentar novamente</button></p>}
     {loading ? <p className="muted">Carregando convites…</p> : items.length ? <div className="partner-invite-list">
@@ -60,6 +89,7 @@ export default function PartnerPreRegistrations() {
           <div className="partner-invite-person"><strong>{item.name}</strong><span>{item.email}</span><small>Criado em {fmtDateTime(item.createdAt)}{item.emailSentAt ? ` · E-mail enviado ${fmtDateTime(item.emailSentAt)}` : ""}</small></div>
           <div className="partner-invite-side">
             <span className={`badge ${item.status === "completed" ? "ok" : item.status === "cancelled" ? "muted" : expired ? "warn" : "info"}`}>{expired ? "Convite expirado" : STATUS[item.status] || item.status}</span>
+            {item.status === "completed" && item.completedPartnerId && <button type="button" className="btn primary" onClick={() => onOpenPartner(item.completedPartnerId)}>Configurar parceria</button>}
             {!["completed", "cancelled"].includes(item.status) && <div className="partner-invite-actions">
               <button type="button" className="btn" disabled={busy} onClick={() => send(item)}>{item.emailSentAt ? "Reenviar" : "Enviar convite"}</button>
               <button type="button" className="btn" disabled={busy} onClick={() => cancel(item)}>Cancelar</button>
