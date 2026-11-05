@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api } from "./api.js";
+import ServerHistoryModal from "./ServerHistoryModal.jsx";
+import { api, getAuth } from "./api.js";
 import "./server-monitor.css";
 
 const STATES = [
@@ -17,6 +18,8 @@ const host = (value) => { try { return new URL(value).host; } catch { return "En
 
 export default function ServerMonitorView({ scope = "admin" }) {
   const endpoint = scope === "admin" ? "/admin/server-monitor" : "/partner/server-monitor";
+  const [historyServer, setHistoryServer] = useState(null);
+  const canViewHistory = scope === "admin" && getAuth()?.user?.role === "superadmin";
   const [typed, setTyped] = useState("");
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
@@ -95,6 +98,7 @@ export default function ServerMonitorView({ scope = "admin" }) {
             </div>
             <div className="srv-item-footer"><div><span>Última verificação</span><strong>{date(server.lastCheckedAt)}</strong></div><div><span>Último sucesso</span><strong>{date(server.lastGoodAt)}</strong></div></div>
             {server.healthStatus === "down" || server.healthStatus === "suspect" ? <div className="srv-incident">{server.lastError || "Resposta fora do limite configurado."}</div> : null}
+            {canViewHistory && <div className="actions left"><button type="button" className="btn" onClick={() => setHistoryServer(server)}>Histórico detalhado</button></div>}
           </article>)}
         </div>}
         <div className="srv-bottom">
@@ -102,6 +106,7 @@ export default function ServerMonitorView({ scope = "admin" }) {
           <div className="srv-pagination"><button className="btn sm" disabled={!data || page <= 1 || loading} onClick={() => setPage((p) => Math.max(1, p - 1))}>Anterior</button><button className="btn sm" disabled={!data || page >= data.pages || loading} onClick={() => setPage((p) => p + 1)}>Próxima</button></div>
         </div>
       </section>
+      {historyServer && <ServerHistoryModal server={historyServer} onClose={() => setHistoryServer(null)} />}
       <p className="srv-footnote srv-note">A latência é medida da VPS até a API HTTP do servidor, não da TV. A indicação de saúde não garante que todos os canais estejam reproduzindo.</p>
     </div>
   );

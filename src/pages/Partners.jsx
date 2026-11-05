@@ -1,3 +1,4 @@
+import ServerHistoryModal from "../ServerHistoryModal.jsx";
 import { useEffect, useState } from "react";
 import AdminDeleteModal from "./AdminDeleteModal.jsx";
 import PartnerPreRegistrations from "./PartnerPreRegistrations.jsx";
@@ -249,6 +250,7 @@ function PartnerDetail({ id, onClose, onChanged }) {
   const [newCode, setNewCode] = useState(false);
   const [editCode, setEditCode] = useState(null);
   const [provForm, setProvForm] = useState(null);
+  const [historyServer, setHistoryServer] = useState(null);
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const role = getAuth()?.user?.role;
@@ -332,6 +334,7 @@ function PartnerDetail({ id, onClose, onChanged }) {
             <td className="actions">
               <RowMenu items={[
                 { label: "Editar", onClick: () => setProvForm(pr) },
+                { label: "Histórico detalhado", hidden: role !== "superadmin", onClick: () => setHistoryServer({ ...pr, partnerName: p.name }) },
                 { label: "Excluir", danger: true, onClick: () => delProvider(pr) },
               ]} />
             </td></tr>)}
@@ -355,6 +358,7 @@ function PartnerDetail({ id, onClose, onChanged }) {
         </tbody></Table></>}
       {newCode && <CodeModal checkPath="/admin/partners/codes/check" createPath={`/admin/partners/${id}/codes`} balancesPath={`/admin/partners/${id}/stock`} kind={p.kind} providers={p.providers} onClose={() => setNewCode(false)} onCreated={() => { setNewCode(false); load(); }} />}
       {editCode && <CodeEditModal partnerId={id} code={editCode} kind={p.kind} providers={p.providers} onClose={() => setEditCode(null)} onSaved={() => { setEditCode(null); load(); }} />}
+      {historyServer && <ServerHistoryModal server={historyServer} onClose={() => setHistoryServer(null)} />}
       {provForm && <ProviderForm partnerId={id} provider={provForm.id ? provForm : null} onClose={() => setProvForm(null)} onSaved={() => { setProvForm(null); load(); }} />}
       {deleting && <AdminDeleteModal type="partner" id={id} onClose={() => setDeleting(false)} onDone={() => { setDeleting(false); onClose(); onChanged?.(); }} />}
       {editing && <PartnerForm partner={p} scope={p.kind === "content" ? "content" : "reseller"} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); load(); onChanged(); }} />}
