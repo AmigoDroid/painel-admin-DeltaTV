@@ -1,0 +1,53 @@
+.notification-recipient-list {
+  height: 258px;
+  max-width: 100%;
+  min-width: 0;
+  padding: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
+}
+.notification-recipient-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 64px;
+  box-sizing: border-box;
+  padding: 8px 14px;
+  margin: 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+.notification-recipient-row:hover,
+.notification-recipient-row:focus-within {
+  background: rgba(99, 115, 255, .1);
+}
+.notification-recipient-row input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+}
+.notification-recipient-text { min-width: 0; flex: 1; }
+.notification-recipient-text b,
+.notification-recipient-text small {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  line-height: 22px;
+}
+.notification-recipient-list:focus-visible { outline: 2px solid #7885ff; outline-offset: 2px; }
+.notification-recipient-list > p,
+.notification-recipient-list > small { display: block; margin: 12px 14px; }
+.notification-selected {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  max-height: 88px;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  min-width: 0;
+}
+.notification-selected .btn { max-width: 100%; overflow-wrap: anywhere; white-space: normal; }

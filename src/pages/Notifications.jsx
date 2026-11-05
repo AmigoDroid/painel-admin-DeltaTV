@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react";
+import "./notifications.css";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../api.js";
 export default function Notifications() {
+  const recipientList = useRef(null);
   const [partners, setPartners] = useState([]), [audience, setAudience] = useState("all"), [selected, setSelected] = useState([]);
   const [search, setSearch] = useState(""), [searchPage, setSearchPage] = useState(1), [searchPages, setSearchPages] = useState(1), [searchBusy, setSearchBusy] = useState(false);
   const [title, setTitle] = useState(""), [message, setMessage] = useState(""), [severity, setSeverity] = useState("info");
@@ -16,7 +18,7 @@ export default function Notifications() {
       setSearchBusy(true);
       try {
         const result = await api("/admin/notifications/recipient-search", { query: { q: search.trim(), page: searchPage, limit: 20 } });
-        if (!controller.signal.aborted) { setPartners(result.data || []); setSearchPages(Math.max(1,result.meta?.pages || 1)); }
+        if (!controller.signal.aborted) { setPartners(result.data || []); if (recipientList.current) recipientList.current.scrollTop = 0; setSearchPages(Math.max(1,result.meta?.pages || 1)); }
       } catch (e) { if (!controller.signal.aborted) setError(e.message); }
       finally { if (!controller.signal.aborted) setSearchBusy(false); }
     }, 300);
@@ -36,8 +38,8 @@ export default function Notifications() {
     {audience === "selected" && <section aria-label="Selecionar destinatários" style={{ display:"grid",gap:12,minWidth:0 }}>
       <label>Buscar parceiro ou revenda por nome, código ou email<input type="search" value={search} onChange={e => { setSearch(e.target.value); setSearchPage(1); }} placeholder="Digite para buscar entre todas as revendas" /></label>
       <div aria-live="polite"><strong>{selected.length} selecionada(s)</strong>{selected.length > 0 && <button type="button" className="btn sm" style={{marginLeft:12}} onClick={() => setSelected([])}>Limpar seleção</button>}</div>
-      {selected.length > 0 && <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>{selected.map(p => <button key={p.id} type="button" className="btn sm" onClick={() => toggle(p)} title="Remover destinatário">{p.name} ×</button>)}</div>}
-      <div className="card" style={{padding:12,display:"grid",gap:8}}>{searchBusy && <small>Pesquisando…</small>}{partners.map(p => <label key={p.id} style={{display:"flex",alignItems:"center",gap:10,padding:8,overflowWrap:"anywhere"}}><input type="checkbox" checked={selected.some(x => x.id === p.id)} onChange={() => toggle(p)}/><span><b>{p.name}</b><small className="muted" style={{display:"block"}}>{p.slug} · {p.status}</small></span></label>)}{!searchBusy && !partners.length && <p className="muted">Nenhum destinatário encontrado.</p>}</div>
+      {selected.length > 0 && <div className="notification-selected" aria-label="Destinatários selecionados">{selected.map(p => <button key={p.id} type="button" className="btn sm" onClick={() => toggle(p)} title="Remover destinatário">{p.name} ×</button>)}</div>}
+      <div ref={recipientList} className="card notification-recipient-list" role="region" aria-label="Lista de destinatários com rolagem" tabIndex={0} aria-busy={searchBusy}>{searchBusy && <small>Pesquisando…</small>}{partners.map(p => <label key={p.id} className="notification-recipient-row"><input type="checkbox" checked={selected.some(x => x.id === p.id)} onChange={() => toggle(p)}/><span className="notification-recipient-text"><b title={p.name}>{p.name}</b><small className="muted" title={`${p.slug} · ${p.status}`}>{p.slug} · {p.status}</small></span></label>)}{!searchBusy && !partners.length && <p className="muted">Nenhum destinatário encontrado.</p>}</div>
       <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}><button type="button" className="btn" disabled={searchPage<=1} onClick={() => setSearchPage(v=>v-1)}>Anterior</button><small>Página {searchPage} de {searchPages}</small><button type="button" className="btn" disabled={searchPage>=searchPages} onClick={() => setSearchPage(v=>v+1)}>Próxima</button></div>
     </section>}
     <label>Prioridade<select value={severity} onChange={e => setSeverity(e.target.value)}><option value="info">Informativa</option><option value="important">Importante</option><option value="warning">Atenção</option></select></label>
