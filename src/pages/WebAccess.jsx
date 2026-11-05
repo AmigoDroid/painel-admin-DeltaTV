@@ -1,3 +1,4 @@
+import CredentialsModal from "./CredentialsModal.jsx";
 import { useEffect, useState } from "react";
 import PlatformDefaultsModal from "./PlatformDefaultsModal.jsx";
 import { api, getAuth } from "../api.js";
@@ -195,6 +196,9 @@ export default function WebAccess({ admin = false }) {
   const [q, setQ] = useState("");
   const dq = useDebounced(q);
   const list = useList(base, { q: "", status: "" });
+  const [renaming, setRenaming] = useState(null);
+  const [newLabel, setNewLabel] = useState("");
+  const [credentials, setCredentials] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [created, setCreated] = useState(null);
@@ -239,6 +243,8 @@ export default function WebAccess({ admin = false }) {
             <td>{m ? <span title={KINDS.map(([k, l]) => `${l}: ${m[k]}`).join(" · ")}>{chip(m.live)} <span className="muted">ao vivo</span></span> : "—"}</td>
             <td className="actions">
               <RowMenu items={[
+                { label: "Credenciais", hidden: !admin || getAuth()?.user?.role !== "superadmin" || a.status === "revoked", onClick: ()=>setCredentials(a.id) },
+                { label: "Renomear", hidden: a.status === "revoked", onClick: ()=>{setNewLabel(a.label||"");setRenaming(a)} },
                 { label: "Entrega", hidden: a.status === "revoked", onClick: () => setModesFor(a) },
                 { label: "Copiar código", hidden: a.status === "revoked", onClick: () => copy(a.code) },
                 { label: "Renovar", hidden: a.status === "revoked" || !a.license?.id, onClick: () => renew(a) },
@@ -250,6 +256,8 @@ export default function WebAccess({ admin = false }) {
           </tr>);
       })}</tbody></Table>
       <Empty loading={list.loading} error={list.error} count={list.data.length} /><Pager meta={list.meta} onPage={list.setPage} />
+      {renaming && <Modal title="Renomear acesso" onClose={()=>setRenaming(null)}><Field label="Nome do cliente"><input maxLength={160} value={newLabel} onChange={e=>setNewLabel(e.target.value)}/></Field><button className="btn primary" disabled={!newLabel.trim()} onClick={async()=>{if(await run(()=>api(`${base}/${renaming.id}`,{method:"PATCH",body:{label:newLabel.trim()}}),"Nome atualizado.")){setRenaming(null);list.reload()}}}>Salvar nome</button></Modal>}
+      {credentials && <CredentialsModal path={`${base}/${credentials}/credentials`} onClose={()=>setCredentials(null)} />}
       {settingsOpen && <PlatformDefaultsModal section="web" onClose={() => setSettingsOpen(false)} onSaved={list.reload} />}
       {creating && <CreateModal admin={admin} base={base} onClose={() => setCreating(false)} onCreated={(r) => { setCreating(false); setCreated(r); list.reload(); window.dispatchEvent(new Event("stock-changed")); }} />}
       {created && <Created item={created} onClose={() => setCreated(null)} />}

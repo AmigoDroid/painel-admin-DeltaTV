@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { api } from "../api.js";
+import CodeManagement from "./CodeManagement.jsx";
+import { api, getAuth } from "../api.js";
 import { Field, Modal, useAction, useDebounced } from "../ui.jsx";
 
 // Texto do servidor de um código nas tabelas. Código antigo sem servidor = o app testa os servidores da parceria por prioridade.
@@ -115,6 +116,9 @@ export default function CodeModal({ checkPath, createPath, balancesPath, kind = 
 /** Edita servidor, licença, rótulo e limite de um código. Só afeta NOVAS ativações: quem já ativou não muda de servidor nem perde o prazo. */
 export function CodeEditModal({ partnerId, code, kind = "content", providers = [], onClose, onSaved }) {
   const run = useAction();
+  const superadmin = getAuth()?.user?.role === "superadmin";
+  const [allowWeb, setAllowWeb] = useState(!!code.allowWebIssuance);
+  const [expires, setExpires] = useState(code.expiresAt ? new Date(code.expiresAt).toISOString().slice(0,16) : "");
   const sells = kind === "reseller" || kind === "both";
   const balances = useBalances(sells, `/admin/partners/${partnerId}/stock`);
   const [providerId, setProviderId] = useState(code.providerId || "");
@@ -123,14 +127,14 @@ export function CodeEditModal({ partnerId, code, kind = "content", providers = [
   const [months, setMonths] = useState(code.licenseMonths ? String(code.licenseMonths) : "");
   const submit = async () => {
     const body = {
-      providerId: providerId || null, label: label || undefined, maxActivations: max === "" ? null : Number(max),
+      ...(providerId !== (code.providerId || "") ? {providerId: providerId || null} : {}), expiresAt: expires ? new Date(expires+"Z").toISOString() : null, ...(superadmin ? {allowWebIssuance:allowWeb} : {}), label: label || undefined, maxActivations: max === "" ? null : Number(max),
       ...(sells ? { licenseMonths: months ? Number(months) : null } : {}),
     };
     if (await run(() => api(`/admin/partners/${partnerId}/codes/${code.id}`, { method: "PATCH", body }), "Código atualizado.")) onSaved();
   };
   return (
     <Modal title={`Editar código ${code.code}`} onClose={onClose}>
-      <Field label="Servidor" hint="Vale para as próximas ativações. Dispositivos já ativados com este código continuam no servidor em que estão.">
+      <Field label="Servidor" hint="Trocar o servidor principal redefine as URLs alternativas. Use a seção de failover para gerenciar várias URLs.">
         <ServerSelect providers={providers} value={providerId} onChange={setProviderId} allowNone />
       </Field>
       {!providerId && <p className="muted">Sem servidor definido, o aplicativo testa os servidores ativos da parceria na ordem de prioridade (comportamento antigo). Recomendado: escolher um servidor.</p>}
@@ -140,6 +144,9 @@ export function CodeEditModal({ partnerId, code, kind = "content", providers = [
         <Field label="Rótulo"><input value={label} onChange={(e) => setLabel(e.target.value)} /></Field>
         <Field label="Máx. de ativações" hint="Vazio = sem limite"><input type="number" min="1" value={max} onChange={(e) => setMax(e.target.value)} /></Field>
       </div>
+      <Field label="Vencimento (UTC, vazio = sem prazo)"><input type="datetime-local" value={expires} onChange={e=>setExpires(e.target.value)} /></Field>
+      {superadmin && <label><input type="checkbox" checked={allowWeb} onChange={e=>setAllowWeb(e.target.checked)}/> Autorizar emissão de PlayerWeb por este código (exige liberação no contrato)</label>}
+      {superadmin && <CodeManagement partnerId={partnerId} code={code} providers={providers} onSaved={onSaved}/>}
       <div className="actions"><button className="btn" onClick={onClose}>Cancelar</button><button className="btn primary" disabled={kind === "reseller" && !months} onClick={submit}>Salvar</button></div>
     </Modal>
   );

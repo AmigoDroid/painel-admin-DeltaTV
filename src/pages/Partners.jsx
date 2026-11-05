@@ -321,7 +321,7 @@ function PartnerDetail({ id, onClose, onChanged }) {
           {p.codes.map((c) => <tr key={c.id}><td><strong>{c.code}</strong></td><td>{c.provider ? <>{c.provider.name}{c.provider.status !== "active" && <> <Badge status="disabled" label="Desativado" /></>}<div className="muted">{c.provider.baseUrl}</div></> : c.status === "active" ? <span className="muted" title="Código antigo: o app testa os servidores da parceria por prioridade. Edite para escolher um servidor.">Qualquer servidor ⚠</span> : "—"}</td><td>{c.label || "—"}</td>{p.kind !== "content" && <td>{c.licenseMonths ? <>{c.licenseMonths} {c.licenseMonths === 1 ? "mês" : "meses"} · <span style={c.stockAvailable === 0 ? { color: "var(--bad)" } : undefined}>{c.stockAvailable} em estoque</span></> : <span className="muted" title="Sem licença: este código não consome estoque.">—</span>}</td>}<td><Badge status={c.status === "active" ? "active" : "revoked"} label={c.status === "active" ? "Ativo" : "Revogado"} /></td><td>{c.activationCount ?? 0} / {c.maxActivations ?? "∞"}</td><td>{fmtDate(c.expiresAt)}</td>
             <td className="actions">
               <RowMenu items={[
-                { label: "Editar", hidden: c.status !== "active", onClick: () => setEditCode(c) },
+                { label: "Configurar código", hidden: c.status !== "active" && role !== "superadmin", onClick: () => setEditCode(c) },
                 { label: "Revogar", hidden: c.status !== "active", danger: true, onClick: () => revokeCode(c) },
               ]} />
             </td></tr>)}
