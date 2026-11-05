@@ -5,6 +5,7 @@ import EditDeviceModal from "./EditDeviceModal.jsx";
 import AdminDeleteModal from "./AdminDeleteModal.jsx";
 
 const EVENTS = {
+  "device.trial.granted": "Teste gratuito concedido", "device.trial.replaced": "Teste substituído por licença paga",
   "activation.create": "Ativação criada", "activation.block": "Lista bloqueada", "activation.unblock": "Lista desbloqueada",
   "activation.revoke": "Ativação removida", "activation.restore": "Ativação restaurada", "activation.delete.admin": "Ativação excluída definitivamente",
   "device.configuration.confirm": "Lista adicionada ou configurada", "device.configuration.cancel": "Configuração cancelada",
@@ -15,8 +16,8 @@ const EVENTS = {
   "web_access.create": "Player Web criado", "web_access.update": "Player Web configurado", "web_access.login": "Acesso ao Player Web",
 };
 const STATUS = { active: "Ativo", blocked: "Bloqueado", revoked: "Removido" };
-const labelOf = a => a.listName || a.partner?.name || (a.license ? `Licença ••••${a.license.codeLast4}` : "Lista própria");
-const detailOf = event => [event.metadata?.reason, event.metadata?.from && event.metadata?.to
+const labelOf = a => a.listName || a.partner?.name || (a.license?.isTrial ? "Teste gratuito" : a.license ? `Licença ••••${a.license.codeLast4}` : "Lista própria");
+const detailOf = event => [event.metadata?.reason, event.metadata?.days ? `Teste de ${event.metadata.days} dias` : null, event.metadata?.from && event.metadata?.to
   ? `${STATUS[event.metadata.from] || event.metadata.from} → ${STATUS[event.metadata.to] || event.metadata.to}` : null,
   event.metadata?.listName, event.metadata?.webAutoHttps !== undefined ? `HTTPS automático: ${event.metadata.webAutoHttps ? "ativado" : "desativado"}` : null].filter(Boolean).join(" · ");
 
@@ -63,7 +64,7 @@ export default function DeviceRecordModal({ device, initialTab = "lists", onClos
       {data.eventsMeta?.totalPages > 1 && <Pager meta={data.eventsMeta} onPage={setEventPage} />}
     </> : <>
       <Table><thead><tr><th>Lista / vínculo</th><th>Situação</th><th>Entrega</th><th>Ativação</th><th>Remoção</th><th>Ações</th></tr></thead><tbody>
-        {rows.map(a => <tr key={a.id}><td><strong>{labelOf(a)}</strong><div className="muted">{a.provider?.name || ""}{a.grantedLicense ? ` · Licença ••••${a.grantedLicense.codeLast4}` : ""}</div></td>
+        {rows.map(a => <tr key={a.id}><td><strong>{labelOf(a)}</strong>{a.license?.isTrial && <div><span className="badge info">Teste gratuito</span></div>}<div className="muted">{a.provider?.name || ""}{a.grantedLicense ? ` · Licença ••••${a.grantedLicense.codeLast4}` : ""}</div></td>
           <td><Badge status={accessStatus(a)} /><div className="muted">{a.statusReason || (a.access?.allowed === false ? a.access.message : "")}</div></td>
           <td><DeliveryBadge mode={a.deliveryMode} fixed={a.deliveryModeFixed} /></td><td>{fmtDateTime(a.activatedAt)}</td><td>{fmtDateTime(a.revokedAt)}</td>
           <td><div className="device-record-actions">

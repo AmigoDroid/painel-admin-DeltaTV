@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { api } from "../api.js";
+import PlatformDefaultsModal from "./PlatformDefaultsModal.jsx";
+import { api, getAuth } from "../api.js";
 import { useBalances, monthsLabel } from "./CodeModal.jsx";
 import { Badge, Empty, Field, Modal, Pager, Table, fmtDate, fmtDateTime, formatMac, useAction, useDebounced, useList, useUi, PasswordInput, RowMenu } from "../ui.jsx";
 
@@ -30,31 +31,21 @@ function ModesEditor({ value, onChange, readOnly = false }) {
   );
 }
 
-function WebHttpsOption({ value, onChange, readOnly = false }) {
-  return <div className="field">
-    <label className="partner-invite-check"><input type="checkbox" checked={value} disabled={readOnly} onChange={event => onChange(event.target.checked)} />
-      <span>Usar HTTPS automaticamente nas URLs do parceiro</span></label>
-    <small>Converte http:// para https:// apenas neste acesso do Player Web. URLs HTTPS e portas personalizadas são preservadas. O servidor do parceiro precisa oferecer HTTPS com certificado válido.</small>
-    {readOnly && <small className="muted">Esta opção é controlada pela administração.</small>}
-  </div>;
-}
-
 function ModesModal({ item, base, readOnly, onClose, onSaved }) {
-  const modesReadOnly = readOnly || item.gatewayManaged;
+  readOnly = readOnly || item.gatewayManaged;
+  const modesReadOnly = readOnly;
   const run = useAction();
   const [modes, setModes] = useState({ ...DEFAULTS, ...(item.deliveryModes || {}) });
-  const [webAutoHttps, setWebAutoHttps] = useState(item.webAutoHttps !== false);
   const save = async (body, msg) => { if (await run(() => api(`${base}/${item.id}`, { method: "PATCH", body }), msg)) onSaved(); };
   return (
     <Modal title={`Entrega · ${fmtCode(item.code)}`} onClose={onClose}>
       {item.gatewayManaged && <p className="muted">Entrega HTTPS gerenciada pela plataforma: mídia pelo Nginx e playlists pela API.</p>}
       <ModesEditor value={modes} onChange={setModes} readOnly={modesReadOnly} />
-      <WebHttpsOption value={webAutoHttps} onChange={setWebAutoHttps} readOnly={readOnly} />
       <div className="actions">
         {readOnly ? <button className="btn primary" onClick={onClose}>Fechar</button> : (
           <>
             <button className="btn" disabled={modesReadOnly} onClick={() => save({ deliveryModes: null }, "Voltou ao padrão.")}>Restaurar entrega padrão</button>
-            <button className="btn primary" onClick={() => save({ ...(!modesReadOnly ? { deliveryModes: modes } : {}), webAutoHttps }, "Configurações do Player Web salvas.")}>Salvar</button>
+            <button className="btn primary" onClick={() => save({ ...(!modesReadOnly ? { deliveryModes: modes } : {}) }, "Configurações do Player Web salvas.")}>Salvar</button>
           </>
         )}
       </div>
@@ -67,7 +58,8 @@ function CreateModal({ admin, base, onClose, onCreated }) {
   const [partners, setPartners] = useState([]);
   const [partnerId, setPartnerId] = useState("");
   const [useStock, setUseStock] = useState(true);
-  const [webAutoHttps, setWebAutoHttps] = useState(true);
+  const [defaultsReady, setDefaultsReady] = useState(false);
+  const [defaultsError, setDefaultsError] = useState("");
   const [label, setLabel] = useState("");
   const [source, setSource] = useState("mac"); // mac | partner | playlist
   const [mac, setMac] = useState("");
@@ -84,6 +76,9 @@ function CreateModal({ admin, base, onClose, onCreated }) {
     if (admin) api("/admin/partners", { query: { pageSize: 100 } }).then((r) => setPartners(r.data.filter((p) => p.kind !== "content"))).catch(() => {});
   }, [admin]);
 
+  const loadDefaults = async () => { try { const result = await api(`${base}/defaults`); setModes(result.deliveryModes); setDefaultsReady(true); setDefaultsError(""); } catch (e) { setDefaultsError(e.message); } };
+  useEffect(() => { loadDefaults(); }, [base]);
+
   const findLists = async () => {
     const r = await run(async () => {
       if (!admin) return (await api("/partner/mac/lookup", { method: "POST", body: { mac } })).activations;
@@ -96,7 +91,7 @@ function CreateModal({ admin, base, onClose, onCreated }) {
   };
 
   const needMonths = source === "playlist" || (source === "mac" && lists?.find((l) => l.activationId === activationId)?.mode === "playlist");
-  const ready = (source !== "mac" || (mac && activationId)) &&
+  const ready = defaultsReady && (source !== "mac" || (mac && activationId)) &&
     (source !== "partner" || (f.code && f.username && f.password)) && (source !== "playlist" || (f.name && f.url)) && (!needMonths || months);
 
   const submit = async () => {
@@ -104,7 +99,7 @@ function CreateModal({ admin, base, onClose, onCreated }) {
     if (source === "mac") Object.assign(body, { mac, activationId });
     else if (source === "partner") body.config = { mode: "partner", code: f.code, username: f.username, password: f.password };
     else body.config = { mode: "playlist", name: f.name, url: f.url };
-    if (admin) Object.assign(body, { webAutoHttps, partnerId: partnerId || undefined, useStock: partnerId ? useStock : false });
+    if (admin) Object.assign(body, { partnerId: partnerId || undefined, useStock: partnerId ? useStock : false });
     setBusy(true);
     const r = await run(() => api(base, { method: "POST", body }), "Acesso web criado.");
     setBusy(false);
@@ -167,7 +162,7 @@ function CreateModal({ admin, base, onClose, onCreated }) {
         </Field>
       )}
       <ModesEditor value={modes} onChange={setModes} />
-      {admin && source !== "playlist" && <WebHttpsOption value={webAutoHttps} onChange={setWebAutoHttps} />}
+      {defaultsError && <p className="error">{defaultsError} <button type="button" className="btn" onClick={loadDefaults}>Tentar novamente</button></p>}
       <div className="actions">
         <button className="btn" onClick={onClose}>Cancelar</button>
         <button className="btn primary" disabled={!ready || busy} onClick={submit}>{busy ? "Gerando…" : "Gerar código"}</button>
@@ -200,6 +195,7 @@ export default function WebAccess({ admin = false }) {
   const [q, setQ] = useState("");
   const dq = useDebounced(q);
   const list = useList(base, { q: "", status: "" });
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [created, setCreated] = useState(null);
   const [modesFor, setModesFor] = useState(null);
@@ -219,6 +215,7 @@ export default function WebAccess({ admin = false }) {
 
   return (
     <>
+      <div className="page-head"><h2>PlayerWeb</h2>{admin && getAuth()?.user?.role === "superadmin" && <button className="btn" onClick={() => setSettingsOpen(true)}>Configurações</button>}</div>
       <p className="muted">Cada código libera o Player Web para um cliente, com lista, licença e prazo próprios. Consulte o botão Entrega para ver como esse acesso recebe o conteúdo.</p>
       <div className="actions left"><button className="btn primary" onClick={() => setCreating(true)}>Novo acesso web</button></div>
       <div className="section-head">
@@ -253,6 +250,7 @@ export default function WebAccess({ admin = false }) {
           </tr>);
       })}</tbody></Table>
       <Empty loading={list.loading} error={list.error} count={list.data.length} /><Pager meta={list.meta} onPage={list.setPage} />
+      {settingsOpen && <PlatformDefaultsModal section="web" onClose={() => setSettingsOpen(false)} onSaved={list.reload} />}
       {creating && <CreateModal admin={admin} base={base} onClose={() => setCreating(false)} onCreated={(r) => { setCreating(false); setCreated(r); list.reload(); window.dispatchEvent(new Event("stock-changed")); }} />}
       {created && <Created item={created} onClose={() => setCreated(null)} />}
       {modesFor && <ModesModal item={modesFor} base={base} readOnly={!admin} onClose={() => setModesFor(null)} onSaved={() => { setModesFor(null); list.reload(); }} />}

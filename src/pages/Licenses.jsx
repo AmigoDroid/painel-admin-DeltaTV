@@ -1,3 +1,4 @@
+import PlatformDefaultsModal from "./PlatformDefaultsModal.jsx";
 import { useEffect, useState } from "react";
 import { api, getAuth } from "../api.js";
 import { NewPlanInline } from "./Stock.jsx";
@@ -9,6 +10,7 @@ export default function Licenses() {
   const [q, setQ] = useState("");
   const dq = useDebounced(q);
   const list = useList("/admin/licenses", { q: "", status: "" });
+  const [trialSettings, setTrialSettings] = useState(false);
   const [creating, setCreating] = useState(false);
   const [openId, setOpenId] = useState(null);
   const [secret, setSecret] = useState(null);
@@ -16,7 +18,7 @@ export default function Licenses() {
 
   return (
     <>
-      <div className="page-head"><h2>Licenças individuais</h2><button className="btn primary" onClick={() => setCreating(true)}>Nova licença</button></div>
+      <div className="page-head"><h2>Licenças individuais</h2><div className="actions">{getAuth()?.user?.role === "superadmin" && <button className="btn" onClick={() => setTrialSettings(true)}>Teste gratuito</button>}<button className="btn primary" onClick={() => setCreating(true)}>Nova licença</button></div></div>
       <div className="toolbar">
         <input placeholder="Buscar por cliente, e-mail ou final do código" value={q} onChange={(e) => setQ(e.target.value)} />
         <select value={list.params.status} onChange={(e) => list.filter({ status: e.target.value })}>
@@ -32,7 +34,7 @@ export default function Licenses() {
           {list.data.map((l) => (
             <tr key={l.id} className="click" onClick={() => setOpenId(l.id)}>
               <td>{l.Customer?.name || "—"}<div className="muted">{l.Customer?.email}</div></td>
-              <td>••••{l.codeLast4}</td><td>{l.Plan?.name}</td>
+              <td>••••{l.codeLast4}</td><td>{l.Plan?.name}{l.isTrial && <div><span className="badge info">Teste gratuito</span></div>}</td>
               <td><Badge status={l.effectiveStatus} /></td><td>{fmtDate(l.expiresAt)}</td><td>{l.deviceCount}/{l.maxDevices}</td>
             </tr>
           ))}
@@ -40,6 +42,7 @@ export default function Licenses() {
       </Table>
       <Empty loading={list.loading} error={list.error} count={list.data.length} />
       <Pager meta={list.meta} onPage={list.setPage} />
+      {trialSettings && <PlatformDefaultsModal section="trial" onClose={() => setTrialSettings(false)} />}
       {creating && <CreateLicense onClose={() => setCreating(false)} onCreated={(code) => { setCreating(false); setSecret(code); list.reload(); }} />}
       {openId && <LicenseDetail id={openId} onClose={() => setOpenId(null)} onChanged={list.reload} />}
       {secret && <SecretCode code={secret} title="Código da licença" onClose={() => setSecret(null)} />}
