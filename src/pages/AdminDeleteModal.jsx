@@ -37,7 +37,7 @@ export default function AdminDeleteModal({ type, id, onClose, onDone }) {
         : { confirmMac: confirmed.trim(), reason: reason.trim() };
       const result = await api(root, { method: "DELETE", body });
       if (result?.deleted) {
-        toast("Exclusão administrativa concluída.");
+        toast(type === "partner" ? "Cadastro arquivado. Encontre-o em Sistema → Lixeira." : "Exclusão administrativa concluída.");
         onDone?.(result);
       } else {
         setSubmitError("A API não confirmou a exclusão. Confira o log do backend antes de repetir a operação.");
@@ -61,7 +61,7 @@ export default function AdminDeleteModal({ type, id, onClose, onDone }) {
           </p>
         </div>
         {type === "partner" ? <>
-          <p><strong>Remover do sistema:</strong> os acessos ao portal e os códigos serão desativados. O cadastro é arquivado para preservar pagamentos, créditos, faturas e auditoria; servidores são desativados, não apagados.</p>
+          <p><strong>Enviar à Lixeira:</strong> os acessos ao portal e os códigos serão desativados. O cadastro será arquivado em <strong>Sistema → Lixeira</strong>, onde o superadmin poderá restaurar ou excluir definitivamente. O histórico financeiro permanece até uma eventual exclusão definitiva confirmada.</p>
           <label style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "9px 0" }}>
             <input type="checkbox" checked={deleteClients} onChange={(e) => setDeleteClients(e.target.checked)} />
             <span><strong>Apagar também os clientes cadastrados</strong><div className="muted">{info.clients} fichas privadas de clientes desta revenda serão excluídas permanentemente; clientes globais, licenças e dados financeiros permanecem.</div></span>

@@ -8,6 +8,7 @@ import VpsMonitor from "./pages/VpsMonitor.jsx";
 import PlansAndPricing from "./pages/PlansAndPricing.jsx";
 import Licenses from "./pages/Licenses.jsx";
 import Partners, { Resellers } from "./pages/Partners.jsx";
+import PartnerTrash from "./pages/PartnerTrash.jsx";
 import Devices from "./pages/Devices.jsx";
 import Unlinked from "./pages/Unlinked.jsx";
 import Sources from "./pages/Sources.jsx";
@@ -31,7 +32,7 @@ const PAGES = {
   webaccess: ["Player Web", WebAccess],
   licenses: ["Licenças", Licenses], devices: ["Dispositivos", Devices], unlinked: ["Sem vínculo", Unlinked],
   partners: ["Parceiros", Partners], servermonitor: ["Monitoramento", ServerMonitor], sources: ["Fontes de conteúdo", Sources],
-  resellers: ["Revendas", Resellers], clients: ["Clientes", Clients], credits: ["Créditos", Credits], downloads: ["Downloads e links", Downloads],
+  resellers: ["Revendas", Resellers], trash: ["Lixeira", PartnerTrash], clients: ["Clientes", Clients], credits: ["Créditos", Credits], downloads: ["Downloads e links", Downloads],
   billing: ["Financeiro", Billing], pix: ["Pix", Pix], pricing: ["Planos e valores", PlansAndPricing],
   users: ["Usuários", Users], loginhistory: ["Histórico de login", LoginHistory], notifications: ["Notificações", Notifications], mail: ["E-mails", Mail], audit: ["Auditoria", Audit],
 };
@@ -43,7 +44,7 @@ const GROUPS = [
   { label: "Parceiros", items: ["partners", "servermonitor", "sources"] },
   { label: "Revendas", items: ["resellers", "clients", "credits", "downloads"] },
   { label: "Financeiro", items: ["pricing", "billing", "pix"] },
-  { label: "Sistema", items: ["vpsmonitor", "users", "loginhistory", "notifications", "mail", "audit"] },
+  { label: "Sistema", items: ["vpsmonitor", "trash", "users", "loginhistory", "notifications", "mail", "audit"] },
 ];
 
 // Ícones do menu (traço simples, herdam a cor do texto).
@@ -62,6 +63,7 @@ const ICONS = {
   pricing: <><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M7 9h10M7 13h7M7 17h5"/></>,
   pix: <><path d="M12 2.8l9.2 9.2-9.2 9.2L2.8 12z" /><path d="M12 8l4 4-4 4-4-4z" /></>,
   credits: <><circle cx="12" cy="12" r="9" /><path d="M14.8 9.3c-.5-.9-1.5-1.3-2.8-1.3-1.7 0-2.8.8-2.8 2 0 3 5.6 1.2 5.6 4.2 0 1.2-1.1 2-2.8 2-1.3 0-2.4-.5-2.9-1.4M12 6.5V8m0 8v1.5" /></>,
+  trash: <><path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14M10 11v6M14 11v6" /></>,
   users: <path d="M12 3l8 3v6c0 4.5-3.2 8-8 9-4.8-1-8-4.5-8-9V6z" />,
   loginhistory: <><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/></>,
   notifications: <><path d="M18 8a6 6 0 00-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></>,
@@ -134,7 +136,7 @@ function UserMenu({ user }) {
 
 function Shell({ user }) {
   // Itens do menu são conveniência: cada rota é protegida por permissão no backend.
-  const hidden = (k) => ((k === "vpsmonitor" || k === "pricing") && user.role !== "superadmin") || (user.role === "support" && k === "audit") || ((k === "users" || k === "loginhistory" || k === "mail" || k === "notifications") && user.role !== "superadmin");
+  const hidden = (k) => ((k === "vpsmonitor" || k === "pricing" || k === "trash") && user.role !== "superadmin") || (user.role === "support" && k === "audit") || ((k === "users" || k === "loginhistory" || k === "mail" || k === "notifications") && user.role !== "superadmin");
   const menu = Object.entries(PAGES).filter(([k]) => !hidden(k));
   const allowed = (h) => menu.some(([k]) => k === h);
   const fromHash = () => (allowed(location.hash.slice(1)) ? location.hash.slice(1) : "dashboard");
