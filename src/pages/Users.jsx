@@ -1,3 +1,4 @@
+import PartnerPicker from "../PartnerPicker.jsx";
 import { useEffect, useState } from "react";
 import { api, getAuth } from "../api.js";
 import { Badge, Empty, Field, Modal, PasswordInput, Pager, Table, fmtDateTime, useAction, useDebounced, useList, RowMenu } from "../ui.jsx";
@@ -15,12 +16,7 @@ export function UsersPanel({ partnerId: fixedPartnerId }) {
   const dq = useDebounced(q);
   const list = useList("/admin/users", { q: "", role: "", status: "", partnerId: fixedPartnerId || "" });
   const [form, setForm] = useState(null);
-  const [partners, setPartners] = useState([]);
   useEffect(() => { list.filter({ q: dq }); /* eslint-disable-next-line */ }, [dq]);
-  useEffect(() => {
-    if (fixedPartnerId) return;
-    api("/admin/partners", { query: { pageSize: 100 } }).then((r) => setPartners(r.data)).catch(() => {});
-  }, [fixedPartnerId]);
   const full = me?.role === "superadmin";
 
   return (
@@ -48,12 +44,12 @@ export function UsersPanel({ partnerId: fixedPartnerId }) {
       </Table>
       <Empty loading={list.loading} error={list.error} count={list.data.length} />
       <Pager meta={list.meta} onPage={list.setPage} />
-      {form && <UserForm {...form} me={me} full={full} fixedPartnerId={fixedPartnerId} partners={partners} onClose={() => setForm(null)} onSaved={() => { setForm(null); list.reload(); }} />}
+      {form && <UserForm {...form} me={me} full={full} fixedPartnerId={fixedPartnerId} onClose={() => setForm(null)} onSaved={() => { setForm(null); list.reload(); }} />}
     </>
   );
 }
 
-function UserForm({ user, me, full, fixedPartnerId, partners, onClose, onSaved }) {
+function UserForm({ user, me, full, fixedPartnerId, onClose, onSaved }) {
   const run = useAction();
   const edit = !!user;
   const self = user?.id === me?.id;
@@ -79,7 +75,7 @@ function UserForm({ user, me, full, fixedPartnerId, partners, onClose, onSaved }
           <select value={f.role} onChange={set("role")} disabled={roleLocked}>{Object.entries(ROLE).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
         </Field>
         {isPartner && !fixedPartnerId && (
-          <Field label="Revenda / parceiro"><select value={f.partnerId} onChange={set("partnerId")}><option value="">Selecione…</option>{partners.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
+          <Field label="Revenda / parceiro"><PartnerPicker value={f.partnerId} onChange={(v) => setF((f) => ({ ...f, partnerId: v }))} /></Field>
         )}
       </div>
       {edit && <Field label="Status" hint={self ? "Você não pode desativar a própria conta." : "Desativar encerra as sessões abertas do usuário."}><select value={f.status} onChange={set("status")} disabled={self}><option value="active">Ativo</option><option value="disabled">Desativado</option></select></Field>}

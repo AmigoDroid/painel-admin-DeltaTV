@@ -1,3 +1,4 @@
+import PartnerPicker from "../PartnerPicker.jsx";
 import { useState } from "react";
 import { api } from "../api.js";
 import { Badge, Empty, Field, LoadError, Modal, Pager, Table, fmtDateTime, fmtMoney, toCents, useAction, useList, useLoad, useUi, RowMenu } from "../ui.jsx";
@@ -36,8 +37,9 @@ export default function Pix() {
           <strong>{reviewCount} pagamento(s) em conferência:</strong> o dinheiro chegou, mas não foi possível entregar automaticamente (valor diferente, fatura já quitada ou cadastro bloqueado). Veja abaixo.
         </div>
       )}
-      <div className="tabs">{[["charges", "Cobranças Pix"], ["prices", "Preços das licenças"]].map(([k, n]) => <button key={k} className={`tab ${tab === k ? "active" : ""}`} onClick={() => setTab(k)}>{n}</button>)}</div>
+      <div className="tabs">{[["charges", "Cobranças Pix"], ["refunds", "Pendências de estorno"], ["prices", "Preços das licenças"]].map(([k, n]) => <button key={k} className={`tab ${tab === k ? "active" : ""}`} onClick={() => setTab(k)}>{n}</button>)}</div>
       {tab === "charges" && <Charges provider={cfg.data?.provider} onChanged={review.reload} />}
+      {tab === "refunds" && <RefundCases />}
       {tab === "prices" && <Prices />}
     </>
   );
@@ -85,6 +87,7 @@ function Charges({ provider, onChanged }) {
               <RowMenu items={[
                 { label: "Reconsultar", hidden: !(["review", "pending", "expired", "cancelled"].includes(c.status) && c.providerRef), onClick: () => reprocess(c) },
                 { label: "Resolver", hidden: c.status !== "review", onClick: () => resolve(c) },
+                { label: "Repetir compensação de estorno", hidden: c.status !== "refunded" || c.error === "Devolução conciliada e compensada.", onClick: () => act(() => api(`/admin/pix/charges/${c.id}/retry-refund`, { method: "POST" }), "Compensação reavaliada.") },
                 { label: "Simular pagamento", hidden: !(provider === "mock" && c.status === "pending"), onClick: () => simulate(c) },
               ]} />
             </td>
@@ -96,15 +99,45 @@ function Charges({ provider, onChanged }) {
   );
 }
 
+/** Resolução rastreável de Pix já devolvidos. Nenhuma ação aqui transfere dinheiro. */
+function RefundCases() {
+  const list = useList("/admin/pix/refund-cases", { status: "" });
+  const { confirm } = useUi();
+  const run = useAction();
+  const decide = async (item, action, title) => {
+    const r = await confirm({ title, message: `Pix ${item.chargeId} · ${fmtMoney(item.amountCents)}. Registre os detalhes e documentos da decisão no motivo. Esta ação NÃO envia nem recebe dinheiro.`,
+      reason: "required", confirmLabel: "Confirmar decisão", danger: action === "waive" });
+    if (!r?.reason || r.reason.trim().length < 8) return;
+    const path = action === "revoke_license" ? `/admin/pix/refund-cases/${item.id}/revoke-license` : `/admin/pix/refund-cases/${item.id}/decision`;
+    if (await run(() => api(path, { method: "POST", body: action === "revoke_license" ? { reason: r.reason } : { action, reason: r.reason } }), "Decisão auditada.")) list.reload();
+  };
+  return <>
+    <p className="muted">Pendências de valores devolvidos cujo benefício foi entregue ou consumido. “Recebido externamente” é apenas uma baixa administrativa: confirme o recebimento fora do sistema antes de usar.</p>
+    <div className="toolbar"><select value={list.params.status} onChange={e => list.filter({status:e.target.value})}>
+      <option value="">Todos os casos</option><option value="pending">Aguardando decisão</option><option value="receivable">A recuperar</option>
+      <option value="compensated">Compensados</option><option value="recovered">Recebidos externamente</option><option value="waived">Dispensados</option>
+    </select></div>
+    <Table><thead><tr><th>Data</th><th>Cobrança</th><th>Origem</th><th>Valor</th><th>Situação</th><th>Decisão</th><th /></tr></thead><tbody>
+      {list.data.map(c => <tr key={c.id}>
+        <td>{fmtDateTime(c.createdAt)}</td><td className="mono">{c.chargeId?.slice(0, 8)}</td><td>{c.charge?.purpose ?? "—"}{c.charge?.mac ? ` · ${c.charge.mac}` : ""}</td>
+        <td>{fmtMoney(c.amountCents)}</td><td><Badge status={c.status} label={c.status === "pending" ? "Pendente" : c.status === "receivable" ? "A recuperar" : c.status === "compensated" ? "Compensado" : c.status === "recovered" ? "Recebido externamente" : "Dispensado"} /></td>
+        <td title={c.notes ?? ""}>{c.decision || "—"}</td><td className="actions"><RowMenu items={[
+          { label: "Registrar valor a recuperar", hidden: c.status !== "pending", onClick:()=>decide(c,"record_receivable","Registrar crédito a recuperar") },
+          { label: "Baixar recebimento externo", hidden: c.status !== "receivable", onClick:()=>decide(c,"mark_recovered","Confirmar recebimento externo") },
+          { label: "Dispensar cobrança", danger:true, hidden: !["pending","receivable"].includes(c.status), onClick:()=>decide(c,"waive","Dispensar recuperação") },
+          { label: "Cancelar licença exclusiva", danger:true, hidden: c.status !== "pending" || c.charge?.purpose !== "license", onClick:()=>decide(c,"revoke_license","Cancelar licença desta compra devolvida") },
+        ]} /></td></tr>)}
+    </tbody></Table><Empty loading={list.loading} error={list.error} count={list.data.length} /><Pager meta={list.meta} onPage={list.setPage} />
+  </>;
+}
+
 /** Preços de venda das licenças: tabela geral e preços combinados com um revendedor (sobrepõem a geral). */
 function Prices() {
   const { confirm } = useUi();
   const run = useAction();
   const [partnerId, setPartnerId] = useState("");
-  const partners = useLoad(() => api("/admin/partners", { query: { pageSize: 100 } }), []);
   const prices = useLoad(() => api("/admin/pix/prices", { query: { partnerId } }), [partnerId]);
   const [edit, setEdit] = useState(null); // { months, price, active } (months fixo ao editar)
-  const resellers = (partners.data?.data ?? []).filter((p) => ["reseller", "both"].includes(p.kind));
 
   const remove = async (p) => {
     if (!(await confirm({ title: "Remover preço", message: `${monthsLabel(p.months)} — ${fmtMoney(p.priceCents)}`, danger: true }))) return;
@@ -115,10 +148,7 @@ function Prices() {
     <>
       <p className="muted">Preço de <strong>1 licença</strong> por duração. Só o que estiver aqui aparece para o revendedor comprar por Pix. O valor cobrado é sempre calculado pelo servidor.</p>
       <div className="toolbar">
-        <select value={partnerId} onChange={(e) => setPartnerId(e.target.value)} aria-label="Escopo dos preços">
-          <option value="">Tabela geral (todos os revendedores)</option>
-          {resellers.map((p) => <option key={p.id} value={p.id}>Preço combinado: {p.name}</option>)}
-        </select>
+        <PartnerPicker kind="reseller" value={partnerId} onChange={setPartnerId} emptyLabel="Tabela geral (todos os revendedores)" ariaLabel="Escopo dos preços" />
         <button className="btn primary" onClick={() => setEdit({ months: "", price: "", active: true, isNew: true })}>Novo preço</button>
       </div>
       {partnerId && <p className="muted">Estes preços valem só para este revendedor e sobrepõem a tabela geral. Desmarcar “à venda” esconde a duração para ele.</p>}

@@ -1,3 +1,4 @@
+import PartnerPicker from "../PartnerPicker.jsx";
 import { useEffect, useState } from "react";
 import { api, getAuth } from "../api.js";
 import { Badge, Empty, Field, Modal, Pager, Table, fmtDate, fmtMoney, formatMac, toCents, useAction, useDebounced, useList, useLoad, useUi, RowMenu } from "../ui.jsx";
@@ -8,15 +9,6 @@ import { Badge, Empty, Field, Modal, Pager, Table, fmtDate, fmtMoney, formatMac,
  * `partnerId` fixo = aba dentro do detalhe de uma revenda; sem ele = tela geral com filtro por revenda.
  */
 const FILTER_LABEL = { all: "Todos", overdue: "Vencidos", due_soon: "Vencem em breve", no_due: "Sem vencimento" };
-
-function usePartners(enabled = true) {
-  const [list, setList] = useState([]);
-  useEffect(() => {
-    if (!enabled) return;
-    api("/admin/partners", { query: { pageSize: 100 } }).then((r) => setList(r.data)).catch(() => {});
-  }, [enabled]);
-  return list;
-}
 
 const Stat = ({ label, value, hint }) => <div className="card stat"><small>{label}</small><strong>{value}</strong>{hint && <span>{hint}</span>}</div>;
 
@@ -32,7 +24,6 @@ export function ClientsPanel({ partnerId: fixedPartnerId }) {
   const canWrite = getAuth()?.user?.role !== "support";
   const { confirm } = useUi();
   const run = useAction();
-  const partners = usePartners(!fixedPartnerId);
   const [q, setQ] = useState("");
   const dq = useDebounced(q);
   const list = useList("/admin/clients", { q: "", filter: "", partnerId: fixedPartnerId || "" });
@@ -58,10 +49,7 @@ export function ClientsPanel({ partnerId: fixedPartnerId }) {
       <div className="toolbar">
         <input placeholder="Buscar por nome, telefone, endereço, MAC ou revenda" value={q} onChange={(e) => setQ(e.target.value)} />
         {!fixedPartnerId && (
-          <select value={list.params.partnerId} onChange={(e) => list.filter({ partnerId: e.target.value, filter: list.params.filter === "unregistered" ? "" : list.params.filter })}>
-            <option value="">Todas as revendas</option>
-            {partners.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
+          <PartnerPicker kind="reseller" value={list.params.partnerId} emptyLabel="Todas as revendas" onChange={(v) => list.filter({ partnerId: v, filter: list.params.filter === "unregistered" ? "" : list.params.filter })} />
         )}
         <select value={list.params.filter} onChange={(e) => list.filter({ filter: e.target.value })}>
           {Object.entries(FILTER_LABEL).map(([k, v]) => <option key={k} value={k === "all" ? "" : k}>{v}</option>)}
@@ -92,12 +80,12 @@ export function ClientsPanel({ partnerId: fixedPartnerId }) {
       </Table>
       <Empty loading={list.loading} error={list.error} count={list.data.length} />
       <Pager meta={list.meta} onPage={list.setPage} />
-      {form && <ClientForm {...form} fixedPartnerId={fixedPartnerId} partners={partners} defaultPartnerId={partnerId} onClose={() => setForm(null)} onSaved={() => { setForm(null); refresh(); }} />}
+      {form && <ClientForm {...form} fixedPartnerId={fixedPartnerId} defaultPartnerId={partnerId} onClose={() => setForm(null)} onSaved={() => { setForm(null); refresh(); }} />}
     </>
   );
 }
 
-function ClientForm({ client, prefill, fixedPartnerId, partners, defaultPartnerId, onClose, onSaved }) {
+function ClientForm({ client, prefill, fixedPartnerId, defaultPartnerId, onClose, onSaved }) {
   const run = useAction();
   const { toast } = useUi();
   const edit = !!client;
@@ -123,10 +111,7 @@ function ClientForm({ client, prefill, fixedPartnerId, partners, defaultPartnerI
     <Modal title={edit ? "Editar cliente" : "Novo cliente"} onClose={onClose}>
       {!fixedPartnerId && (
         <Field label="Revenda" hint={edit ? "Trocar a revenda move a ficha (o MAC não pode já ter ficha na revenda de destino)." : undefined}>
-          <select value={f.partnerId} onChange={set("partnerId")}>
-            <option value="">Selecione…</option>
-            {partners.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
+          <PartnerPicker kind="reseller" value={f.partnerId} onChange={(v) => setF((f) => ({ ...f, partnerId: v }))} />
         </Field>
       )}
       <div className="row"><Field label="Nome"><input value={f.name} onChange={set("name")} /></Field><Field label="MAC"><input value={f.mac} onChange={set("mac")} placeholder="AA:BB:CC:DD:EE:FF" /></Field></div>

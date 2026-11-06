@@ -9,9 +9,11 @@ export default function Billing() {
   const invoices = useList("/admin/billing/invoices", { status: "" });
   const payments = useList("/admin/billing/payments", {});
   const [paying, setPaying] = useState(null);
+  const [revising, setRevising] = useState(null);
 
   const generate = async () => {
-    const competence = new Date().toISOString().slice(0, 7);
+    const now = new Date();
+    const competence = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1)).toISOString().slice(0, 7);
     const r = await run(() => api("/admin/billing/invoices/generate", { method: "POST", body: { competence } }));
     if (r) { invoices.reload(); toast(`Competência ${r.competence}: ${r.created} cobrança(s) criada(s) para ${r.partners} parceiro(s).`); }
   };
@@ -25,9 +27,18 @@ export default function Billing() {
     if (c && (await run(() => api(`/admin/billing/invoices/${i.id}/cancel`, { method: "POST", body: { reason: c.reason } }), "Fatura cancelada."))) invoices.reload();
   };
 
+  const reopen = async (i) => {
+    const c = await confirm({ title: "Reabrir fatura cancelada", message: `${i.Partner?.name} · ${i.competence}. Mantém a mesma identificação e registra a justificativa.`, reason: "required" });
+    if (c && await run(() => api(`/admin/billing/invoices/${i.id}/reopen`, { method: "POST", body: { reason: c.reason } }), "Fatura reaberta.")) invoices.reload();
+  };
+  const refund = async (p) => {
+    if (p.provider !== "manual") return toast("Estorne primeiro no provedor Pix. A conciliação processará o estorno confirmado.", "bad");
+    const c = await confirm({ title: "Contabilizar devolução manual", message: `Pagamento ${fmtMoney(p.amountCents)}. Confirme que o dinheiro já foi devolvido ao cliente. Esta ação não transfere valores bancários.`, reason: "required", danger: true });
+    if (c && await run(() => api(`/admin/billing/payments/${p.id}/refund`, { method: "POST", body: { reason: c.reason } }), "Estorno contabilizado.")) { invoices.reload(); payments.reload(); }
+  };
   return (
     <>
-      <div className="page-head"><h2>Financeiro</h2><div className="actions"><button className="btn" onClick={generate}>Gerar cobranças do mês</button><button className="btn danger" onClick={sweep}>Aplicar inadimplência</button></div></div>
+      <div className="page-head"><h2>Financeiro</h2><div className="actions"><button className="btn" onClick={generate}>Gerar cobranças do mês encerrado</button><button className="btn danger" onClick={sweep}>Aplicar inadimplência</button></div></div>
       <div className="tabs">{[["invoices", "Cobranças"], ["payments", "Pagamentos"]].map(([k, n]) => <button key={k} className={`tab ${tab === k ? "active" : ""}`} onClick={() => setTab(k)}>{n}</button>)}</div>
       {tab === "invoices" && <>
         <div className="toolbar"><select value={invoices.params.status} onChange={(e) => invoices.filter({ status: e.target.value })}>
@@ -39,14 +50,18 @@ export default function Billing() {
               <td className="actions">
               <RowMenu items={[
                 { label: "Confirmar pagamento", hidden: ["paid", "cancelled"].includes(i.status), onClick: () => setPaying(i) },
+                { label: "Revisar valor/vencimento", hidden: i.paidCents !== 0 || i.status === "cancelled", onClick: () => setRevising(i) },
+                { label: "Reabrir cancelada", hidden: i.status !== "cancelled", onClick: () => reopen(i) },
                 { label: "Cancelar", hidden: ["paid", "cancelled"].includes(i.status) || i.paidCents !== 0, danger: true, onClick: () => cancel(i) },
               ]} />
             </td></tr>))}</tbody></Table>
         <Empty loading={invoices.loading} error={invoices.error} count={invoices.data.length} /><Pager meta={invoices.meta} onPage={invoices.setPage} /></>}
       {tab === "payments" && <>
-        <Table><thead><tr><th>Data</th><th>Parceiro</th><th>Competência</th><th>Valor</th><th>Forma</th><th>Origem</th></tr></thead>
-          <tbody>{payments.data.map((p) => <tr key={p.id}><td>{fmtDateTime(p.paidAt)}</td><td>{p.Invoice?.Partner?.name || "—"}</td><td>{p.Invoice?.competence || "—"}</td><td>{fmtMoney(p.amountCents)}</td><td>{p.method || "—"}</td><td>{p.origin === "webhook" ? `Webhook (${p.provider})` : "Administrador"}</td></tr>)}</tbody></Table>
+        <Table><thead><tr><th>Data</th><th>Parceiro</th><th>Competência</th><th>Valor</th><th>Forma</th><th>Origem</th><th>Status</th><th /></tr></thead>
+          <tbody>{payments.data.map((p) => <tr key={p.id}><td>{fmtDateTime(p.paidAt)}</td><td>{p.Invoice?.Partner?.name || "—"}</td><td>{p.Invoice?.competence || "—"}</td><td>{fmtMoney(p.amountCents)}</td><td>{p.method || "—"}</td><td>{p.origin === "webhook" ? `Webhook (${p.provider})` : "Administrador"}</td>
+            <td><Badge status={p.status} /></td><td><RowMenu items={[{ label: "Registrar devolução", hidden: p.status !== "confirmed" || p.provider !== "manual", danger: true, onClick: () => refund(p) }]} /></td></tr>)}</tbody></Table>
         <Empty loading={payments.loading} error={payments.error} count={payments.data.length} /><Pager meta={payments.meta} onPage={payments.setPage} /></>}
+      {revising && <ReviseInvoiceModal invoice={revising} onClose={() => setRevising(null)} onDone={() => { setRevising(null); invoices.reload(); }} />}
       {paying && <PayModal invoice={paying} onClose={() => setPaying(null)} onDone={() => { setPaying(null); invoices.reload(); payments.reload(); }} />}
     </>
   );
@@ -76,4 +91,26 @@ function PayModal({ invoice, onClose, onDone }) {
       <div className="actions"><button className="btn" onClick={onClose}>Cancelar</button><button className="btn primary" onClick={submit}>Confirmar</button></div>
     </Modal>
   );
+}
+
+function ReviseInvoiceModal({ invoice, onClose, onDone }) {
+  const run = useAction();
+  const [amount, setAmount] = useState((invoice.amountCents / 100).toFixed(2).replace(".", ","));
+  const [dueDate, setDueDate] = useState(invoice.dueDate);
+  const [reason, setReason] = useState("");
+  const { toast } = useUi();
+  const submit = async () => {
+    const amountCents = toCents(amount);
+    if (!Number.isInteger(amountCents) || amountCents <= 0 || reason.trim().length < 5) return toast("Informe valor positivo e justificativa de pelo menos 5 caracteres.", "bad");
+    const result = await run(() => api(`/admin/billing/invoices/${invoice.id}/revise`, { method: "PATCH",
+      body: { amountCents, dueDate, reason: reason.trim() } }), "Fatura revisada e registrada na auditoria.");
+    if (result) onDone();
+  };
+  return <Modal title={`Revisar fatura · ${invoice.competence}`} onClose={onClose}>
+    <p className="muted">Disponível somente para faturas ainda sem pagamentos. O valor anterior fica registrado na auditoria.</p>
+    <Field label="Valor (R$)"><input value={amount} onChange={(e) => setAmount(e.target.value)} /></Field>
+    <Field label="Novo vencimento"><input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} /></Field>
+    <Field label="Justificativa obrigatória"><textarea value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
+    <div className="actions"><button className="btn" onClick={onClose}>Cancelar</button><button className="btn primary" onClick={submit}>Salvar revisão</button></div>
+  </Modal>;
 }

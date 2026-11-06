@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import PartnerPicker from "../PartnerPicker.jsx";
 import { api } from "../api.js";
 import { Badge, Empty, Field, LoadError, Modal, Pager, Table, fmtDate, fmtDateTime, fmtMoney, toCents, useAction, useLoad, useUi } from "../ui.jsx";
 
@@ -66,10 +67,12 @@ export function StockAdmin({ partnerId }) {
       <div className="actions left" style={{ marginTop: 12 }}>
         <button className="btn primary" onClick={() => setModal("grant")}>Lançar licenças</button>
         <button className="btn" onClick={() => setModal("adjust")}>Ajustar estoque</button>
+        <button className="btn" onClick={() => setModal("transfer")}>Transferir para revenda</button>
       </div>
       <h4>Extrato</h4>
       <Ledger ledger={data.ledger} onPage={setPage} admin />
       {modal === "grant" && <GrantModal partnerId={partnerId} onClose={() => setModal(null)} onDone={() => { setModal(null); reload(); }} />}
+      {modal === "transfer" && <AdminTransferModal partnerId={partnerId} onClose={() => setModal(null)} onDone={() => { setModal(null); reload(); }} />}
       {modal === "adjust" && <AdjustModal partnerId={partnerId} balances={data.balances} onClose={() => setModal(null)} onDone={() => { setModal(null); reload(); }} />}
     </>
   );
@@ -142,5 +145,115 @@ export function NewPlanInline({ onCreated }) {
         <button type="button" className="btn" disabled={!validMonths(months)} onClick={create}>Criar plano</button>
       </div>
     </Field>
+  );
+}
+
+function AdminTransferModal({ partnerId, onClose, onDone }) {
+  const run = useAction();
+  const [toPartnerId, setToPartnerId] = useState("");
+  const [months, setMonths] = useState("1");
+  const [quantity, setQuantity] = useState("1");
+  const [reason, setReason] = useState("");
+  const ok = !!toPartnerId && validMonths(months) && Number.isInteger(Number(quantity)) && Number(quantity) > 0 && Number(quantity) <= 10000 && reason.trim().length >= 5;
+  const submit = async () => {
+    if (!ok) return;
+    const result = await run(() => api("/admin/partners/stock/transfer-admin", { method: "POST", body: {
+      fromPartnerId: partnerId, toPartnerId, months: Number(months), quantity: Number(quantity), reason: reason.trim(),
+    } }), "Transferência registrada nas duas carteiras.");
+    if (result) onDone();
+  };
+  return <Modal title="Transferir estoque entre revendas" onClose={onClose}>
+    <p className="muted">Transação única: débito na origem e crédito no destino, com extratos vinculados e motivo obrigatório.</p>
+    <Field label="Revenda de destino"><PartnerPicker value={toPartnerId} onChange={setToPartnerId} kind="reseller" excludedId={partnerId} emptyLabel="Selecione a revenda" /></Field>
+    <MonthsField value={months} onChange={setMonths} />
+    <Field label="Quantidade"><input type="number" min="1" max="10000" value={quantity} onChange={(e) => setQuantity(e.target.value)} /></Field>
+    <Field label="Motivo"><textarea value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
+    <div className="actions"><button className="btn" onClick={onClose}>Cancelar</button><button className="btn primary" disabled={!ok} onClick={submit}>Transferir</button></div>
+  </Modal>;
+}
+
+/* ================= Portal da revenda: saldo, transferência e aplicação ================= */
+
+/** Disponível no painel que hospeda /partner/*; revenda não informa partnerId. */
+export function StockPortal() {
+  const [page, setPage] = useState(1);
+  const [transfer, setTransfer] = useState(false);
+  const { data, error, reload } = useLoad(() => api("/partner/stock", { query: { page, pageSize: 15 } }), [page]);
+  useEffect(() => {
+    window.addEventListener("stock-changed", reload);
+    return () => window.removeEventListener("stock-changed", reload);
+  }, [reload]);
+  return (
+    <section>
+      <div className="section-head"><h3>Meu estoque de licenças</h3>
+        <button className="btn" onClick={() => setTransfer(true)}>Transferir licenças</button>
+      </div>
+      {data ? <><Balances balances={data.balances} />
+        <h4>Movimentações</h4><Ledger ledger={data.ledger} onPage={setPage} admin={false} /></>
+        : error ? <LoadError error={error} onRetry={reload} /> : <p className="muted">Carregando estoque…</p>}
+      {transfer && <TransferStockModal onClose={() => setTransfer(false)} onDone={() => { setTransfer(false); reload(); changed(); }} />}
+    </section>
+  );
+}
+
+function TransferStockModal({ onClose, onDone }) {
+  const run = useAction();
+  const { toast } = useUi();
+  const [email, setEmail] = useState("");
+  const [recipient, setRecipient] = useState(null);
+  const [months, setMonths] = useState("1");
+  const [quantity, setQuantity] = useState("1");
+  const [note, setNote] = useState("");
+  const lookup = async () => {
+    const result = await run(() => api("/partner/stock/recipient", { method: "POST", body: { email: email.trim() } }));
+    setRecipient(result && result !== true ? result : null);
+  };
+  const submit = async () => {
+    if (!recipient) return toast("Verifique primeiro a revenda de destino.", "bad");
+    const r = await run(() => api("/partner/stock/transfer", { method: "POST",
+      body: { email: email.trim(), months: Number(months), quantity: Number(quantity), note: note.trim() } }),
+    "Transferência registrada.");
+    if (r) onDone();
+  };
+  const qty = Number(quantity);
+  const valid = !!recipient && validMonths(months) && Number.isInteger(qty) && qty >= 1 && qty <= 1000;
+  return (
+    <Modal title="Transferir licenças" onClose={onClose}>
+      <Field label="E-mail do usuário da revenda de destino">
+        <div className="input-group"><input type="email" value={email} onChange={(e) => { setEmail(e.target.value); setRecipient(null); }} />
+          <button className="btn" disabled={!email.includes("@") || !!recipient} onClick={lookup}>Verificar</button></div>
+      </Field>
+      {recipient && <p className="muted">Destino confirmado: <strong>{recipient.name}</strong></p>}
+      <MonthsField value={months} onChange={setMonths} />
+      <Field label="Quantidade"><input type="number" min="1" max="1000" value={quantity} onChange={(e) => setQuantity(e.target.value)} /></Field>
+      <Field label="Observação"><input maxLength="200" value={note} onChange={(e) => setNote(e.target.value)} /></Field>
+      <div className="actions"><button className="btn" onClick={onClose}>Cancelar</button>
+        <button className="btn primary" disabled={!valid} onClick={submit}>Transferir</button></div>
+    </Modal>
+  );
+}
+
+/** Aplica uma licença do estoque ao MAC pesquisado, sem usar credenciais da TV. */
+export function ApplyStock({ mac, onApplied }) {
+  const run = useAction();
+  const [months, setMonths] = useState("1");
+  const [expanded, setExpanded] = useState(false);
+  const submit = async () => {
+    const r = await run(() => api("/partner/stock/apply", {
+      method: "POST", body: { mac, months: Number(months) },
+    }), "Licença aplicada ao dispositivo.");
+    if (r) { changed(); setExpanded(false); onApplied?.(); }
+  };
+  return (
+    <div style={{ margin: "12px 0" }}>
+      <button className="btn" onClick={() => setExpanded((s) => !s)}>
+        {expanded ? "Fechar aplicação de licença" : "Aplicar licença do meu estoque"}
+      </button>
+      {expanded && <div className="card" style={{ marginTop: 8, padding: 12 }}>
+        <p className="muted">Dispositivo: <strong>{mac}</strong>. A operação consome uma licença do estoque.</p>
+        <MonthsField value={months} onChange={setMonths} />
+        <button className="btn primary" disabled={!mac || !validMonths(months)} onClick={submit}>Confirmar aplicação</button>
+      </div>}
+    </div>
   );
 }

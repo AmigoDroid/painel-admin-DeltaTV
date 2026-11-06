@@ -58,6 +58,11 @@ function SourceDetail({ id, onClose, onChanged }) {
   const [s, setS] = useState(null);
   const [error, setError] = useState("");
   const [partners, setPartners] = useState([]);
+  const [partnerQuery, setPartnerQuery] = useState("");
+  const [partnerPage, setPartnerPage] = useState(1);
+  const [partnerPages, setPartnerPages] = useState(1);
+  const [knownPartners, setKnownPartners] = useState({});
+  const [partnersError, setPartnersError] = useState("");
   const [selected, setSelected] = useState([]);
   const [channels, setChannels] = useState([]);
   const [editing, setEditing] = useState(false);
@@ -65,11 +70,24 @@ function SourceDetail({ id, onClose, onChanged }) {
   const load = async () => {
     try {
       const src = await api(`/admin/sources/${id}`);
-      setS(src); setSelected(src.Partners.map((p) => p.id)); setError("");
+      setS(src); setSelected(src.Partners.map((p) => p.id));
+      setKnownPartners((prior) => ({ ...prior, ...Object.fromEntries(src.Partners.map((p) => [p.id, p])) }));
+      setError("");
       if (src.kind === "catalog") setChannels((await api(`/admin/sources/${id}/channels`, { query: { pageSize: 100 } })).data);
     } catch (e) { setError(e.message); }
   };
-  useEffect(() => { load(); api("/admin/partners", { query: { pageSize: 100 } }).then((r) => setPartners(r.data)).catch(() => {}); /* eslint-disable-next-line */ }, [id]);
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
+  useEffect(() => {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => {
+      api("/admin/partners", { query: { q: partnerQuery.trim(), page: partnerPage, pageSize: 20 }, signal: ctrl.signal })
+        .then((r) => { if (!ctrl.signal.aborted) {
+          setPartners(r.data || []); setPartnerPages(r.meta?.totalPages || 1); setPartnersError("");
+          setKnownPartners((prior) => ({ ...prior, ...Object.fromEntries((r.data || []).map((p) => [p.id, p])) }));
+        } }).catch((e) => { if (!ctrl.signal.aborted) setPartnersError(e.message); });
+    }, 250);
+    return () => { clearTimeout(timer); ctrl.abort(); };
+  }, [id, partnerQuery, partnerPage]);
   if (!s) return <Modal title="Fonte" onClose={onClose}>{error ? <LoadError error={error} onRetry={load} /> : <p className="muted">Carregando…</p>}</Modal>;
 
   const savePartners = async () => { if (await run(() => api(`/admin/sources/${id}/partners`, { method: "PUT", body: { partnerIds: selected } }), "Parceiros atualizados.")) { load(); onChanged(); } };
@@ -86,7 +104,19 @@ function SourceDetail({ id, onClose, onChanged }) {
       <dl className="kv"><dt>Status</dt><dd><Badge status={s.status} /></dd><dt>Host</dt><dd>{s.host || "—"}</dd><dt>Entrega</dt><dd>{s.deliveryMode === "proxy" ? "Proxy" : "Redirecionamento"} · assinatura: {s.signing.type}{s.signing.hasSecret ? " (segredo definido)" : ""}</dd></dl>
       <div className="actions left"><button className="btn" onClick={() => setEditing(true)}>Editar</button><button className="btn" onClick={toggle}>{s.status === "active" ? "Desativar" : "Ativar"}</button><button className="btn danger" onClick={remove}>Excluir</button></div>
       {s.scope === "partner" && <div className="card" style={{ margin: "12px 0" }}><h3>Parceiros com acesso</h3>
-        <div className="grid two">{partners.map((p) => <label key={p.id}><input type="checkbox" style={{ width: "auto" }} checked={selected.includes(p.id)} onChange={(e) => setSelected(e.target.checked ? [...selected, p.id] : selected.filter((x) => x !== p.id))} /> {p.name}</label>)}</div>
+        <input type="search" placeholder="Buscar parceiro…" value={partnerQuery} onChange={(e) => { setPartnerQuery(e.target.value); setPartnerPage(1); }} />
+        <p className="muted">{selected.length} selecionado(s). Navegue pelas páginas; os vínculos selecionados permanecem marcados.</p>
+        <div style={{ maxHeight: 170, overflowY: "auto", display: "grid", gap: 6 }}>
+          {[...new Set([...selected, ...partners.map((p) => p.id)])].map((partnerId) => {
+            const p = knownPartners[partnerId];
+            return <label key={partnerId}><input type="checkbox" style={{ width: "auto" }} checked={selected.includes(partnerId)}
+              onChange={(e) => setSelected((prior) => e.target.checked ? [...new Set([...prior, partnerId])] : prior.filter((x) => x !== partnerId))} /> {p?.name || partnerId}</label>;
+          })}
+        </div>
+        {partnersError && <span className="error">{partnersError}</span>}
+        <div className="actions left"><button className="btn sm" disabled={partnerPage <= 1} onClick={() => setPartnerPage((p) => p - 1)}>Anterior</button>
+          <span className="muted">Página {partnerPage} de {partnerPages}</span>
+          <button className="btn sm" disabled={partnerPage >= partnerPages} onClick={() => setPartnerPage((p) => p + 1)}>Próxima</button></div>
         <div className="actions"><button className="btn primary" onClick={savePartners}>Salvar vínculos</button></div></div>}
       {s.kind === "catalog" && <><h3>Canais</h3>
         <div className="row"><Field label="Nome"><input value={ch.name} onChange={(e) => setCh({ ...ch, name: e.target.value })} /></Field><Field label="URL de reprodução"><input value={ch.streamUrl} onChange={(e) => setCh({ ...ch, streamUrl: e.target.value })} /></Field></div>

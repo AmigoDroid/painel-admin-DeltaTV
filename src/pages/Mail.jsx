@@ -1,3 +1,4 @@
+import PartnerPicker from "../PartnerPicker.jsx";
 import { useEffect, useState } from "react";
 import { api } from "../api.js";
 import { Badge, Empty, Field, Modal, Pager, Table, fmtDateTime, useAction, useList, useLoad, useUi, RowMenu } from "../ui.jsx";
@@ -21,7 +22,6 @@ export default function Mail() {
   const run = useAction();
   const status = useLoad(() => api("/admin/mail/status"), []);
   const list = useList("/admin/mail/messages", {});
-  const partners = useLoad(() => api("/admin/partners", { query: { pageSize: 100 } }).then((r) => r.data), []);
   const [form, setForm] = useState({ audience: "resellers", partnerId: "", emailsText: "", subject: "", body: "" });
   const [preview, setPreview] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -85,10 +85,7 @@ export default function Mail() {
         </Field>
         {form.audience === "partner" && (
           <Field label="Parceria">
-            <select value={form.partnerId} onChange={set("partnerId")}>
-              <option value="">Escolha…</option>
-              {(partners.data ?? []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
+            <PartnerPicker value={form.partnerId} onChange={(v) => setForm((f) => ({ ...f, partnerId: v }))} />
           </Field>
         )}
         {form.audience === "custom" && (

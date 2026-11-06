@@ -1,3 +1,4 @@
+import PartnerPicker from "../PartnerPicker.jsx";
 import { useEffect, useState } from "react";
 import { api } from "../api.js";
 import { Badge, Empty, Field, LoadError, Modal, Pager, Table, fmtDateTime, fmtMoney, toCents, useAction, useDebounced, useList, useLoad, useUi, RowMenu } from "../ui.jsx";
@@ -8,11 +9,6 @@ const KIND = { topup: "Recarga Pix", purchase: "Compra de licença", adjust: "Aj
 const brl = (cents) => (cents / 100).toFixed(2).replace(".", ",");
 
 // Revendedores/parceiros que têm carteira (quem compra licença para estoque).
-function useResellers() {
-  const partners = useLoad(() => api("/admin/partners", { query: { pageSize: 100 } }), []);
-  return (partners.data?.data ?? []).filter((p) => ["reseller", "both"].includes(p.kind));
-}
-
 /**
  * Créditos (admin): saldo pré-pago que o revendedor usa SÓ para comprar licenças. Aqui você define o câmbio
  * (quanto vale 1 crédito em R$), o preço de cada licença em créditos e ajusta saldos. Não há transferência entre
@@ -101,7 +97,6 @@ function AdjustModal({ wallet, onClose, onDone }) {
 function Rates({ data, error, reload }) {
   const { confirm } = useUi();
   const run = useAction();
-  const resellers = useResellers();
   const [edit, setEdit] = useState(null); // { partnerId, partnerName, value, fixedPartner }
   if (error) return <LoadError error={error} onRetry={reload} />;
   if (!data) return <p className="muted">Carregando…</p>;
@@ -135,12 +130,12 @@ function Rates({ data, error, reload }) {
           </tr>))}</tbody>
       </Table>
       <Empty loading={false} error="" count={data.custom.length} />
-      {edit && <RateModal value={edit} resellers={resellers} onClose={() => setEdit(null)} onSaved={() => { setEdit(null); reload(); }} />}
+      {edit && <RateModal value={edit} onClose={() => setEdit(null)} onSaved={() => { setEdit(null); reload(); }} />}
     </>
   );
 }
 
-function RateModal({ value, resellers, onClose, onSaved }) {
+function RateModal({ value, onClose, onSaved }) {
   const run = useAction();
   const { toast } = useUi();
   const [partnerId, setPartnerId] = useState(value.partnerId);
@@ -156,10 +151,7 @@ function RateModal({ value, resellers, onClose, onSaved }) {
     <Modal title={value.custom ? "Câmbio combinado" : "Câmbio geral"} onClose={onClose}>
       {value.custom && (
         <Field label="Revendedor">
-          <select value={partnerId} onChange={(e) => setPartnerId(e.target.value)} disabled={!!value.locked}>
-            <option value="">Escolha…</option>
-            {resellers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
+          <PartnerPicker kind="reseller" value={partnerId} onChange={setPartnerId} disabled={!!value.locked} />
         </Field>
       )}
       <Field label="1 crédito vale (R$)" hint="Valor cobrado por crédito na recarga por Pix."><input value={price} onChange={(e) => setPrice(e.target.value)} placeholder="1,00" inputMode="decimal" /></Field>
@@ -174,7 +166,6 @@ function Prices() {
   const { confirm } = useUi();
   const run = useAction();
   const [partnerId, setPartnerId] = useState("");
-  const resellers = useResellers();
   const prices = useLoad(() => api("/admin/credits/prices", { query: { partnerId } }), [partnerId]);
   const [edit, setEdit] = useState(null);
   const remove = async (p) => {
@@ -185,10 +176,7 @@ function Prices() {
     <>
       <p className="muted">Quantos <strong>créditos custa 1 licença</strong> de cada duração. Só o que estiver aqui aparece para o revendedor comprar com crédito.</p>
       <div className="toolbar">
-        <select value={partnerId} onChange={(e) => setPartnerId(e.target.value)} aria-label="Escopo dos preços">
-          <option value="">Tabela geral (todos os revendedores)</option>
-          {resellers.map((p) => <option key={p.id} value={p.id}>Preço combinado: {p.name}</option>)}
-        </select>
+        <PartnerPicker kind="reseller" value={partnerId} onChange={setPartnerId} emptyLabel="Tabela geral (todos os revendedores)" ariaLabel="Escopo dos preços" />
         <button className="btn primary" onClick={() => setEdit({ months: "", price: "", active: true, isNew: true })}>Novo preço</button>
       </div>
       {partnerId && <p className="muted">Estes preços valem só para este revendedor e sobrepõem a tabela geral. Desmarcar “à venda” esconde a duração para ele.</p>}
@@ -241,15 +229,11 @@ function PriceModal({ value, partnerId, onClose, onSaved }) {
 /* ---------------- Extrato ---------------- */
 
 function Ledger({ initialPartner }) {
-  const resellers = useResellers();
   const list = useList("/admin/credits/ledger", initialPartner ? { partnerId: initialPartner } : {});
   return (
     <>
       <div className="toolbar">
-        <select value={list.params.partnerId ?? ""} onChange={(e) => list.filter({ partnerId: e.target.value })} aria-label="Revendedor">
-          <option value="">Todos os revendedores</option>
-          {resellers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-        </select>
+        <PartnerPicker kind="reseller" value={list.params.partnerId ?? ""} onChange={(v) => list.filter({ partnerId: v })} emptyLabel="Todos os revendedores" ariaLabel="Revendedor" />
         <select value={list.params.kind ?? ""} onChange={(e) => list.filter({ kind: e.target.value })} aria-label="Movimento">
           <option value="">Todos os movimentos</option>
           {Object.entries(KIND).map(([k, n]) => <option key={k} value={k}>{n}</option>)}

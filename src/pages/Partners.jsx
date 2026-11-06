@@ -247,16 +247,20 @@ function PartnerDetail({ id, onClose, onChanged }) {
   const run = useAction();
   const [tab, setTab] = useState(null);
   const [devices, setDevices] = useState([]);
+  const [devicesPage, setDevicesPage] = useState(1);
+  const [devicesMeta, setDevicesMeta] = useState(null);
   const [newCode, setNewCode] = useState(false);
   const [editCode, setEditCode] = useState(null);
   const [provForm, setProvForm] = useState(null);
   const [historyServer, setHistoryServer] = useState(null);
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [transferring, setTransferring] = useState(null);
   const role = getAuth()?.user?.role;
   const { data: p, error, reload: load, setData: setP } = useLoad(() => api(`/admin/partners/${id}`), [id]);
-  const loadDevices = () => api(`/admin/partners/${id}/devices`, { query: { pageSize: 100 } }).then((r) => setDevices(r.data)).catch(() => {});
-  useEffect(() => { loadDevices(); /* eslint-disable-next-line */ }, [id]);
+  const loadDevices = () => api(`/admin/partners/${id}/devices`, { query: { page: devicesPage, pageSize: 50 } })
+    .then((r) => { setDevices(r.data); setDevicesMeta(r.meta); }).catch(() => {});
+  useEffect(() => { loadDevices(); /* eslint-disable-line react-hooks/exhaustive-deps */ }, [id, devicesPage]);
   if (!p) return <Modal title="Parceiro" onClose={onClose}>{error ? <LoadError error={error} onRetry={load} /> : <p className="muted">Carregando…</p>}</Modal>;
 
   const what = p.kind === "content" ? "parceria" : "revenda";
@@ -289,7 +293,8 @@ function PartnerDetail({ id, onClose, onChanged }) {
     if (await run(() => api(`/admin/devices/activations/${a.id}/${action}`, { method: "POST", body: { reason: c.reason } }), "Dispositivo atualizado.")) { loadDevices(); load(); }
   };
   const generate = async () => {
-    const competence = new Date().toISOString().slice(0, 7);
+    const now = new Date();
+    const competence = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1)).toISOString().slice(0, 7);
     const r = await run(() => api(`/admin/partners/${id}/invoices`, { method: "POST", body: { competence } }));
     if (r) { toast(r.created ? `Cobrança de ${competence} gerada.` : r.skipped ? "Sem mensalidade a cobrar neste cadastro; nenhuma cobrança foi gerada." : `A cobrança de ${competence} já existia; nada foi criado.`); load(); }
   };
@@ -345,19 +350,22 @@ function PartnerDetail({ id, onClose, onChanged }) {
       {cur === "devices" && <Table><thead><tr><th>MAC</th><th>Servidor</th><th>Entrega</th><th>Status</th><th>Ativado em</th><th /></tr></thead><tbody>
         {devices.map((a) => <tr key={a.id}><td>{a.mac}</td><td>{a.provider?.name || "—"}</td><td><DeliveryBadge mode={a.deliveryMode} fixed={a.deliveryModeFixed} /></td><td><Badge status={accessStatus(a)} /></td><td>{fmtDateTime(a.activatedAt)}</td><td className="actions">
               <RowMenu items={[
+                { label: "Transferir licença para outro MAC", hidden: role !== "superadmin" || !a.grantedLicense?.id || a.status !== "active", onClick: () => setTransferring(a) },
                 { label: "Bloquear", hidden: a.status !== "active", onClick: () => device(a, "block", { title: "Bloquear dispositivo", message: a.mac, reason: "required", danger: true }) },
                 { label: "Desbloquear", hidden: a.status !== "blocked", onClick: () => device(a, "unblock", { title: "Desbloquear", message: a.mac }) },
                 { label: "Restaurar", hidden: !(a.status === "revoked" && role === "superadmin"), onClick: () => device(a, "restore", { title: "Restaurar ativação", message: a.mac }) },
                 { label: "Remover", hidden: a.status === "revoked", danger: true, onClick: () => device(a, "revoke", { title: "Remover ativação", message: a.mac, danger: true }) },
               ]} />
             </td></tr>)}</tbody></Table>}
+      {cur === "devices" && devicesMeta?.totalPages > 1 && <Pager meta={devicesMeta} onPage={setDevicesPage} />}
       {cur === "invoices" && <>
-        <div className="actions left"><button className="btn" onClick={generate}>Gerar cobrança do mês</button></div>
+        <div className="actions left"><button className="btn" onClick={generate}>Gerar cobrança do mês encerrado</button></div>
         <Table><thead><tr><th>Competência</th><th>Dispositivos</th><th>Valor</th><th>Pago</th><th>Vencimento</th><th>Status</th></tr></thead><tbody>
           {p.invoices.map((i) => <tr key={i.id}><td>{i.competence}</td><td>{i.deviceCount}</td><td>{fmtMoney(i.amountCents)}</td><td>{fmtMoney(i.paidCents)}</td><td>{fmtDate(i.dueDate)}</td><td><Badge status={i.status} /></td></tr>)}
         </tbody></Table></>}
       {newCode && <CodeModal checkPath="/admin/partners/codes/check" createPath={`/admin/partners/${id}/codes`} balancesPath={`/admin/partners/${id}/stock`} kind={p.kind} providers={p.providers} onClose={() => setNewCode(false)} onCreated={() => { setNewCode(false); load(); }} />}
       {editCode && <CodeEditModal partnerId={id} code={editCode} kind={p.kind} providers={p.providers} onClose={() => setEditCode(null)} onSaved={() => { setEditCode(null); load(); }} />}
+      {transferring && <AdminLicenseTransferModal activation={transferring} onClose={() => setTransferring(null)} onDone={() => { setTransferring(null); loadDevices(); load(); }} />}
       {historyServer && <ServerHistoryModal server={historyServer} onClose={() => setHistoryServer(null)} />}
       {provForm && <ProviderForm partnerId={id} provider={provForm.id ? provForm : null} onClose={() => setProvForm(null)} onSaved={() => { setProvForm(null); load(); }} />}
       {deleting && <AdminDeleteModal type="partner" id={id} onClose={() => setDeleting(false)} onDone={() => { setDeleting(false); onClose(); onChanged?.(); }} />}
@@ -394,4 +402,23 @@ function ProviderForm({ partnerId, provider, onClose, onSaved }) {
       <div className="actions"><button className="btn" onClick={onClose}>Cancelar</button><button className="btn primary" disabled={!f.name || !f.baseUrl} onClick={submit}>Salvar</button></div>
     </Modal>
   );
+}
+
+function AdminLicenseTransferModal({ activation, onClose, onDone }) {
+  const run = useAction();
+  const [toMac, setToMac] = useState("");
+  const [reason, setReason] = useState("");
+  const submit = async () => {
+    if (reason.trim().length < 5 || toMac.trim().length < 11) return;
+    const result = await run(() => api(`/admin/devices/activations/${activation.id}/transfer-license`, {
+      method: "POST", body: { toMac: toMac.trim(), reason: reason.trim() },
+    }), "Licença transferida sem alteração do vencimento.");
+    if (result) onDone();
+  };
+  return <Modal title="Transferir licença para outro MAC" onClose={onClose}>
+    <p className="muted">Origem: {activation.mac}. O dispositivo de destino deve estar cadastrado, sem outra lista ativa desta revenda. O prazo de validade é preservado.</p>
+    <Field label="MAC de destino"><input value={toMac} onChange={(e) => setToMac(e.target.value)} placeholder="AA:BB:CC:DD:EE:FF" /></Field>
+    <Field label="Justificativa"><textarea value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
+    <div className="actions"><button className="btn" onClick={onClose}>Cancelar</button><button className="btn primary" onClick={submit} disabled={toMac.trim().length < 11 || reason.trim().length < 5}>Transferir licença</button></div>
+  </Modal>;
 }

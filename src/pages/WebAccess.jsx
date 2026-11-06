@@ -1,3 +1,4 @@
+import PartnerPicker from "../PartnerPicker.jsx";
 import CredentialsModal from "./CredentialsModal.jsx";
 import { useEffect, useState } from "react";
 import PlatformDefaultsModal from "./PlatformDefaultsModal.jsx";
@@ -56,7 +57,6 @@ function ModesModal({ item, base, readOnly, onClose, onSaved }) {
 
 function CreateModal({ admin, base, onClose, onCreated }) {
   const run = useAction();
-  const [partners, setPartners] = useState([]);
   const [partnerId, setPartnerId] = useState("");
   const [useStock, setUseStock] = useState(true);
   const [defaultsReady, setDefaultsReady] = useState(false);
@@ -73,9 +73,6 @@ function CreateModal({ admin, base, onClose, onCreated }) {
   const stockPath = admin ? (partnerId && useStock ? `/admin/partners/${partnerId}/stock` : null) : "/partner/stock";
   const balances = useBalances(!!stockPath, stockPath || "");
 
-  useEffect(() => {
-    if (admin) api("/admin/partners", { query: { pageSize: 100 } }).then((r) => setPartners(r.data.filter((p) => p.kind !== "content"))).catch(() => {});
-  }, [admin]);
 
   const loadDefaults = async () => { try { const result = await api(`${base}/defaults`); setModes(result.deliveryModes); setDefaultsReady(true); setDefaultsError(""); } catch (e) { setDefaultsError(e.message); } };
   useEffect(() => { loadDefaults(); }, [base]);
@@ -111,9 +108,7 @@ function CreateModal({ admin, base, onClose, onCreated }) {
     <Modal title="Novo acesso web" onClose={onClose} wide>
       {admin && (
         <>
-          <Field label="Revendedor (dono do código)"><select value={partnerId} onChange={(e) => setPartnerId(e.target.value)}>
-            <option value="">Sem revendedor (administrador)</option>{partners.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select></Field>
+          <Field label="Revendedor (dono do código)"><PartnerPicker kind="reseller" value={partnerId} onChange={setPartnerId} emptyLabel="Sem revendedor (administrador)" /></Field>
           {partnerId && <label className="field"><span><input type="checkbox" checked={useStock} onChange={(e) => setUseStock(e.target.checked)} /> Gastar 1 licença do estoque dele (desmarque para cortesia)</span></label>}
         </>
       )}
@@ -187,6 +182,28 @@ function Created({ item, onClose }) {
   );
 }
 
+function RestoreModal({ item, base, onClose, onSaved }) {
+  const run = useAction();
+  const [code, setCode] = useState(item.partnershipCode ?? "");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [reason, setReason] = useState("");
+  const submit = async () => {
+    if (!/^[a-z0-9]{4,12}$/i.test(code.trim()) || !username.trim() || !password || reason.trim().length < 8) return;
+    if (await run(() => api(`${base}/${item.id}/restore`, { method:"POST", body: {
+      reason:reason.trim(), config: { mode:"partner", code:code.trim(), username:username.trim(), password },
+    } }), "Acesso recuperado com novas credenciais.")) onSaved();
+  };
+  return <Modal title={`Recuperar código ${fmtCode(item.code)}`} onClose={onClose}>
+    <p className="muted">O código web continuará o mesmo. As credenciais anteriores foram apagadas na revogação. A nova ativação passará pela validação e cobrança normais do parceiro, quando aplicável.</p>
+    <Field label="Código da parceria"><input value={code} onChange={e=>setCode(e.target.value)} maxLength={12}/></Field>
+    <Field label="Usuário do servidor"><input value={username} onChange={e=>setUsername(e.target.value)} maxLength={128}/></Field>
+    <Field label="Senha do servidor"><PasswordInput value={password} onChange={e=>setPassword(e.target.value)} /></Field>
+    <Field label="Justificativa administrativa"><textarea value={reason} onChange={e=>setReason(e.target.value)} maxLength={500} rows={3}/></Field>
+    <div className="actions"><button className="btn" onClick={onClose}>Cancelar</button><button className="btn primary" disabled={!username.trim() || !password || reason.trim().length < 8 || !/^[a-z0-9]{4,12}$/i.test(code.trim())} onClick={submit}>Validar e recuperar</button></div>
+  </Modal>;
+}
+
 const chip = (m) => <Badge status={m} />;
 
 export default function WebAccess({ admin = false }) {
@@ -199,6 +216,7 @@ export default function WebAccess({ admin = false }) {
   const [renaming, setRenaming] = useState(null);
   const [newLabel, setNewLabel] = useState("");
   const [credentials, setCredentials] = useState(null);
+  const [restoring, setRestoring] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [created, setCreated] = useState(null);
@@ -244,6 +262,7 @@ export default function WebAccess({ admin = false }) {
             <td className="actions">
               <RowMenu items={[
                 { label: "Credenciais", hidden: !admin || getAuth()?.user?.role !== "superadmin" || a.status === "revoked", onClick: ()=>setCredentials(a.id) },
+                { label: "Recuperar código", hidden: !admin || getAuth()?.user?.role !== "superadmin" || a.status !== "revoked", onClick:()=>setRestoring(a) },
                 { label: "Renomear", hidden: a.status === "revoked", onClick: ()=>{setNewLabel(a.label||"");setRenaming(a)} },
                 { label: "Entrega", hidden: a.status === "revoked", onClick: () => setModesFor(a) },
                 { label: "Copiar código", hidden: a.status === "revoked", onClick: () => copy(a.code) },
@@ -257,6 +276,7 @@ export default function WebAccess({ admin = false }) {
       })}</tbody></Table>
       <Empty loading={list.loading} error={list.error} count={list.data.length} /><Pager meta={list.meta} onPage={list.setPage} />
       {renaming && <Modal title="Renomear acesso" onClose={()=>setRenaming(null)}><Field label="Nome do cliente"><input maxLength={160} value={newLabel} onChange={e=>setNewLabel(e.target.value)}/></Field><button className="btn primary" disabled={!newLabel.trim()} onClick={async()=>{if(await run(()=>api(`${base}/${renaming.id}`,{method:"PATCH",body:{label:newLabel.trim()}}),"Nome atualizado.")){setRenaming(null);list.reload()}}}>Salvar nome</button></Modal>}
+      {restoring && <RestoreModal item={restoring} base={base} onClose={()=>setRestoring(null)} onSaved={()=>{setRestoring(null);list.reload()}} />}
       {credentials && <CredentialsModal path={`${base}/${credentials}/credentials`} onClose={()=>setCredentials(null)} />}
       {settingsOpen && <PlatformDefaultsModal section="web" onClose={() => setSettingsOpen(false)} onSaved={list.reload} />}
       {creating && <CreateModal admin={admin} base={base} onClose={() => setCreating(false)} onCreated={(r) => { setCreating(false); setCreated(r); list.reload(); window.dispatchEvent(new Event("stock-changed")); }} />}
