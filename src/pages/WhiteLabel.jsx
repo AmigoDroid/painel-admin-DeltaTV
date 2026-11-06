@@ -3,6 +3,7 @@ import { api } from "../api.js";
 import PartnerPicker from "../PartnerPicker.jsx";
 import { fmtMoney } from "../ui.jsx";
 import "./white-label.css";
+import RokuBuildManager from "./RokuBuildManager.jsx";
 const ROOT = "/admin/white-label";
 const initial = { partnerId: "", name: "", appKey: "", status: "draft", planType: "limited", activationLimit: "100", monthlyFeeCents: "9900", paidThrough: "", logoUrl: "", downloadUrl: "", notes: "" };
 const statuses = { draft: "Em preparação", active: "Ativo", suspended: "Suspenso", archived: "Arquivado", payment_required: "Pendente de pagamento", owner_inactive: "Titular inativo" };
@@ -109,6 +110,7 @@ export default function WhiteLabel() {
       <div><h3>Pagamentos registrados</h3><p className="muted">Registro manual do superadmin, não confirmação automática do Pix.</p>
         {payments.map(p => <div className="adm-wl-entry" key={p.id}><b>{fmtMoney(p.amountCents)}</b><small>{p.reference} · {p.months} mês(es) · até {p.paidThrough}</small></div>)}
         {!payments.length && <p className="muted">Ainda sem pagamentos.</p>}</div></div>
+      <RokuBuildManager appId={chosen.id} appName={chosen.name} appearanceEnabled={chosen.appearanceEnabled}/>
       <h3 style={{ marginTop: 22 }}>Instalações</h3><div className="table-wrap"><table><thead><tr><th>Plataforma</th><th>Ativado em</th><th>Último uso</th><th>Situação</th><th /></tr></thead><tbody>
         {activations.data?.map(a => <tr key={a.id}><td>{a.platform}</td><td>{new Date(a.activatedAt).toLocaleString("pt-BR")}</td>
           <td>{a.lastSeenAt ? new Date(a.lastSeenAt).toLocaleString("pt-BR") : "—"}</td><td>{a.status}</td><td><button className="btn sm" onClick={() => doActivation(a)}>{a.status === "active" ? "Revogar" : "Restaurar"}</button></td></tr>)}

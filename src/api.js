@@ -141,3 +141,49 @@ export async function deviceApi(path, { method = "GET", body, token } = {}) {
 // Públicos: são chamados sem sessão para não expor um access token num link de e-mail.
 export const requestPasswordReset = (email) => raw("/auth/password-reset/request", { method: "POST", body: { email } });
 export const completePasswordReset = (token, newPassword) => raw("/auth/password-reset/complete", { method: "POST", body: { token, newPassword } });
+
+// Authenticated binary Roku ZIP export. Avoids tokens in URL/query or browser history.
+export async function downloadRokuZip(path, filename) {
+  const request = async (retry = true) => {
+    const token = await ensureAccessToken();
+    if (!token) throw new ApiError(401, { code: "INVALID_TOKEN", message: "Entre novamente para baixar." });
+    const response = await fetch(`${API}/api/v1${path}`, {
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/zip" }, cache: "no-store",
+    });
+    if (response.status === 401 && retry && auth?.refreshToken) {
+      await refresh();
+      return request(false);
+    }
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new ApiError(response.status, data);
+    }
+    if (!(response.headers.get("Content-Type") || "").includes("application/zip"))
+      throw new ApiError(502, { message: "O servidor não retornou o pacote Roku." });
+    const blob = await response.blob();
+    if (blob.size > 70_000_000) throw new ApiError(502, { message: "O arquivo excedeu o tamanho permitido." });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+  };
+  return request();
+}
+
+export async function uploadRokuImage(path, file) {
+  if (!file || file.type !== "image/png" || file.size > 3_000_000) {
+    throw new ApiError(422,{message:"Envie PNG com até 3 MB, nas dimensões indicadas."});
+  }
+  const send = async retry => {
+    const token=await ensureAccessToken();
+    if(!token) throw new ApiError(401,{message:"Faça login novamente."});
+    const res=await fetch(`${API}/api/v1${path}`,{
+      method:"PUT",cache:"no-store",headers:{Authorization:`Bearer ${token}`,"Content-Type":"image/png"},body:file,
+    });
+    if(res.status===401 && retry && auth?.refreshToken){await refresh();return send(false);}
+    const response=await res.json().catch(()=>null);
+    if(!res.ok) throw new ApiError(res.status,response);
+    return response;
+  };
+  return send(true);
+}
