@@ -49,7 +49,7 @@ export default function WhiteLabel() {
       monthlyFeeCents: cents(form.monthlyFeeCents),
       paidThrough: form.paidThrough || null, logoUrl: form.logoUrl || null, downloadUrl: form.downloadUrl || null,
       notes: form.notes || null };
-    if (form.id) { delete body.partnerId; delete body.appKey; delete body.id; delete body.partnerName; delete body.partnerKind; delete body.activeActivations; delete body.availableActivations; delete body.effectiveStatus; delete body.createdAt; delete body.updatedAt; }
+    if (form.id) { delete body.partnerId; delete body.appKey; delete body.id; delete body.partnerName; delete body.partnerKind; delete body.activeActivations; delete body.availableActivations; delete body.effectiveStatus; delete body.createdAt; delete body.updatedAt; delete body.appearanceEnabled; }
     const id = form.id;
     const result = await task(() => api(id ? `${ROOT}/${id}` : ROOT, { method: id ? "PATCH" : "POST", body }), "Contrato do aplicativo salvo.");
     if (result) setForm(null);
@@ -70,6 +70,14 @@ export default function WhiteLabel() {
     if (window.confirm(`${action === "revoke" ? "Revogar" : "Restaurar"} a ativação desta instalação?`))
       void task(() => api(`${ROOT}/${chosen.id}/activations/${a.id}/${action}`, { method: "POST" }), "Ativação atualizada.");
   };
+  const toggleStudio = () => {
+    if (!chosen?.id) return;
+    const enabled = !chosen.appearanceEnabled;
+    const msg = enabled ? `Liberar o Estúdio Visual para ${chosen.name}?` : `Bloquear o Estúdio Visual de ${chosen.name}? O tema publicado deixará de ser entregue ao player.`;
+    if (!window.confirm(msg)) return;
+    void task(() => api(`${ROOT}/${chosen.id}/appearance-access`, { method: 'PATCH', body: { enabled } }),
+      enabled ? 'Estúdio Visual habilitado.' : 'Estúdio Visual desabilitado.');
+  };
   const openEdit = a => setForm({ ...a, logoUrl: a.logoUrl || "", downloadUrl: a.downloadUrl || "", paidThrough: a.paidThrough || "",
     monthlyFeeCents: inputAmount(a.monthlyFeeCents), activationLimit: a.activationLimit || "", notes: a.notes || "" });
   const openNew = () => setForm({ ...initial, monthlyFeeCents: inputAmount(9900) });
@@ -82,16 +90,18 @@ export default function WhiteLabel() {
     <div className="table-wrap"><table><thead><tr><th>Aplicativo</th><th>Cliente</th><th>Plano</th><th>Mensalidade</th><th>Vigência</th><th>Situação</th><th /></tr></thead><tbody>
       {apps.map(a => <tr key={a.id}><td><b>{a.name}</b><br/><small className="mono muted">{a.appKey}</small></td>
         <td>{a.partnerName || "—"}</td><td>{a.planType === "unlimited" ? "Ilimitado" : `${a.activeActivations}/${a.activationLimit} aparelhos`}</td>
-        <td>{fmtMoney(a.monthlyFeeCents)}</td><td>{a.paidThrough || "Não liberado"}</td><td>{statuses[a.effectiveStatus] || a.effectiveStatus}</td>
+        <td>{fmtMoney(a.monthlyFeeCents)}</td><td>{a.paidThrough || "Não liberado"}</td><td>{statuses[a.effectiveStatus] || a.effectiveStatus}<br/><small>{a.appearanceEnabled ? "Estúdio Visual liberado" : "Estúdio Visual bloqueado"}</small></td>
         <td><button className="btn sm" onClick={() => { setChosen(a); setActivationPage(1); }}>Gerenciar</button></td></tr>)}
     </tbody></table></div>
     <div className="pager"><span>{meta.total || 0} aplicativo(s) · página {page}</span><div><button className="btn sm" disabled={page <= 1} onClick={() => setPage(x => x - 1)}>Anterior</button>
       <button className="btn sm" disabled={page >= (meta.totalPages || 1)} onClick={() => setPage(x => x + 1)}>Próxima</button></div></div>
     {chosen && <section className="adm-wl-box"><div className="page-head"><div><h3>{chosen.name}</h3><small className="muted mono">{chosen.appKey} · {chosen.partnerName}</small></div>
       <div className="adm-wl-actions"><button className="btn" onClick={() => openEdit(chosen)}>Editar plano</button>
+      <button className={`btn ${chosen.appearanceEnabled ? '' : 'primary'}`} disabled={busy} onClick={toggleStudio}>
+        {chosen.appearanceEnabled ? 'Desativar Estúdio Visual' : 'Habilitar Estúdio Visual'}</button>
       <button className="btn primary" onClick={() => setPayment({ months: 1, amount: inputAmount(chosen.monthlyFeeCents), reference: "", notes: "" })}>Registrar mensalidade</button>
       <button className="btn sm" onClick={() => setChosen(null)}>Fechar</button></div></div>
-      <p><b>Situação:</b> {statuses[chosen.effectiveStatus] || chosen.effectiveStatus} · <b>Válido até:</b> {chosen.paidThrough || "Pendente"} · <b>Aparelhos:</b> {chosen.activeActivations}{chosen.planType === "limited" ? ` / ${chosen.activationLimit}` : " (ilimitados)"}</p>
+      <p><b>Personalização Roku:</b> {chosen.appearanceEnabled ? "Liberada para este cliente" : "Bloqueada pelo Superadmin"} · <b>Situação:</b> {statuses[chosen.effectiveStatus] || chosen.effectiveStatus} · <b>Válido até:</b> {chosen.paidThrough || "Pendente"} · <b>Aparelhos:</b> {chosen.activeActivations}{chosen.planType === "limited" ? ` / ${chosen.activationLimit}` : " (ilimitados)"}</p>
       <div className="adm-wl-cols"><div><header className="page-head"><h3>URLs do cliente</h3><button className="btn sm" onClick={() => setServerForm({ name: "", baseUrl: "", priority: 0, status: "active" })}>+ Servidor</button></header>
         {servers.map(s => <div className="adm-wl-entry" key={s.id}><div><b>{s.name}</b><small>{s.baseUrl} · {s.status}</small></div><div className="adm-wl-actions"><button className="btn sm" onClick={() => setServerForm(s)}>Editar</button>
           <button className="btn sm danger" onClick={() => { if (window.confirm(`Remover URL ${s.name}?`)) void task(() => api(`${ROOT}/${chosen.id}/servers/${s.id}`, { method: "DELETE" }), "URL removida."); }}>Excluir</button></div></div>)}
