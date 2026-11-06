@@ -1,5 +1,5 @@
 import ServerHistoryModal from "../ServerHistoryModal.jsx";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import AdminDeleteModal from "./AdminDeleteModal.jsx";
 import PartnerPreRegistrations from "./PartnerPreRegistrations.jsx";
 import { offlineDuration } from "../presence-time.js";
@@ -95,6 +95,34 @@ function PartnersList({ scope, onChanged }) {
     return () => { window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", refresh); };
   }, [list.reload]);
   const rows = list.data.filter((p) => cfg.kinds.includes(p.kind));
+  // A lista contém apenas a revisão da foto, nunca 50 imagens base64 no JSON.
+  // Carrega em lote as fotos que ainda não estão em cache e reutiliza em atualizações
+  // automáticas da lista. A mesma lógica funciona para parceiros e revendas.
+  const [avatarCache, setAvatarCache] = useState(() => new Map());
+  const requestedAvatars = useRef(new Set());
+  useEffect(() => {
+    const missing = list.data.filter((p) => {
+      const key = p.avatarVersion && `${p.id}:${p.avatarVersion}`;
+      return key && !avatarCache.has(key) && !requestedAvatars.current.has(key);
+    });
+    if (!missing.length) return;
+    const keys = missing.map((p) => `${p.id}:${p.avatarVersion}`);
+    keys.forEach((key) => requestedAvatars.current.add(key));
+    // A API aceita no máximo 50 IDs por solicitação (pageSize da lista = 50).
+    api("/admin/partners/avatars", { method: "POST", body: { ids: missing.map(p => p.id) } })
+      .then((result) => {
+        const available = new Map((result.data || []).map((item) => [`${item.partnerId}:${item.avatarVersion}`, item.avatarData]));
+        setAvatarCache((previous) => {
+          const next = new Map(previous);
+          for (const key of keys) next.set(key, available.get(key) || null);
+          // Limita a memória durante navegação por muitas páginas.
+          while (next.size > 100) next.delete(next.keys().next().value);
+          return next;
+        });
+      })
+      .catch(() => { /* A lista continua utilizável com iniciais se houver falha de rede. */ })
+      .finally(() => keys.forEach((key) => requestedAvatars.current.delete(key)));
+  }, [list.data, avatarCache]);
   const changed = () => { list.reload(); setInviteRevision(value => value + 1); onChanged?.(); };
   const count = (fn) => rows.filter(fn).length;
   const pending = count(isPending);
@@ -125,7 +153,10 @@ function PartnersList({ scope, onChanged }) {
         <thead><tr><th>{scope === "reseller" ? "Revenda" : "Parceiro"}</th><th>Status</th><th>Portal</th><th>{cfg.billing}</th><th>Dispositivos</th><th>Término</th></tr></thead>
         <tbody>{rows.map((p) => (
           <tr key={p.id} className="click" onClick={() => setOpenId(p.id)}>
-            <td><strong>{p.name}</strong><div className="muted">{p.slug}{p.kind === "both" && <span className="kind both">{cfg.also}</span>}</div></td>
+            <td><div className="partner-list-identity">
+              <PartnerAvatar name={p.name} avatarData={p.avatarVersion ? avatarCache.get(`${p.id}:${p.avatarVersion}`) : null} />
+              <div className="partner-list-name"><strong>{p.name}</strong><div className="muted">{p.slug}{p.kind === "both" && <span className="kind both">{cfg.also}</span>}</div></div>
+            </div></td>
             <td>{isPending(p) ? <Badge status="pending" label="Novo cadastro" /> : <Badge status={p.effectiveStatus} />}</td>
             <td>
               <PortalPresence
@@ -144,6 +175,14 @@ function PartnersList({ scope, onChanged }) {
       {openId && <PartnerDetail id={openId} onClose={() => setOpenId(null)} onChanged={changed} />}
     </>
   );
+}
+
+function PartnerAvatar({ name, avatarData }) {
+  const initials = String(name || "?").trim().split(/\s+/).filter(Boolean).slice(0, 2)
+    .map((part) => part[0]).join("").toLocaleUpperCase("pt-BR") || "?";
+  return <span className="partner-list-avatar" aria-hidden="true">
+    {avatarData ? <img src={avatarData} alt="" loading="lazy" decoding="async" /> : <span>{initials}</span>}
+  </span>;
 }
 
 function PortalPresence({ online, lastActivityAt, disconnectedAt, now }) {
