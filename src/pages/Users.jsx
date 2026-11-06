@@ -16,6 +16,7 @@ export function UsersPanel({ partnerId: fixedPartnerId }) {
   const dq = useDebounced(q);
   const list = useList("/admin/users", { q: "", role: "", status: "", partnerId: fixedPartnerId || "" });
   const [form, setForm] = useState(null);
+  const sendResetAction = useAction();
   useEffect(() => { list.filter({ q: dq }); /* eslint-disable-next-line */ }, [dq]);
   const full = me?.role === "superadmin";
 
@@ -38,6 +39,11 @@ export function UsersPanel({ partnerId: fixedPartnerId }) {
             <td className="actions">
               <RowMenu items={[
                 { label: "Editar", onClick: () => setForm({ user: u }) },
+                ...(u.status === "active" ? [{ label: "Enviar link de redefinição de senha", onClick: () => {
+                  if (window.confirm(`Enviar um link de redefinição para ${u.email}? O link expira em 30 minutos.`)) {
+                    void sendResetAction(() => api(`/admin/users/${u.id}/send-password-reset`, { method: "POST" }), "Link enviado para o e-mail cadastrado.");
+                  }
+                } }] : []),
               ]} />
             </td>
           </tr>))}</tbody>

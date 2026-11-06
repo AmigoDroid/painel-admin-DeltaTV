@@ -2,6 +2,7 @@
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
+    <meta name="referrer" content="no-referrer" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0a0c1a" />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 3.5L29.5 27.5H2.5z' fill='%236d6bff'/%3E%3Cpath d='M13 15.2L20.4 19.6 13 24z' fill='%230a0c1a'/%3E%3C/svg%3E" />
@@ -12,6 +13,18 @@
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
+    <script type="module">
+      const isReset = /^\/redefinir-senha\/?$/.test(window.location.pathname);
+      if (isReset) {
+        const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+        window.__DELTA_PASSWORD_RESET_TOKEN__ = hash.get("token") || "";
+        window.history.replaceState(window.history.state, "", "/redefinir-senha");
+      }
+      const entry = isReset ? import("./src/reset-entry.jsx") : import("./src/main.jsx");
+      entry.catch(error => {
+        console.error("[delta-admin] Falha ao carregar a interface", error);
+        document.getElementById("root").textContent = "Não foi possível carregar o painel. Atualize a página.";
+      });
+    </script>
   </body>
 </html>
