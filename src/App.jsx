@@ -24,12 +24,13 @@ import Mail from "./pages/Mail.jsx";
 import Notifications from "./pages/Notifications.jsx";
 import WebAccessPage from "./pages/WebAccess.jsx";
 import Downloads from "./pages/Downloads.jsx";
+import WhiteLabel from "./pages/WhiteLabel.jsx";
 
 const WebAccess = () => <WebAccessPage admin />;
 
 const PAGES = {
   dashboard: ["Visão geral", Dashboard], vpsmonitor: ["Servidor / VPS", VpsMonitor],
-  webaccess: ["Player Web", WebAccess],
+  webaccess: ["Player Web", WebAccess], whiteLabel: ["Aplicativos white-label", WhiteLabel],
   licenses: ["Licenças", Licenses], devices: ["Dispositivos", Devices], unlinked: ["Sem vínculo", Unlinked],
   partners: ["Parceiros", Partners], servermonitor: ["Monitoramento", ServerMonitor], sources: ["Fontes de conteúdo", Sources],
   resellers: ["Revendas", Resellers], trash: ["Lixeira", PartnerTrash], clients: ["Clientes", Clients], credits: ["Créditos", Credits], downloads: ["Downloads e links", Downloads],
@@ -41,7 +42,7 @@ const PAGES = {
 const GROUPS = [
   { label: null, items: ["dashboard"] },
   { label: "Licenciamento", items: ["licenses", "devices", "unlinked", "webaccess"] },
-  { label: "Parceiros", items: ["partners", "servermonitor", "sources"] },
+  { label: "Parceiros", items: ["partners", "servermonitor", "sources", "whiteLabel"] },
   { label: "Revendas", items: ["resellers", "clients", "credits", "downloads"] },
   { label: "Financeiro", items: ["pricing", "billing", "pix"] },
   { label: "Sistema", items: ["vpsmonitor", "trash", "users", "loginhistory", "notifications", "mail", "audit"] },
@@ -69,6 +70,7 @@ const ICONS = {
   notifications: <><path d="M18 8a6 6 0 00-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></>,
   mail: <><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 7l9 6 9-6" /></>,
   downloads: <><path d="M12 3v12M7 10.5l5 5 5-5" /><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" /></>,
+  whiteLabel: <><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h8M8 17h5"/></>,
   webaccess: <><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18" /></>,
   audit: <><path d="M8 3h8v3H8z" /><path d="M6 5H5a1 1 0 00-1 1v14a1 1 0 001 1h14a1 1 0 001-1V6a1 1 0 00-1-1h-1M8 12h8M8 16h5" /></>,
 };
@@ -136,7 +138,7 @@ function UserMenu({ user }) {
 
 function Shell({ user }) {
   // Itens do menu são conveniência: cada rota é protegida por permissão no backend.
-  const hidden = (k) => ((k === "vpsmonitor" || k === "pricing" || k === "trash") && user.role !== "superadmin") || (user.role === "support" && k === "audit") || ((k === "users" || k === "loginhistory" || k === "mail" || k === "notifications") && user.role !== "superadmin");
+  const hidden = (k) => (k === "whiteLabel" && user.role !== "superadmin") || ((k === "vpsmonitor" || k === "pricing" || k === "trash") && user.role !== "superadmin") || (user.role === "support" && k === "audit") || ((k === "users" || k === "loginhistory" || k === "mail" || k === "notifications") && user.role !== "superadmin");
   const menu = Object.entries(PAGES).filter(([k]) => !hidden(k));
   const allowed = (h) => menu.some(([k]) => k === h);
   const fromHash = () => (allowed(location.hash.slice(1)) ? location.hash.slice(1) : "dashboard");
