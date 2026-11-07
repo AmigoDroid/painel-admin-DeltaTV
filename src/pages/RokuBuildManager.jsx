@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { api, downloadRokuZip, uploadRokuImage } from '../api.js';
+import RokuSimulator from '../components/RokuSimulator.jsx';
 
 const ROOT='/admin/white-label';
 const defaults={template:'classic',brandName:'Meu aplicativo',tagline:'Seu entretenimento em um só lugar.',
@@ -11,7 +12,10 @@ const ASSETS=[['logo','Logo 180×180 ou 400×400'],['icon_hd','Ícone HD 336×21
 const templates={
   classic:{primaryColor:'#6B47E6',backgroundColor:'#090B14',panelColor:'#101321',textColor:'#FFFFFF'},
   cinema:{primaryColor:'#E7A94B',backgroundColor:'#090B10',panelColor:'#17191F',textColor:'#FFFFFF'},
-  compact:{primaryColor:'#25B6A6',backgroundColor:'#081519',panelColor:'#10252B',textColor:'#F5FCFC'}
+  compact:{primaryColor:'#25B6A6',backgroundColor:'#081519',panelColor:'#10252B',textColor:'#F5FCFC'},
+  minimal:{primaryColor:'#D4A45C',backgroundColor:'#11161B',panelColor:'#1B2229',textColor:'#F7F5EE'},
+  mosaic:{primaryColor:'#EC734F',backgroundColor:'#151316',panelColor:'#29232A',textColor:'#FFF6F0'},
+  library:{primaryColor:'#93CBAA',backgroundColor:'#0D1615',panelColor:'#1A2B26',textColor:'#F3FBF6'}
 };
 export default function RokuBuildManager({ appId, appName, appearanceEnabled }) {
   const [cfg,setCfg]=useState({...defaults,brandName:appName||defaults.brandName});
@@ -67,7 +71,7 @@ export default function RokuBuildManager({ appId, appName, appearanceEnabled }) 
       <div>
         <label>Modelo de interface<select value={cfg.template} onChange={e=>{
           const val=e.target.value;setCfg(c=>({...c,template:val,...templates[val]}));setDirty(true);
-        }}><option value="classic">Clássico</option><option value="cinema">Cinema</option><option value="compact">Compacto</option></select></label>
+        }}><option value="classic">Clássico</option><option value="cinema">Cinema</option><option value="compact">Compacto</option><option value="minimal">Minimalista</option><option value="mosaic">Mosaico</option><option value="library">Biblioteca</option></select></label>
         <label>Nome na TV<input maxLength="45" value={cfg.brandName} onChange={e=>edit('brandName',e.target.value)}/></label>
         <label>Título da Home<input maxLength="90" value={cfg.heroTitle} onChange={e=>edit('heroTitle',e.target.value)}/></label>
         <label>Mensagem<input maxLength="110" value={cfg.tagline} onChange={e=>edit('tagline',e.target.value)}/></label>
@@ -83,6 +87,10 @@ export default function RokuBuildManager({ appId, appName, appearanceEnabled }) 
           <div style={{padding:14,background:cfg.panelColor,borderRadius:9,color:cfg.textColor}}>{cfg.tagline}</div>
         </div>
       </div>
+    </div>
+    <div className="adm-wl-box" style={{marginTop:20,minWidth:0}}>
+      <h4>Simulador de interface Roku</h4><p className="muted">Prévia navegável com dados fictícios. Escolha Login, Home, Filmes, Séries ou TV ao vivo. A disposição pode variar no aparelho Roku real.</p>
+      <RokuSimulator config={cfg}/>
     </div>
     <div className="adm-wl-actions"><button className="btn" disabled={busy||!dirty} onClick={save}>Salvar rascunho</button>
       <button className="btn primary" disabled={busy||!cfg.brandName.trim()||!cfg.heroTitle.trim()} onClick={publish}>Publicar visual</button></div>
