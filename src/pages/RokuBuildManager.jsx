@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { api, downloadRokuZip, uploadRokuImage } from '../api.js';
-import RokuSimulator from '../components/RokuSimulator.jsx';
+import StudioWorkspace from '../StudioWorkspace.jsx';
+import {normalizeAppearance, updateAppearanceScreen, SCREEN_DEFAULTS} from '../appearance-screen-settings.js';
 
 const ROOT='/admin/white-label';
-const defaults={template:'classic',brandName:'Meu aplicativo',tagline:'Seu entretenimento em um só lugar.',
+const defaults={screens:SCREEN_DEFAULTS,template:'classic',brandName:'Meu aplicativo',tagline:'Seu entretenimento em um só lugar.',
   heroTitle:'Bem-vindo',logoUrl:'',heroUrl:'',primaryColor:'#6B47E6',backgroundColor:'#090B14',
   panelColor:'#101321',textColor:'#FFFFFF'};
 const ASSETS=[['logo','Logo 180×180 ou 400×400'],['icon_hd','Ícone HD 336×210'],
@@ -26,7 +27,7 @@ export default function RokuBuildManager({ appId, appName, appearanceEnabled }) 
   const load=useCallback(async()=>{
     if(!appId)return;
     try{const d=await api(`${ROOT}/${appId}/appearance`);
-      setCfg(d.draft||{...defaults,brandName:appName});setVersion(d.version||0);
+      setCfg(normalizeAppearance(d.draft||{...defaults,brandName:appName}));setVersion(d.version||0);
       setDirty(false);setError('');}
     catch(e){setError(e.message);}
   },[appId,appName]);
@@ -44,6 +45,13 @@ export default function RokuBuildManager({ appId, appName, appearanceEnabled }) 
   });
 
   const edit=(key,value)=>{setCfg(c=>({...c,[key]:value}));setDirty(true);setNotice('');};
+  const editScreen=(screen,key,value)=>{setCfg(c=>{
+    const next=updateAppearanceScreen(c,screen,key,value);
+    if(screen==='home'&&key==='heading')next.heroTitle=value;
+    if(screen==='home'&&key==='subtitle')next.tagline=value;
+    return next;
+  });setDirty(true);setNotice('');};
+  const chooseTemplate=val=>{setCfg(c=>({...c,template:val,...templates[val]}));setDirty(true);setNotice('');};
   const operation=async fn=>{
     setBusy(true);setError('');setNotice('');
     try{await fn();}catch(e){setError(e.message||'Falha ao preparar canal.');}
@@ -67,33 +75,9 @@ export default function RokuBuildManager({ appId, appName, appearanceEnabled }) 
     <div className="page-head"><div><h3>Estúdio e Gerador Roku</h3><p className="muted">Personalize a identidade do canal e exporte um pacote exclusivo para assinatura.</p></div>
       <span>Publicação visual: {version||'não publicada'}</span></div>
     {!appearanceEnabled && <p className="adm-wl-error">O Estúdio Visual está desabilitado. Você pode preparar o tema, mas precisa habilitá-lo para entregá-lo às TVs.</p>}
-    <div className="adm-wl-cols">
-      <div>
-        <label>Modelo de interface<select value={cfg.template} onChange={e=>{
-          const val=e.target.value;setCfg(c=>({...c,template:val,...templates[val]}));setDirty(true);
-        }}><option value="classic">Clássico</option><option value="cinema">Cinema</option><option value="compact">Compacto</option><option value="minimal">Minimalista</option><option value="mosaic">Mosaico</option><option value="library">Biblioteca</option></select></label>
-        <label>Nome na TV<input maxLength="45" value={cfg.brandName} onChange={e=>edit('brandName',e.target.value)}/></label>
-        <label>Título da Home<input maxLength="90" value={cfg.heroTitle} onChange={e=>edit('heroTitle',e.target.value)}/></label>
-        <label>Mensagem<input maxLength="110" value={cfg.tagline} onChange={e=>edit('tagline',e.target.value)}/></label>
-        <label>Logotipo HTTPS (para visual na TV)<input type="url" value={cfg.logoUrl} onChange={e=>edit('logoUrl',e.target.value)}/></label>
-        <label>Banner HTTPS<input type="url" value={cfg.heroUrl} onChange={e=>edit('heroUrl',e.target.value)}/></label>
-      </div>
-      <div>
-        {[["primaryColor","Destaque"],["backgroundColor","Fundo"],["panelColor","Painéis"],["textColor","Texto"]].map(([key,label])=><label key={key}>{label}
-          <input aria-label={label} type="color" value={cfg[key]} onChange={e=>edit(key,e.target.value)}/></label>)}
-        <div style={{padding:20,borderRadius:12,background:cfg.backgroundColor,color:cfg.textColor,border:`2px solid ${cfg.primaryColor}`}}>
-          <div style={{color:cfg.primaryColor,fontWeight:700}}>PRÉVIA DE IDENTIDADE</div>
-          <h3 style={{color:cfg.textColor}}>{cfg.brandName||appName}</h3><p style={{color:cfg.textColor}}>{cfg.heroTitle}</p>
-          <div style={{padding:14,background:cfg.panelColor,borderRadius:9,color:cfg.textColor}}>{cfg.tagline}</div>
-        </div>
-      </div>
-    </div>
-    <div className="adm-wl-box" style={{marginTop:20,minWidth:0}}>
-      <h4>Simulador de interface Roku</h4><p className="muted">Prévia navegável com dados fictícios. Escolha Login, Home, Filmes, Séries ou TV ao vivo. A disposição pode variar no aparelho Roku real.</p>
-      <RokuSimulator config={cfg}/>
-    </div>
-    <div className="adm-wl-actions"><button className="btn" disabled={busy||!dirty} onClick={save}>Salvar rascunho</button>
-      <button className="btn primary" disabled={busy||!cfg.brandName.trim()||!cfg.heroTitle.trim()} onClick={publish}>Publicar visual</button></div>
+    <StudioWorkspace config={cfg} onField={edit} onScreenField={editScreen} onTemplate={chooseTemplate}
+      onSave={save} onPublish={publish} dirty={dirty} busy={busy} version={version}
+      error={error} notice={notice} actionsDisabled={!cfg.heroTitle.trim()}>
     <div className="adm-wl-box" style={{marginTop:15}}><h4>Ícones, splash e banner para a loja Roku</h4>
       <p className="muted">PNG nas dimensões exatas; imagens cadastradas substituem os modelos automáticos nos ZIPs Premium.</p>
       <div className="adm-wl-cols">{ASSETS.map(([key,label])=><label key={key}>{label}
@@ -109,6 +93,6 @@ export default function RokuBuildManager({ appId, appName, appearanceEnabled }) 
         <button className="btn primary" disabled={busy||!version} onClick={()=>download('dedicated')}>Gerar ZIP Premium</button></div>
     </div>
     <p className="muted" style={{marginTop:10}}>Exportação não é assinatura: é preciso instalar o ZIP no Roku de desenvolvimento, criar/usar chave própria, gerar o .pkg e submeter à certificação. Ícones automáticos servem de ponto de partida; substitua por arte profissional quando necessário.</p>
-    {error&&<p className="adm-wl-error" role="alert">{error}</p>}{notice&&<p className="adm-wl-ok" role="status">{notice}</p>}
+    </StudioWorkspace>
   </section>;
 }

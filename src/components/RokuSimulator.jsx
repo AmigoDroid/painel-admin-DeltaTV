@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import './roku-simulator.css';
+import { SCREEN_DEFAULTS } from '../appearance-screen-settings.js';
 
 // This is a browser-based visual/navigation prototype. It does not execute BrightScript,
 // contact IPTV servers or claim to be the Roku emulator/certification environment.
@@ -26,21 +27,26 @@ const CHANNELS = ['Notícias', 'Esportes', 'Cinema', 'Variedades', 'Música', 'C
 const NAV = [ ['home', 'Início'], ['live', 'TV ao vivo'], ['movies', 'Filmes'], ['series', 'Séries'] ];
 const wrap = (n, max) => ((n % max) + max) % max;
 
-export default function RokuSimulator({ config }) {
+export default function RokuSimulator({ config, screen: selectedScreen, onScreenChange }) {
   const [running, setRunning] = useState(false);
-  const [screen, setScreen] = useState('home');
+  const [localScreen, setLocalScreen] = useState('home');
+  const screen = selectedScreen ?? localScreen;
+  const copy = { ...SCREEN_DEFAULTS, ...(config.screens || {}) };
+  const screenText = copy[screen] || SCREEN_DEFAULTS.home;
+  const homeText = copy.home;
   const [focus, setFocus] = useState(0);
   const [detail, setDetail] = useState(null);
   const [genre, setGenre] = useState('Todos');
   const [search, setSearch] = useState('');
+  const [showEmpty, setShowEmpty] = useState(false);
   const ref = useRef(null);
   const isCatalog = screen === 'movies' || screen === 'series';
   const collection = screen === 'series' ? SERIES : MOVIES;
-  const items = useMemo(() => collection.filter(([title, category]) =>
+  const items = useMemo(() => (showEmpty ? [] : collection).filter(([title, category]) =>
     (genre === 'Todos' || category.toLowerCase().includes(genre.toLowerCase())) &&
-    title.toLowerCase().includes(search.trim().toLowerCase())), [collection, genre, search]);
-  const maxFocus = screen === 'login' ? 3 : screen === 'home' ? 7 : isCatalog ? Math.max(1, items.length + 1) : CHANNELS.length;
-  const chooseScreen = (next) => { setScreen(next); setFocus(0); setDetail(null); setSearch(''); setGenre('Todos'); };
+    title.toLowerCase().includes(search.trim().toLowerCase())), [collection, genre, search, showEmpty]);
+  const maxFocus = screen === 'login' ? 3 : screen === 'home' ? (homeText.showFeatured ? 7 : 4) : isCatalog ? Math.max(1, items.length + 1) : (showEmpty ? 1 : CHANNELS.length);
+  const chooseScreen = (next) => { setLocalScreen(next); onScreenChange?.(next); setFocus(0); setDetail(null); setSearch(''); setGenre('Todos'); };
   useEffect(() => { setFocus(0); setDetail(null); }, [config.template]);
   const run = () => { setRunning(true); setDetail(null); setFocus(0); ref.current?.focus(); };
   const stop = () => { setRunning(false); setDetail(null); };
@@ -78,6 +84,7 @@ export default function RokuSimulator({ config }) {
     if (key) { e.preventDefault(); remote(key); }
   };
   const brand = config.brandName || 'Seu aplicativo';
+  const labels = {home:'Início',live:homeText.liveLabel,movies:homeText.moviesLabel,series:homeText.seriesLabel};
   const tokens = { '--rs-bg':config.backgroundColor, '--rs-panel':config.panelColor,
     '--rs-accent':config.primaryColor, '--rs-fg':config.textColor };
   const target = (idx, body, extra='') => <button key={idx} type="button"
@@ -88,7 +95,7 @@ export default function RokuSimulator({ config }) {
     {config.logoUrl ? <img src={config.logoUrl} alt="" onError={e => { e.currentTarget.style.display = 'none'; }} /> : brand.slice(0,1).toUpperCase()}</span><b>{brand}</b></span>;
   const nav = <nav className="rs-navigation" aria-label="Navegação fictícia Roku">{NAV.map(([id,label]) =>
       <button type="button" key={id} className={`rs-nav-item ${screen === id ? 'rs-current' : ''}`}
-        onClick={() => { if (running) chooseScreen(id); }}><span className="rs-nav-symbol">{["⌂", "◉", "▣", "▤"][NAV.findIndex(([key]) => key === id)]}</span><span className="rs-nav-text">{label}</span></button>)}</nav>;
+        onClick={() => { if (running) chooseScreen(id); }}><span className="rs-nav-symbol">{["⌂", "◉", "▣", "▤"][NAV.findIndex(([key]) => key === id)]}</span><span className="rs-nav-text">{labels[id] || label}</span></button>)}</nav>;
   const posters = (data, offset=0) => data.map(([title, sub], idx) => target(idx+offset,
     <><span className={`rs-cover rs-cover-${idx % 8}`}><span className="rs-cover-mark">{String(idx+1).padStart(2,'0')}</span></span>
     <span className="rs-poster-text"><b>{title}</b><small>{sub}</small></span></>, 'rs-poster'));
@@ -102,6 +109,7 @@ export default function RokuSimulator({ config }) {
             {SIM_SCREENS.map(item=><option key={item.id} value={item.id}>{item.title}</option>)}
           </select>
         </label>
+        {(isCatalog||screen==='live')&&<label className="rs-empty-toggle"><input type="checkbox" checked={showEmpty} onChange={e=>setShowEmpty(e.target.checked)}/> Ver vazio</label>}
         <button type="button" className="rs-run" onClick={running?stop:run}>{running?'■ Parar':'▶ Rodar'}</button>
         <button type="button" className="rs-reset" onClick={()=>{chooseScreen('login');setRunning(true);ref.current?.focus();}}>Reiniciar</button>
       </div>
@@ -111,31 +119,31 @@ export default function RokuSimulator({ config }) {
       aria-label={`Prévia de ${screen}. Use setas, Enter e Esc para navegar quando estiver rodando.`}>
       {screen === 'login' ? <div className="rs-login">
         <div className="rs-login-side">{badge}<div className="rs-login-message"><span className="rs-overline">BEM-VINDO</span>
-          <h3>{config.heroTitle || 'Sua TV começa aqui'}</h3><p>{config.tagline}</p></div>
-          <span className="rs-login-foot">Acesso configurado pelo seu provedor</span></div>
-        <div className="rs-login-form"><span className="rs-overline">ENTRAR</span><h3>Conecte sua lista</h3><p>Use as credenciais enviadas pelo seu provedor.</p>
-          {target(0,<>Usuário <span>seu usuário Xtream</span></>,'rs-input-mock')}
-          {target(1,<>Senha <span>••••••••••</span></>,'rs-input-mock')}
-          {target(2,'Conectar','rs-login-button')}
+          <h3>{screenText.heading}</h3><p>{screenText.subtitle}</p></div>
+          <span className="rs-login-foot">{screenText.footer}</span></div>
+        <div className="rs-login-form"><span className="rs-overline">ENTRAR</span><h3>{screenText.heading}</h3><p>{screenText.subtitle}</p>
+          {target(0,<>{screenText.userLabel} <span>seu usuário Xtream</span></>,'rs-input-mock')}
+          {target(1,<>{screenText.passwordLabel} <span>••••••••••</span></>,'rs-input-mock')}
+          {target(2,screenText.submitLabel,'rs-login-button')}
           <small>Simulação sem autenticação ou envio de senha.</small></div></div> : <>
         <aside className="rs-sidebar">{badge}<span className="rs-side-heading">NAVEGAR</span>{nav}<small>◉ Roku · Prévia</small></aside>
         <main className="rs-main">
           {screen === 'home' ? <>
             <div className="rs-home-intro"><span className="rs-overline">{config.template === 'mosaic' ? 'EXPLORAR' : config.template === 'minimal' ? 'BIBLIOTECA' : 'DESTAQUE'}</span>
-              <h3>{config.heroTitle || 'Seu entretenimento'}</h3><p>{config.tagline}</p></div>
-            {config.template !== 'minimal' && config.template !== 'mosaic' && <div className="rs-hero" style={config.heroUrl ? {backgroundImage:`linear-gradient(90deg,var(--rs-bg),transparent),url(${JSON.stringify(config.heroUrl)})`}:undefined}>
-              <span>ESCOLHAS PARA VOCÊ</span><b>{config.heroTitle}</b><small>{config.tagline}</small></div>}
-            <div className="rs-quicknav">{NAV.map(([id,label],idx) => target(idx,<><span className="rs-nav-fig">{['⌂','◉','▣','▤'][idx]}</span><b>{label}</b></>,'rs-quick'))}</div>
-            <div className="rs-row-title"><b>{config.template === 'minimal'?'Continue explorando':'Recomendados para você'}</b><span>VER TUDO</span></div>
-            <div className="rs-poster-row">{posters(MOVIES.slice(0,3),4)}</div>
+              <h3>{screenText.heading}</h3><p>{screenText.subtitle}</p></div>
+            {homeText.showBanner && config.template !== 'minimal' && config.template !== 'mosaic' && <div className="rs-hero" style={config.heroUrl ? {backgroundImage:`linear-gradient(90deg,var(--rs-bg),transparent),url(${JSON.stringify(config.heroUrl)})`}:undefined}>
+              <span>ESCOLHAS PARA VOCÊ</span><b>{homeText.heading}</b><small>{homeText.subtitle}</small></div>}
+            <div className="rs-quicknav">{NAV.map(([id,label],idx) => target(idx,<><span className="rs-nav-fig">{['⌂','◉','▣','▤'][idx]}</span><b>{labels[id] || label}</b></>,'rs-quick'))}</div>
+            {homeText.showFeatured && <><div className="rs-row-title"><b>{homeText.featuredLabel}</b><span>VER TUDO</span></div>
+            <div className="rs-poster-row">{posters(MOVIES.slice(0,3),4)}</div></>}
           </> : isCatalog ? <>
-            <div className="rs-catalog-head"><div><span className="rs-overline">CATÁLOGO</span><h3>{screen === 'movies' ? 'Filmes' : 'Séries'}</h3><p>Escolha algo para assistir.</p></div><span className="rs-search-pill">⌕ &nbsp;Buscar</span></div>
-            <div className="rs-catalog-content"><div className="rs-genres"><b>Categorias</b>
+            <div className="rs-catalog-head"><div><span className="rs-overline">CATÁLOGO</span><h3>{screenText.heading}</h3><p>{screenText.subtitle}</p></div><span className="rs-search-pill">⌕ &nbsp;{screenText.searchLabel}</span></div>
+            <div className="rs-catalog-content"><div className="rs-genres"><b>{screenText.categoriesLabel}</b>
               {target(0,<>▸ {genre}<small>OK para mudar</small></>,'rs-genre-active')}
               {GENRES.filter(g=>g!==genre).slice(0,3).map(g=><span key={g}>{g}</span>)}</div>
-              <div className="rs-grid">{posters(items,1)}{items.length===0&&<p>Sem resultados nesta categoria.</p>}</div></div>
-          </> : <><div className="rs-catalog-head"><div><span className="rs-overline">AO VIVO</span><h3>Canais</h3><p>Selecione um canal para pré-visualizar.</p></div></div>
-            <div className="rs-channels">{CHANNELS.map((c,i)=>target(i,<><span className="rs-channel-symbol">◉</span><b>{c}</b><small>Agora ao vivo</small></>,'rs-channel'))}</div></>}
+              <div className="rs-grid">{posters(items,1)}{items.length===0&&<p>{screenText.emptyLabel}</p>}</div></div>
+          </> : <><div className="rs-catalog-head"><div><span className="rs-overline">AO VIVO</span><h3>{screenText.heading}</h3><p>{screenText.subtitle}</p></div></div>
+            <div className="rs-channels">{showEmpty?<p>{screenText.emptyLabel}</p>:CHANNELS.map((c,i)=>target(i,<><span className="rs-channel-symbol">◉</span><b>{c}</b><small>Agora ao vivo</small></>,'rs-channel'))}</div></>}
         </main>
       </>}
       {detail && <div className="rs-detail"><div className="rs-detail-card"><span className="rs-overline">PRÉVIA</span><h3>{detail}</h3>

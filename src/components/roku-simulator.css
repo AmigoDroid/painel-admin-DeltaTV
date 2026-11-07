@@ -19,3 +19,5 @@
 .rs-template-minimal .rs-main,.rs-template-mosaic .rs-main{padding-top:3%}
 .rs-nav-symbol{display:none}.rs-template-minimal .rs-nav-symbol,.rs-template-mosaic .rs-nav-symbol{display:inline;font-size:1.35em}
 .rs-template-minimal .rs-nav-dot,.rs-template-mosaic .rs-nav-dot{display:none}
+
+.rs-empty-toggle{display:flex;gap:5px;align-items:center;font-size:12px;white-space:nowrap}.rs-empty-toggle input{accent-color:#7455ea}
