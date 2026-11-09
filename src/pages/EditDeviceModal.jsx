@@ -10,6 +10,7 @@ import { Field, Modal, useAction } from "../ui.jsx";
 export default function EditDeviceModal({ device, onClose, onDone }) {
   const run = useAction();
   const [mode, setMode] = useState(device.deliveryModeOverride ? device.deliveryMode : "auto");
+  const [applyMode, setApplyMode] = useState(false);
   const [name, setName] = useState(device.listName || "");
   const [url, setUrl] = useState("");
   const [removeList, setRemoveList] = useState(false);
@@ -20,7 +21,7 @@ export default function EditDeviceModal({ device, onClose, onDone }) {
     if (busy) return;
     const body = {};
     const currentMode = device.deliveryModeOverride ? device.deliveryMode : "auto";
-    if (mode !== currentMode) body.deliveryMode = mode === "auto" ? null : mode;
+    if (applyMode || mode !== currentMode) body.deliveryMode = mode === "auto" ? null : mode;
     if (removeList) body.removeList = true;
     else {
       if (url.trim()) body.playlistUrl = url.trim();
@@ -41,12 +42,15 @@ export default function EditDeviceModal({ device, onClose, onDone }) {
         <p className="muted">A alteração fica registrada em seu nome e vale na próxima abertura do app (até 1 minuto).</p>
         <Field label="MAC do aparelho"><input className="mono" value={device.mac || ""} readOnly tabIndex={-1} /></Field>
         <Field label="Entrega" hint="Automático: lista própria = redirect; parceria = modo do provedor. Redirect: o app fala direto com o provedor. Proxy: o servidor serve o conteúdo.">
-          <select value={mode} onChange={(e) => setMode(e.target.value)}>
+          <select value={mode} onChange={(e) => { setMode(e.target.value); setApplyMode(true); }}>
             <option value="auto">Automático</option>
             <option value="redirect">Redirect (302)</option>
-            <option value="proxy">Proxy</option>
+            <option value="proxy">Proxy completo (catálogo e mídia)</option>
           </select>
         </Field>
+        {device.deliveryProtected && <p className="muted">A proteção global do servidor está ativa: todos os tipos passam pelo proxy.</p>}
+        <label className="check"><input type="checkbox" checked={applyMode} onChange={e => setApplyMode(e.target.checked)} /> Aplicar este modo a todos os tipos, removendo exceções anteriores</label>
+        <p className="muted">O proxy permite intermediar clientes IPv6 e origens IPv4 quando o aparelho suporta IPv6. Consome banda da VPS. Redirect depende da conexão direta com o provedor.</p>
         <>
           <Field label="Nome da lista própria"><input value={name} onChange={(e) => setName(e.target.value)} maxLength={160} disabled={removeList} /></Field>
           <Field label="Novo link da lista (M3U)" hint="Se houver uma lista de parceria, esta lista própria terá prioridade. Deixe vazio para manter a configuração atual.">
