@@ -1,3 +1,4 @@
+import ConnectionAudit from "../ConnectionAudit.jsx";
 import CredentialsModal from "./CredentialsModal.jsx";
 import { useEffect, useState } from "react";
 import { api, getAuth } from "../api.js";
@@ -23,6 +24,7 @@ const detailOf = event => [event.metadata?.reason, event.metadata?.days ? `Teste
   event.metadata?.listName, event.metadata?.webAutoHttps !== undefined ? `HTTPS automático: ${event.metadata.webAutoHttps ? "ativado" : "desativado"}` : null].filter(Boolean).join(" · ");
 
 export default function DeviceRecordModal({ device, initialTab = "lists", onClose, onChanged, onManage }) {
+  const [auditId, setAuditId] = useState(null);
   const [credentials, setCredentials] = useState(null);
   const [tab, setTab] = useState(initialTab);
   const [eventPage, setEventPage] = useState(1);
@@ -55,6 +57,7 @@ export default function DeviceRecordModal({ device, initialTab = "lists", onClos
       <button type="button" className={`tab ${tab === "removed" ? "active" : ""}`} onClick={() => setTab("removed")}>Removidas ({removed.length})</button>
       <button type="button" className={`tab ${tab === "history" ? "active" : ""}`} onClick={() => setTab("history")}>Histórico ({data?.eventsMeta?.total ?? 0})</button>
     </div>
+    {auditId && <ConnectionAudit path={`/admin/devices/activations/${auditId}/connection-audit`} onClose={()=>setAuditId(null)} />}
     {credentials && <CredentialsModal path={`/admin/devices/activations/${credentials}/credentials`} onClose={()=>setCredentials(null)} />}
     {error && <p className="error" role="alert">{error} <button type="button" className="btn" onClick={reload}>Tentar novamente</button></p>}
     {!data ? <p className="muted">Carregando ficha…</p> : tab === "history" ? <>
@@ -71,6 +74,7 @@ export default function DeviceRecordModal({ device, initialTab = "lists", onClos
           <td><Badge status={accessStatus(a)} /><div className="muted">{a.statusReason || (a.access?.allowed === false ? a.access.message : "")}</div></td>
           <td><DeliveryBadge mode={a.deliveryMode} fixed={a.deliveryModeFixed} /></td><td>{fmtDateTime(a.activatedAt)}</td><td>{fmtDateTime(a.revokedAt)}</td>
           <td><div className="device-record-actions">
+            <button className="btn" onClick={()=>setAuditId(a.id)}>Conexão / URL</button>
             {isSuper && <button className="btn" onClick={() => setEditing(a)}>Editar</button>}
             {isSuper && a.status!=="revoked" && <button className="btn" onClick={()=>setCredentials(a.id)}>Credenciais</button>}
             {a.status === "active" && <button className="btn" onClick={() => act(a, "block")}>Bloquear</button>}
