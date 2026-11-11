@@ -34,11 +34,25 @@ export default function ConnectionAudit({path,onClose}){
   catch(e){setRemoteError(e.message)}finally{setCommandBusy('')}
  }
  async function sendRemote(type){
-  const names={'refresh-catalog':'atualizar o catálogo','switch-list':'trocar a lista ativa','disconnect':'desconectar a TV','sync-access':'revalidar a licença','ping':'medir a latência'};
+  const names={'refresh-catalog':'atualizar o catálogo','switch-list':'trocar a lista ativa','disconnect':'desconectar a TV','sync-access':'revalidar a licença','ping':'medir a latência',diagnose:'testar a conexão com a API',failover:'solicitar outra origem verificada','show-message':'enviar um aviso ao aplicativo','set-telemetry':'ajustar a auditoria'};
   if(type==='switch-list'&&!target){setRemoteError('Selecione a lista de destino.');return}
+  let extra={};
+  if(type==='show-message'){
+    const text=window.prompt('Mensagem para exibir na TV (3 a 180 caracteres):','');
+    if(text===null)return;
+    if(text.trim().length<3||text.trim().length>180){setRemoteError('A mensagem precisa ter entre 3 e 180 caracteres.');return}
+    extra.note=text.trim();
+  }
+  if(type==='set-telemetry'){
+    const text=window.prompt('Intervalo da auditoria nesta TV, em segundos (45 a 180):','90');
+    if(text===null)return;
+    const seconds=Number(text);
+    if(!Number.isInteger(seconds)||seconds<45||seconds>180){setRemoteError('Use um valor inteiro de 45 a 180 segundos.');return}
+    extra.telemetryIntervalSeconds=seconds;
+  }
   if(!window.confirm(`Deseja ${names[type]} neste aparelho?`))return;
   setCommandBusy(type);setRemoteError('');
-  try{await api(remotePath,{method:'POST',body:{type,...(type==='switch-list'?{targetActivationId:target}:{})}});setTick(v=>v+1)}
+  try{await api(remotePath,{method:'POST',body:{type,...extra,...(type==='switch-list'?{targetActivationId:target}:{})}});setTick(v=>v+1)}
   catch(e){setRemoteError(e.message)}finally{setCommandBusy('')}
  }
  async function more(){setLoading(true);try{const r=await api(path,{query:cursor});if(alive.current){setOlder(v=>[...v,...r.events]);setCursor(r.nextBefore);}}catch(e){if(alive.current)setError(e.message);}finally{if(alive.current)setLoading(false);}}
@@ -72,6 +86,10 @@ export default function ConnectionAudit({path,onClose}){
        {remote.activationStatus==='blocked'&&<button type="button" disabled={!!commandBusy} onClick={()=>changeAccess('unblock')}>Desbloquear lista na API</button>}
        <button type="button" disabled={!!commandBusy||!remote.connection?.supported} onClick={()=>sendRemote('refresh-catalog')}>Atualizar catálogo</button>
        <button type="button" disabled={!!commandBusy||!remote.connection?.supported} onClick={()=>sendRemote('ping')}>Medir ping agora</button>
+       <button type="button" disabled={!!commandBusy||Number(remote.connection?.build||0)<51} onClick={()=>sendRemote('diagnose')}>Diagnóstico sob demanda</button>
+       <button type="button" disabled={!!commandBusy||Number(remote.connection?.build||0)<51} onClick={()=>sendRemote('failover')}>Solicitar outra origem</button>
+       <button type="button" disabled={!!commandBusy||Number(remote.connection?.build||0)<51} onClick={()=>sendRemote('show-message')}>Exibir mensagem na TV</button>
+       <button type="button" disabled={!!commandBusy||Number(remote.connection?.build||0)<51} onClick={()=>sendRemote('set-telemetry')}>Ajustar intervalo</button>
        <button type="button" disabled={!!commandBusy||!remote.connection?.supported} onClick={()=>sendRemote('sync-access')}>Revalidar licença</button>
        {canDisconnect&&<button type="button" disabled={!!commandBusy||!remote.connection?.supported} onClick={()=>sendRemote('disconnect')}>Desconectar sessão</button>}
        <label>Lista de destino
@@ -82,10 +100,15 @@ export default function ConnectionAudit({path,onClose}){
        </label>
        <button type="button" disabled={!!commandBusy||!remote.connection?.supported||!target} onClick={()=>sendRemote('switch-list')}>Trocar lista</button>
      </div>
+     {remote.quality&&<div className="remote-stats" aria-label="Qualidade da origem selecionada">
+       <div><small>Origem selecionada</small><b>{remote.quality.name||'Sem identificação'}</b><small>{when(remote.quality.selectedAt)}</small></div>
+       <div><small>Monitor ativo</small><b>{remote.quality.healthState||'Sem medição'}</b><small>Latência VPS → origem: {remote.quality.probeLatencyMs==null?'—':`${remote.quality.probeLatencyMs} ms`}</small></div>
+       <div><small>Alerta coletivo</small><b>{remote.quality.severity?`${remote.quality.severity} · ${remote.quality.affectedDevices}/${remote.quality.sampleDevices} TVs`:'Sem alerta coletivo aberto'}</b><small>Dados indicativos da URL selecionada, não do servidor final após redirect</small></div>
+     </div>}
      <p className="remote-hint">Apps anteriores à build 48 continuam usando a API HTTP e podem ser bloqueados/desbloqueados pelo painel, mas não executam comandos remotos com ACK. "Entregue" não significa "executado".</p>
      <div className="remote-history"><strong>Últimos comandos</strong>
        {!remote.history?.length?<p>Nenhum comando enviado.</p>:<div className="remote-history-scroll"><table><thead><tr><th>Enviado</th><th>Comando</th><th>Estado</th><th>Confirmado</th></tr></thead><tbody>
-        {remote.history.map(c=><tr key={c.id}><td>{when(c.createdAt)}</td><td>{({'refresh-catalog':'Atualizar catálogo','switch-list':'Trocar lista','disconnect':'Desconectar','sync-access':'Revalidar','ping':'Medir RTT'})[c.type]||c.type}</td><td>{({pending:'Pendente',delivered:'Entregue, aguardando ACK',executed:'Executado',failed:'Falhou',refused:'Recusado',expired:'Expirado'})[c.status]||c.status}{c.errorCode?` · ${c.errorCode}`:''}</td><td>{when(c.executedAt)}</td></tr>)}
+        {remote.history.map(c=><tr key={c.id}><td>{when(c.createdAt)}</td><td>{({'refresh-catalog':'Atualizar catálogo','switch-list':'Trocar lista','disconnect':'Desconectar','sync-access':'Revalidar','ping':'Medir RTT','diagnose':'Diagnóstico','failover':'Trocar origem','show-message':'Aviso na TV','set-telemetry':'Intervalo da auditoria'})[c.type]||c.type}</td><td>{({pending:'Pendente',delivered:'Entregue, aguardando ACK',executed:'Executado',failed:'Falhou',refused:'Recusado',expired:'Expirado'})[c.status]||c.status}{c.errorCode?` · ${c.errorCode}`:''}{c.result?.rttMs!=null?` · API ${c.result.rttMs} ms`:''}{c.result?.originRttMs!=null?` · origem ${c.result.originRttMs} ms`:''}{c.result?.originHttpStatus!=null?` · HTTP ${c.result.originHttpStatus} (origem)`:''}{c.result?.networkUp===false?' · Rede desconectada':''}{c.result?.failoverAccepted===true?' · Pedido aceito (reprodução a verificar)':''}</td><td>{when(c.executedAt)}</td></tr>)}
        </tbody></table></div>}
      </div>
    </>}
