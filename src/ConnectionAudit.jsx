@@ -7,6 +7,7 @@ const when=v=>v?new Date(v).toLocaleString('pt-BR'):'Sem registro';
 export default function ConnectionAudit({path,onClose}){
  const [data,setData]=useState(null),[error,setError]=useState(''),[older,setOlder]=useState([]),[cursor,setCursor]=useState(null),[loading,setLoading]=useState(false),[tick,setTick]=useState(0);
  const [remote,setRemote]=useState(null),[remoteError,setRemoteError]=useState(''),[commandBusy,setCommandBusy]=useState(''),[target,setTarget]=useState('');
+ const [messageText,setMessageText]=useState(''),[testDaysLeft,setTestDaysLeft]=useState('3'),[sentNotice,setSentNotice]=useState('');
  const remotePath=path.replace(/\/connection-audit$/, '/remote');
  const canDisconnect=path.startsWith('/admin/');
  const close=useRef(null), alive=useRef(true);
@@ -34,14 +35,17 @@ export default function ConnectionAudit({path,onClose}){
   catch(e){setRemoteError(e.message)}finally{setCommandBusy('')}
  }
  async function sendRemote(type){
-  const names={'refresh-catalog':'atualizar o catálogo','switch-list':'trocar a lista ativa','disconnect':'desconectar a TV','sync-access':'revalidar a licença','ping':'medir a latência',diagnose:'testar a conexão com a API',failover:'solicitar outra origem verificada','show-message':'enviar um aviso ao aplicativo','set-telemetry':'ajustar a auditoria'};
+  const names={'refresh-catalog':'atualizar o catálogo','switch-list':'trocar a lista ativa','disconnect':'desconectar a TV','sync-access':'revalidar a licença','ping':'medir a latência',diagnose:'testar a conexão com a API',failover:'solicitar outra origem verificada','show-message':'enviar um aviso ao aplicativo','test-expiry-notice':'testar o aviso de vencimento nesta TV','set-telemetry':'ajustar a auditoria'};
   if(type==='switch-list'&&!target){setRemoteError('Selecione a lista de destino.');return}
   let extra={};
   if(type==='show-message'){
-    const text=window.prompt('Mensagem para exibir na TV (3 a 180 caracteres):','');
-    if(text===null)return;
-    if(text.trim().length<3||text.trim().length>180){setRemoteError('A mensagem precisa ter entre 3 e 180 caracteres.');return}
-    extra.note=text.trim();
+    if(messageText.trim().length<3||messageText.trim().length>180){setRemoteError('A mensagem precisa ter entre 3 e 180 caracteres.');return}
+    extra.note=messageText.trim();
+  }
+  if(type==='test-expiry-notice'){
+    const days=Number(testDaysLeft);
+    if(!Number.isInteger(days)||days<0||days>30){setRemoteError('Escolha de 0 a 30 dias para a simulação.');return}
+    extra.testDaysLeft=days;
   }
   if(type==='set-telemetry'){
     const text=window.prompt('Intervalo da auditoria nesta TV, em segundos (45 a 180):','90');
@@ -51,8 +55,8 @@ export default function ConnectionAudit({path,onClose}){
     extra.telemetryIntervalSeconds=seconds;
   }
   if(!window.confirm(`Deseja ${names[type]} neste aparelho?`))return;
-  setCommandBusy(type);setRemoteError('');
-  try{await api(remotePath,{method:'POST',body:{type,...extra,...(type==='switch-list'?{targetActivationId:target}:{})}});setTick(v=>v+1)}
+  setCommandBusy(type);setRemoteError('');setSentNotice('');
+  try{await api(remotePath,{method:'POST',body:{type,...extra,...(type==='switch-list'?{targetActivationId:target}:{})}});if(type==='show-message'||type==='test-expiry-notice')setSentNotice('Comando enviado à fila desta TV. Confira o ACK no histórico: enviado não significa exibido.');setTick(v=>v+1)}
   catch(e){setRemoteError(e.message)}finally{setCommandBusy('')}
  }
  async function more(){setLoading(true);try{const r=await api(path,{query:cursor});if(alive.current){setOlder(v=>[...v,...r.events]);setCursor(r.nextBefore);}}catch(e){if(alive.current)setError(e.message);}finally{if(alive.current)setLoading(false);}}
@@ -60,7 +64,7 @@ export default function ConnectionAudit({path,onClose}){
  const rows=[...new Map([...(data?.events||[]),...older].map(e=>[e.id,e])).values()];
  return <div className="connection-audit-overlay" onKeyDown={e=>{
   if(e.key==='Escape'){e.stopPropagation();onClose();}
-  if(e.key==='Tab'){const f=[...e.currentTarget.querySelectorAll('button:not(:disabled),[tabindex="0"]')];const first=f[0],last=f.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus()}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus()}}
+  if(e.key==='Tab'){const f=[...e.currentTarget.querySelectorAll('button:not(:disabled),select:not(:disabled),textarea:not(:disabled),[tabindex="0"]')];const first=f[0],last=f.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus()}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus()}}
  }}>
  <section className="connection-audit" role="dialog" aria-modal="true" aria-label="Auditoria de conexão">
  <header><div><h2>Conexão do dispositivo</h2><p>Atualização a cada 15 segundos · histórico dos últimos 7 dias</p></div><button ref={close} type="button" aria-label="Fechar auditoria" onClick={onClose}>Fechar</button></header>
@@ -88,7 +92,6 @@ export default function ConnectionAudit({path,onClose}){
        <button type="button" disabled={!!commandBusy||!remote.connection?.supported} onClick={()=>sendRemote('ping')}>Medir ping agora</button>
        <button type="button" disabled={!!commandBusy||Number(remote.connection?.build||0)<51} onClick={()=>sendRemote('diagnose')}>Diagnóstico sob demanda</button>
        <button type="button" disabled={!!commandBusy||Number(remote.connection?.build||0)<51} onClick={()=>sendRemote('failover')}>Solicitar outra origem</button>
-       <button type="button" disabled={!!commandBusy||Number(remote.connection?.build||0)<51} onClick={()=>sendRemote('show-message')}>Exibir mensagem na TV</button>
        <button type="button" disabled={!!commandBusy||Number(remote.connection?.build||0)<51} onClick={()=>sendRemote('set-telemetry')}>Ajustar intervalo</button>
        <button type="button" disabled={!!commandBusy||!remote.connection?.supported} onClick={()=>sendRemote('sync-access')}>Revalidar licença</button>
        {canDisconnect&&<button type="button" disabled={!!commandBusy||!remote.connection?.supported} onClick={()=>sendRemote('disconnect')}>Desconectar sessão</button>}
@@ -100,6 +103,26 @@ export default function ConnectionAudit({path,onClose}){
        </label>
        <button type="button" disabled={!!commandBusy||!remote.connection?.supported||!target} onClick={()=>sendRemote('switch-list')}>Trocar lista</button>
      </div>
+     <div className="remote-notifications" aria-label="Notificações individuais">
+       <strong>Notificações para esta TV</strong>
+       <p className="remote-hint">As ações abaixo são individuais: não mudam vencimentos nem enviam avisos aos outros clientes.</p>
+       {sentNotice&&<p role="status" className="remote-hint">{sentNotice}</p>}
+       <div className="remote-notification-grid">
+         <label>Simular vencimento
+           <select value={testDaysLeft} onChange={e=>setTestDaysLeft(e.target.value)} disabled={!!commandBusy}>
+             <option value="3">Vence em 3 dias</option><option value="1">Vence amanhã</option><option value="0">Vence hoje</option>
+           </select>
+         </label>
+         <button type="button" disabled={!!commandBusy||!remote.connection?.connected||Number(remote.connection?.build||0)<55} onClick={()=>sendRemote('test-expiry-notice')}>Testar aviso nesta TV</button>
+       </div>
+       <label className="remote-message-label">Mensagem personalizada (3 a 180 caracteres)
+         <textarea value={messageText} maxLength={180} rows={3} placeholder="Ex.: Olá! Entre em contato com seu revendedor para renovar seus canais." onChange={e=>setMessageText(e.target.value)} disabled={!!commandBusy}/>
+       </label>
+       <div className="remote-notification-grid"><small>{messageText.length}/180 caracteres · texto simples, sem links automáticos</small>
+         <button type="button" disabled={!!commandBusy||!remote.connection?.connected||Number(remote.connection?.build||0)<51||messageText.trim().length<3} onClick={()=>sendRemote('show-message')}>Enviar alerta a esta TV</button>
+       </div>
+       <p className="remote-hint">O teste usa a mensagem configurada pelo proprietário da lista, inclusive quando os avisos automáticos estão desativados. Na build 55, a TV identifica a simulação como TESTE. O ACK “Executado” significa que o diálogo foi exibido, não que o usuário o leu.</p>
+     </div>
      {remote.quality&&<div className="remote-stats" aria-label="Qualidade da origem selecionada">
        <div><small>Origem selecionada</small><b>{remote.quality.name||'Sem identificação'}</b><small>{when(remote.quality.selectedAt)}</small></div>
        <div><small>Monitor ativo</small><b>{remote.quality.healthState||'Sem medição'}</b><small>Latência VPS → origem: {remote.quality.probeLatencyMs==null?'—':`${remote.quality.probeLatencyMs} ms`}</small></div>
@@ -108,7 +131,7 @@ export default function ConnectionAudit({path,onClose}){
      <p className="remote-hint">Apps anteriores à build 48 continuam usando a API HTTP e podem ser bloqueados/desbloqueados pelo painel, mas não executam comandos remotos com ACK. "Entregue" não significa "executado".</p>
      <div className="remote-history"><strong>Últimos comandos</strong>
        {!remote.history?.length?<p>Nenhum comando enviado.</p>:<div className="remote-history-scroll"><table><thead><tr><th>Enviado</th><th>Comando</th><th>Estado</th><th>Confirmado</th></tr></thead><tbody>
-        {remote.history.map(c=><tr key={c.id}><td>{when(c.createdAt)}</td><td>{({'refresh-catalog':'Atualizar catálogo','switch-list':'Trocar lista','disconnect':'Desconectar','sync-access':'Revalidar','ping':'Medir RTT','diagnose':'Diagnóstico','failover':'Trocar origem','show-message':'Aviso na TV','set-telemetry':'Intervalo da auditoria'})[c.type]||c.type}</td><td>{({pending:'Pendente',delivered:'Entregue, aguardando ACK',executed:'Executado',failed:'Falhou',refused:'Recusado',expired:'Expirado'})[c.status]||c.status}{c.errorCode?` · ${c.errorCode}`:''}{c.result?.rttMs!=null?` · API ${c.result.rttMs} ms`:''}{c.result?.originRttMs!=null?` · origem ${c.result.originRttMs} ms`:''}{c.result?.originHttpStatus!=null?` · HTTP ${c.result.originHttpStatus} (origem)`:''}{c.result?.networkUp===false?' · Rede desconectada':''}{c.result?.failoverAccepted===true?' · Pedido aceito (reprodução a verificar)':''}</td><td>{when(c.executedAt)}</td></tr>)}
+        {remote.history.map(c=><tr key={c.id}><td>{when(c.createdAt)}</td><td>{({'refresh-catalog':'Atualizar catálogo','switch-list':'Trocar lista','disconnect':'Desconectar','sync-access':'Revalidar','ping':'Medir RTT','diagnose':'Diagnóstico','failover':'Trocar origem','show-message':'Aviso na TV','test-expiry-notice':'Teste do vencimento','set-telemetry':'Intervalo da auditoria'})[c.type]||c.type}</td><td>{({pending:'Pendente',delivered:'Entregue, aguardando ACK',executed:'Executado',failed:'Falhou',refused:'Recusado',expired:'Expirado'})[c.status]||c.status}{c.note?` · ${c.note}`:''}{c.errorCode?` · ${c.errorCode}`:''}{c.result?.rttMs!=null?` · API ${c.result.rttMs} ms`:''}{c.result?.originRttMs!=null?` · origem ${c.result.originRttMs} ms`:''}{c.result?.originHttpStatus!=null?` · HTTP ${c.result.originHttpStatus} (origem)`:''}{c.result?.networkUp===false?' · Rede desconectada':''}{c.result?.failoverAccepted===true?' · Pedido aceito (reprodução a verificar)':''}</td><td>{when(c.executedAt)}</td></tr>)}
        </tbody></table></div>}
      </div>
    </>}

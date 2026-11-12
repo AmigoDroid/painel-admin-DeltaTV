@@ -12,3 +12,12 @@
 .remote-history th,.remote-history td{font-size:12px;text-align:left;padding:8px;border-bottom:1px solid #354560}
 .remote-hint{font-size:12px;color:#c2cde4}.remote-error{color:#ffb8b8!important}
 @media(max-width:660px){.remote-stats{grid-template-columns:1fr}.remote-control-box{padding:11px}.remote-actions button{flex:1 1 120px}}
+
+/* Comandos de notificação direcionados a uma única TV. */
+.remote-notifications{border:1px solid #506b98;background:#182a47;border-radius:12px;padding:14px;margin:15px 0;display:flex;flex-direction:column;gap:10px}
+.remote-notifications p{margin:0}.remote-notification-grid{display:flex;gap:12px;align-items:end;justify-content:space-between;flex-wrap:wrap}
+.remote-notifications label{display:flex;flex:1;min-width:200px;flex-direction:column;gap:6px;font-size:13px;color:#eaf2ff}
+.remote-notifications select,.remote-notifications textarea{width:100%;box-sizing:border-box;background:#101f35;color:#fff;border:1px solid #657fab;border-radius:8px;padding:10px;font:inherit}
+.remote-notifications textarea:focus-visible,.remote-notifications select:focus-visible{outline:3px solid #bd9fff;outline-offset:2px}
+.remote-notification-grid button{min-width:185px}
+@media(max-width:600px){.remote-notification-grid button{width:100%}}
