@@ -43,10 +43,11 @@ export default function Devices({ onChanged }) {
           <option value="">Online e offline</option><option value="true">Só online</option><option value="false">Só offline</option>
         </select>
       </div>
-      <Table><thead><tr><th>MAC / aparelho</th><th>Tipo</th><th>Conexão</th><th>Listas atuais</th><th>Parceiros</th><th>Situação dos vínculos</th><th /></tr></thead>
+      <Table><thead><tr><th>MAC / aparelho</th><th>Tipo</th><th>Conexão</th><th>Assistindo / IP</th><th>Listas atuais</th><th>Parceiros</th><th>Situação dos vínculos</th><th /></tr></thead>
         <tbody>{list.data.map(device => <tr key={device.deviceId}>
           <td><button type="button" className="device-mac-link mono" onClick={() => setRecord({ device, tab: "lists" })}>{device.mac}</button></td>
           <td><PlatformBadge platform={device.platform} /></td><td><OnlineBadge online={device.online} lastSeenAt={device.lastSeenAt} /></td>
+          <td><strong>{device.live?.playback?.title || '—'}</strong><div className="muted">{device.live?.online ? `IP: ${device.live.ip || 'indisponível'}` : 'Sem telemetria atual'}</div></td>
           <td><strong>{device.currentCount}</strong><div className="muted">{device.activeCount} ativa(s){device.removedCount > 0 ? ` · ${device.removedCount} removida(s)` : ""}</div></td>
           <td>{device.partners?.join(" · ") || "—"}</td>
           <td>{device.status === "unlinked" ? <span className="badge muted">Sem vínculo</span> : <Badge status={device.status} label={device.status === "active" ? "Com vínculo ativo" : device.status === "blocked" ? "Vínculos bloqueados" : "Vínculos removidos"} />}

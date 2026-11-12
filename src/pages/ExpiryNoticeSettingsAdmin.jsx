@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../api.js';
 
 const initial = {
-  enabled: false, daysBefore: 3, messageMode: 'service',
+  enabled: false, daysBefore: 3, messageMode: 'service', deliveryMode: 'daily',
   customBefore: 'Seu acesso vence em {prazo}.', customToday: 'Seu acesso vence hoje.',
 };
 const preview = (form, days) => {
@@ -76,6 +76,14 @@ export default function ExpiryNoticeSettingsAdmin({ partnerId, canWrite = false 
               </select>
             </label>
           </div>
+          <label className="field" style={{ display: 'block', marginTop: 12, marginBottom: 10 }}>
+            <span>Frequência dos avisos</span>
+            <select value={form.deliveryMode} onChange={e => set('deliveryMode', e.target.value)}>
+              <option value="daily">Uma vez por dia</option>
+              <option value="every_open">Toda vez que o aplicativo abrir e conectar</option>
+            </select>
+          </label>
+          <p className="muted" style={{ fontSize: 12 }}>Uma reconexão automática do WebSocket não repete o aviso. Ele continua aguardando a volta ao menu se houver vídeo em reprodução.</p>
           {form.messageMode === 'custom' && (
             <div className="row" style={{ gap: 15, marginTop: 10 }}>
               <label className="field" style={{ flex: '1 1 220px' }}>

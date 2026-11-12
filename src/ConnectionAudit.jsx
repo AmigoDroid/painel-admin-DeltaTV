@@ -85,6 +85,18 @@ export default function ConnectionAudit({path,onClose}){
        <div><small>RTT TV ↔ API</small><b>{remote.connection?.latencyMs!=null?`${remote.connection.latencyMs} ms`:'Aguardando medição'}</b><small>{remote.connection?.latencyMethod||'Latência de aplicação, não ICMP'}</small></div>
        <div><small>Build / controle</small><b>{remote.connection?.build||'Não informada'}</b><small>{remote.connection?.supported?'Comandos compatíveis':'Requer build 48 ou superior'}</small></div>
      </div>
+     <section className="remote-live-panel" aria-label="Informações ao vivo desta TV">
+       <div className="remote-head"><strong>TV em tempo real</strong><small>Dados efêmeros, sem armazenamento de IP ou título no histórico</small></div>
+       <div className="remote-live-grid">
+         <div><small>IP observado pela API</small><b>{remote.live?.online ? remote.live.ip || 'Indisponível' : 'TV fora do ar'}</b></div>
+         <div><small>Tempo do aplicativo aberto</small><b>{remote.live?.appActiveSeconds == null ? '—' : `${Math.floor(remote.live.appActiveSeconds / 3600)}h ${Math.floor((remote.live.appActiveSeconds % 3600)/60)}min`}</b></div>
+         <div><small>O que está assistindo</small><b>{remote.live?.playback?.title || 'Nenhuma reprodução informada'}</b><small>{remote.live?.playback ? `${({live:'Canal ao vivo',movie:'Filme',series:'Série'})[remote.live.playback.type] || 'Conteúdo'} · ${states[remote.live.playback.state]||remote.live.playback.state}` : 'Apenas enquanto o player estiver aberto'}</small></div>
+         <div><small>Posição / duração</small><b>{remote.live?.playback?.positionSeconds!=null ? `${Math.floor(remote.live.playback.positionSeconds / 60)} min` : '—'} / {remote.live?.playback?.durationSeconds ? `${Math.floor(remote.live.playback.durationSeconds / 60)} min` : 'Ao vivo / indisponível'}</b></div>
+         <div><small>Sessões de reprodução (24h / 7d)</small><b>{remote.live?.usage ? `${remote.live.usage.sessions24h} / ${remote.live.usage.sessions7d}` : '—'}</b><small>Contagem aproximada desde o início do processo</small></div>
+         <div><small>Qualidade do player</small><b>{remote.live?.playback?.bitrateKbps ? `${remote.live.playback.bitrateKbps} kbps` : '—'}</b><small>{remote.live?.playback?.startupMs!=null ? `Início: ${remote.live.playback.startupMs} ms` : 'Início: sem medição'}{remote.live?.playback?.bufferPercent!=null ? ` · Buffer ${remote.live.playback.bufferPercent}%` : ''}</small></div>
+       </div>
+       <p className="remote-hint">Os dados são fornecidos pela TV autenticada e podem ficar indisponíveis quando o player ou a conexão fecha. Em PM2 cluster, configure compartilhamento de estado ou uma única instância Node para a visão completa.</p>
+     </section>
      <div className="remote-actions">
        {remote.activationStatus==='active'&&<button type="button" disabled={!!commandBusy} onClick={()=>changeAccess('block')}>Bloquear lista na API</button>}
        {remote.activationStatus==='blocked'&&<button type="button" disabled={!!commandBusy} onClick={()=>changeAccess('unblock')}>Desbloquear lista na API</button>}

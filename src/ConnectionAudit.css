@@ -21,3 +21,11 @@
 .remote-notifications textarea:focus-visible,.remote-notifications select:focus-visible{outline:3px solid #bd9fff;outline-offset:2px}
 .remote-notification-grid button{min-width:185px}
 @media(max-width:600px){.remote-notification-grid button{width:100%}}
+
+/* Build 63 — visibilidade operacional, sem persistir hábitos de visualização */
+.remote-live-panel { margin: 14px 0; padding: 16px; border: 1px solid var(--border, #4446); border-radius: 14px; }
+.remote-live-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(175px,1fr)); gap: 10px; margin: 12px 0; }
+.remote-live-grid > div { padding: 11px; background: color-mix(in srgb,currentColor 5%,transparent); border-radius: 10px; min-width: 0; }
+.remote-live-grid small, .remote-live-grid b { display: block; overflow-wrap: anywhere; }
+.remote-live-grid small { opacity: .77; font-size: .77rem; margin-bottom: 5px; }
+.remote-live-grid b { font-size: .94rem; }

@@ -23,3 +23,5 @@
 
 /* Origem alcançável, mas com latência acima do limite: não confundir com queda. */
 .srv-state-slow, .srv-slow { color: #aa7618; }
+
+.srv-availability { grid-template-columns: repeat(3,minmax(0,1fr)); } .srv-availability small {display:block;opacity:.7;font-size:.72rem} @media(max-width:660px){.srv-availability{grid-template-columns:1fr}}
