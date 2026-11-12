@@ -304,7 +304,8 @@ function PartnerDetail({ id, onClose, onChanged }) {
 
   const what = p.kind === "content" ? "parceria" : "revenda";
   const tabList = [
-    ...(p.kind !== "content" ? [["stock", "Estoque de licenças"], ["clients", "Clientes"]] : []),
+    ...(p.kind !== "content" ? [["stock", "Estoque de licenças"]] : []),
+    ["clients", "Clientes e avisos"],
     ...(p.kind !== "reseller" ? [["commercial", "Contrato de conteúdo"]] : []),
     ["service-plan", "Plano de recursos"],
     ["codes", "Códigos"], ["providers", "Servidores IPTV"], ["devices", "Dispositivos"],
@@ -384,7 +385,7 @@ function PartnerDetail({ id, onClose, onChanged }) {
             </td></tr>)}
         </tbody></Table></>}
       {cur === "stock" && p.kind !== "content" && <StockAdmin partnerId={id} />}
-      {cur === "clients" && p.kind !== "content" && <ClientsPanel partnerId={id} />}
+      {cur === "clients" && <ClientsPanel partnerId={id} />}
       {cur === "users" && <UsersPanel partnerId={id} />}
       {cur === "devices" && <Table><thead><tr><th>MAC</th><th>Servidor</th><th>Entrega</th><th>Status</th><th>Ativado em</th><th /></tr></thead><tbody>
         {devices.map((a) => <tr key={a.id}><td>{a.mac}</td><td>{a.provider?.name || "—"}</td><td><DeliveryBadge mode={a.deliveryMode} fixed={a.deliveryModeFixed} /></td><td><Badge status={accessStatus(a)} /></td><td>{fmtDateTime(a.activatedAt)}</td><td className="actions">

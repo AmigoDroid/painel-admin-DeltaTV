@@ -22,7 +22,7 @@ function DueBadge({ c }) {
 }
 
 export function ClientsPanel({ partnerId: fixedPartnerId }) {
-  const canWrite = getAuth()?.user?.role !== "support";
+  const canWrite = ["admin", "superadmin"].includes(getAuth()?.user?.role);
   const { confirm } = useUi();
   const run = useAction();
   const [q, setQ] = useState("");
@@ -50,7 +50,7 @@ export function ClientsPanel({ partnerId: fixedPartnerId }) {
       <div className="toolbar">
         <input placeholder="Buscar por nome, telefone, endereço, MAC ou revenda" value={q} onChange={(e) => setQ(e.target.value)} />
         {!fixedPartnerId && (
-          <PartnerPicker kind="reseller" value={list.params.partnerId} emptyLabel="Todas as revendas" onChange={(v) => list.filter({ partnerId: v, filter: list.params.filter === "unregistered" ? "" : list.params.filter })} />
+          <PartnerPicker value={list.params.partnerId} emptyLabel="Todas as parcerias e revendas" onChange={(v) => list.filter({ partnerId: v, filter: list.params.filter === "unregistered" ? "" : list.params.filter })} />
         )}
         <select value={list.params.filter} onChange={(e) => list.filter({ filter: e.target.value })}>
           {Object.entries(FILTER_LABEL).map(([k, v]) => <option key={k} value={k === "all" ? "" : k}>{v}</option>)}
@@ -59,7 +59,7 @@ export function ClientsPanel({ partnerId: fixedPartnerId }) {
         {canWrite && <button className="btn primary" onClick={() => setForm({})}>Novo cliente</button>}
       </div>
       {partnerId && <ExpiryNoticeSettingsAdmin key={partnerId} partnerId={partnerId} canWrite={canWrite} />}
-      {!partnerId && <p className="muted" style={{ marginTop: 8 }}>Para configurar os avisos de vencimento, selecione uma revenda no filtro acima. A mesma regra ficará visível para ela no portal.</p>}
+      {!partnerId && <p className="muted" style={{ marginTop: 8 }}>Para configurar os avisos, selecione uma revenda ou parceiro no filtro acima. A regra ficará disponível também no respectivo portal.</p>}
       <Table>
         <thead><tr>{!fixedPartnerId && <th>Revenda</th>}<th>Cliente</th><th>MAC</th><th>Contato</th><th>Valor</th><th>Vencimento</th><th>Dispositivo</th><th /></tr></thead>
         <tbody>{list.data.map((c) => (
@@ -114,7 +114,7 @@ function ClientForm({ client, prefill, fixedPartnerId, defaultPartnerId, onClose
     <Modal title={edit ? "Editar cliente" : "Novo cliente"} onClose={onClose}>
       {!fixedPartnerId && (
         <Field label="Revenda" hint={edit ? "Trocar a revenda move a ficha (o MAC não pode já ter ficha na revenda de destino)." : undefined}>
-          <PartnerPicker kind="reseller" value={f.partnerId} onChange={(v) => setF((f) => ({ ...f, partnerId: v }))} />
+          <PartnerPicker value={f.partnerId} onChange={(v) => setF((f) => ({ ...f, partnerId: v }))} />
         </Field>
       )}
       <div className="row"><Field label="Nome"><input value={f.name} onChange={set("name")} /></Field><Field label="MAC"><input value={f.mac} onChange={set("mac")} placeholder="AA:BB:CC:DD:EE:FF" /></Field></div>
@@ -130,7 +130,7 @@ function ClientForm({ client, prefill, fixedPartnerId, defaultPartnerId, onClose
 export default function Clients() {
   return (
     <>
-      <div className="page-head"><h2>Clientes das revendas</h2></div>
+      <div className="page-head"><h2>Clientes das revendas e parceiros</h2></div>
       <ClientsPanel />
     </>
   );

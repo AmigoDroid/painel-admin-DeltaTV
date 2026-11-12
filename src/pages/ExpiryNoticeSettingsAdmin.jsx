@@ -40,7 +40,7 @@ export default function ExpiryNoticeSettingsAdmin({ partnerId, canWrite = false 
     try {
       const saved = await api(`/admin/clients/expiry-notice-settings/${partnerId}`, { method: 'PUT', body: form });
       setForm({ ...initial, ...saved });
-      setMessage('Regra atualizada pelo painel administrador. A revenda verá as mesmas preferências.');
+      setMessage('Regra atualizada. O portal da parceria ou revenda verá as mesmas preferências.');
     } catch (e) { setError(e.message || 'Falha ao salvar a regra.'); }
     finally { setSaving(false); }
   };
@@ -49,7 +49,7 @@ export default function ExpiryNoticeSettingsAdmin({ partnerId, canWrite = false 
       <div className="row" style={{ alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
         <div>
           <h3 style={{ margin: 0 }}>Avisos de vencimento na TV</h3>
-          <p className="muted" style={{ margin: '5px 0 0' }}>Uma configuração para todos os clientes desta revenda. O aviso usa a data cadastrada no cliente, não a licença da TV.</p>
+          <p className="muted" style={{ margin: '5px 0 0' }}>Uma regra para todos os clientes desta parceria ou revenda. O aviso usa o vencimento da ficha do cliente, não o da licença DeltaTV.</p>
         </div>
       </div>
       {error && <p role="alert" className="error">{error}</p>}
@@ -99,9 +99,9 @@ export default function ExpiryNoticeSettingsAdmin({ partnerId, canWrite = false 
             <p className="muted" style={{ margin: 0 }}>No dia: {preview(form, 0)}</p>
           </div>
           {canWrite
-            ? <div className="actions"><button type="submit" className="btn primary" disabled={saving}>{saving ? 'Salvando…' : 'Salvar configurações desta revenda'}</button></div>
+            ? <div className="actions"><button type="submit" className="btn primary" disabled={saving}>{saving ? 'Salvando…' : 'Salvar configurações desta empresa'}</button></div>
             : <p className="muted">Seu perfil tem acesso somente à leitura dessas configurações.</p>}
-          <p className="muted" style={{ fontSize: 12 }}>A regra é compartilhada com o portal da revenda selecionada e aplica-se apenas aos clientes dela. Avisos não interrompem a reprodução. TVs antigas sem suporte continuam funcionando normalmente.</p>
+          <p className="muted" style={{ fontSize: 12 }}>A regra é compartilhada com o portal da empresa selecionada e aplica-se exclusivamente aos clientes vinculados a ela. Avisos não interrompem a reprodução. TVs antigas sem suporte continuam funcionando normalmente.</p>
           </fieldset>
         </form>
       )}
