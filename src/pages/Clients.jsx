@@ -1,4 +1,5 @@
 import PartnerPicker from "../PartnerPicker.jsx";
+import ExpiryNoticeSettingsAdmin from "./ExpiryNoticeSettingsAdmin.jsx";
 import { useEffect, useState } from "react";
 import { api, getAuth } from "../api.js";
 import { Badge, Empty, Field, Modal, Pager, Table, fmtDate, fmtMoney, formatMac, toCents, useAction, useDebounced, useList, useLoad, useUi, RowMenu } from "../ui.jsx";
@@ -57,6 +58,8 @@ export function ClientsPanel({ partnerId: fixedPartnerId }) {
         </select>
         {canWrite && <button className="btn primary" onClick={() => setForm({})}>Novo cliente</button>}
       </div>
+      {partnerId && <ExpiryNoticeSettingsAdmin key={partnerId} partnerId={partnerId} canWrite={canWrite} />}
+      {!partnerId && <p className="muted" style={{ marginTop: 8 }}>Para configurar os avisos de vencimento, selecione uma revenda no filtro acima. A mesma regra ficará visível para ela no portal.</p>}
       <Table>
         <thead><tr>{!fixedPartnerId && <th>Revenda</th>}<th>Cliente</th><th>MAC</th><th>Contato</th><th>Valor</th><th>Vencimento</th><th>Dispositivo</th><th /></tr></thead>
         <tbody>{list.data.map((c) => (
