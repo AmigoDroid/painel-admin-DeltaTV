@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, getAuth } from "../api.js";
+import EasyStart from "../EasyStart.jsx";
 import { Badge, Table, fmtDate, fmtDateTime, fmtMoney } from "../ui.jsx";
 
 /* Ícones de traço simples, no mesmo estilo do menu. */
@@ -154,6 +155,7 @@ export default function Dashboard() {
         <div><h2>{first ? `Olá, ${first}` : "Visão geral"}</h2><p className="muted page-sub dash-date">{today}</p></div>
       </div>
 
+      <EasyStart role="admin" onNavigate={(id) => { window.location.hash = id; }} />
       <div className={`attn ${attention.length ? "" : "ok"}`}>
         {attention.length
           ? <>

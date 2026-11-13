@@ -3,6 +3,9 @@ import { useEffect, useRef, useState } from "react";
 import { api, getAuth, login, logout } from "./api.js";
 import { UiProvider, Field, useAction, BrandMark } from "./ui.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
+import { useSimpleMode } from "./useSimpleMode.js";
+import { EasyPageGuide } from "./EasyStart.jsx";
+import "./easy-start.css";
 import ServerMonitor from "./pages/ServerMonitor.jsx";
 import VpsMonitor from "./pages/VpsMonitor.jsx";
 import VpsFiles from "./pages/VpsFiles.jsx";
@@ -34,9 +37,9 @@ const WebAccess = () => <WebAccessPage admin />;
 const PAGES = {
   dashboard: ["Visão geral", Dashboard], vpsmonitor: ["Servidor / VPS", VpsMonitor], vpsfiles: ["Arquivos da VPS", VpsFiles],
   webaccess: ["Player Web", WebAccess], whiteLabel: ["Aplicativos white-label", WhiteLabel],
-  licenses: ["Licenças", Licenses], devices: ["Dispositivos", Devices], unlinked: ["Sem vínculo", Unlinked],
+  licenses: ["Licenças das TVs", Licenses], devices: ["TVs e dispositivos", Devices], unlinked: ["TVs sem configuração", Unlinked],
   partners: ["Parceiros", Partners], servermonitor: ["Monitoramento", ServerMonitor], sources: ["Fontes de conteúdo", Sources],
-  resellers: ["Revendas", Resellers], support: ["Atendimento simples", () => <SupportCenter base="/admin" />], trash: ["Lixeira", PartnerTrash], clients: ["Clientes", Clients], credits: ["Créditos", Credits], downloads: ["Downloads e links", Downloads],
+  resellers: ["Revendas", Resellers], support: ["Resolver problema da TV", () => <SupportCenter base="/admin" />], trash: ["Lixeira", PartnerTrash], clients: ["Clientes", Clients], credits: ["Créditos", Credits], downloads: ["Downloads e links", Downloads],
   billing: ["Financeiro", Billing], pix: ["Pix", Pix], pricing: ["Planos e valores", PlansAndPricing],
   help: ["Central de Ajuda", HelpManagement], users: ["Usuários", Users], loginhistory: ["Histórico de login", LoginHistory], notifications: ["Notificações", Notifications], mail: ["E-mails", Mail], audit: ["Auditoria", Audit],
 };
@@ -143,7 +146,9 @@ function UserMenu({ user }) {
   );
 }
 
+const SIMPLE_ADMIN = new Set(["dashboard", "support", "clients", "devices", "resellers", "licenses", "billing", "servermonitor", "help"]);
 function Shell({ user }) {
+  const [simpleMode, setSimpleMode] = useSimpleMode("admin");
   // Itens do menu são conveniência: cada rota é protegida por permissão no backend.
   const hidden = (k) => ((k === "whiteLabel" || k === "help") && user.role !== "superadmin") || ((k === "vpsmonitor" || k === "vpsfiles" || k === "pricing" || k === "trash") && user.role !== "superadmin") || (user.role === "support" && k === "audit") || ((k === "users" || k === "loginhistory" || k === "mail" || k === "notifications") && user.role !== "superadmin");
   const menu = Object.entries(PAGES).filter(([k]) => !hidden(k));
@@ -206,9 +211,10 @@ function Shell({ user }) {
     <div className="layout">
       <aside className={`sidebar ${open ? "open" : ""}`} id="menu-principal">
         <div className="brand"><BrandMark size={32} /><div><strong>DeltaTV</strong><span>Administração</span></div><button type="button" className="sidebar-close" aria-label="Fechar menu" onClick={() => setOpen(false)}>×</button></div>
+        <button type="button" className="easy-mode-button" aria-pressed={!simpleMode} onClick={() => setSimpleMode((s) => !s)}>{simpleMode ? "⚙ Ver todas as opções" : "✓ Voltar ao modo simples"}</button>
         <nav className="nav-scroll" aria-label="Menu principal">
           {GROUPS.map((g) => {
-            const items = g.items.filter(allowed);
+            const items = g.items.filter((k) => allowed(k) && (!simpleMode || SIMPLE_ADMIN.has(k) || page === k));
             if (!items.length) return null;
             return (
               <div className="nav-group" key={g.label || "top"}>
@@ -232,9 +238,13 @@ function Shell({ user }) {
           </button>
           <strong className="topbar-title">{PAGES[page][0]}</strong>
           {badges.unlinked > 0 || badges.resellers > 0 ? <span className="count" aria-label="Itens aguardando">{(badges.unlinked || 0) + (badges.resellers || 0)}</span> : null}
+          <button type="button" className="easy-mode-button" aria-pressed={!simpleMode} onClick={() => setSimpleMode((s) => !s)}>{simpleMode ? "Modo simples · mostrar tudo" : "Modo completo · simplificar"}</button>
           <UserMenu user={user} />
         </div>
-        <main className="content"><Current onChanged={refreshCounts} /></main>
+        <main className="content">
+          {simpleMode && page !== "dashboard" && <EasyPageGuide role="admin" page={page} onBack={() => go("dashboard")} />}
+          <Current onChanged={refreshCounts} />
+        </main>
       </div>
     </div>
   );
