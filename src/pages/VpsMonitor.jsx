@@ -104,7 +104,7 @@ export default function VpsMonitor() {
   return <div className="vps-page">
     <div className="page-head vps-heading">
       <div><h2>Monitoramento da VPS</h2><p className="muted">CPU, memória, armazenamento, tráfego de rede e processo da API.</p></div>
-      <div className="vps-actions"><span className={`badge ${live ? "ok" : "info"}`}>{live ? "Ao vivo · WebSocket" : "API · sincronização"}</span><button className="btn sm" type="button" onClick={refresh}>Atualizar agora</button></div>
+      <div className="vps-actions"><a className="btn sm" href="#vpsfiles">Explorar arquivos</a><span className={`badge ${live ? "ok" : "info"}`}>{live ? "Ao vivo · WebSocket" : "API · sincronização"}</span><button className="btn sm" type="button" onClick={refresh}>Atualizar agora</button></div>
     </div>
     {error && <div className="vps-error" role="alert">{error} {metrics && "Exibindo a última medição recebida."}</div>}
     {!metrics && !error && <div className="card" role="status">Carregando indicadores da VPS…</div>}
