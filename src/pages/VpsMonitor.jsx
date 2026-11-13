@@ -31,9 +31,14 @@ function UsageCard({ name, value, help, usage, color = "violet", extra, icon }) 
   </section>;
 }
 
-function Trend({ values, label }) {
-  const points = values.filter((v) => typeof v === "number");
-  const polyline = points.length < 2 ? "" : points.map((p, i) => `${(i / (points.length - 1)) * 100},${100 - Math.min(100, Math.max(0, p))}`).join(" ");
+function Trend({ history, metricKey, label }) {
+  const end = history.at(-1)?.at ?? Date.now();
+  const points = history.filter((row) => Number.isFinite(row[metricKey]));
+  // Posição horizontal reflete o tempo real, não apenas a quantidade de amostras.
+  const polyline = points.length < 2 ? "" : points.map((row) => {
+    const x = Math.max(0, Math.min(100, 100 * (row.at - (end - 120000)) / 120000));
+    return `${x.toFixed(2)},${(100 - Math.max(0, Math.min(100, row[metricKey]))).toFixed(2)}`;
+  }).join(" ");
   return <div className="card vps-trend"><div className="vps-trend-heading"><h3>{label}</h3><span>Últimos 2 minutos</span></div>
     {polyline ? <svg className="vps-chart" viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label={`Histórico de ${label}`}><path d="M0 25H100 M0 50H100 M0 75H100" stroke="currentColor" strokeWidth="0.4" opacity=".2"/><polyline points={polyline} fill="none" stroke="currentColor" strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round"/></svg>
       : <div className="vps-chart-empty">Coletando amostras…</div>}
@@ -44,9 +49,11 @@ export default function VpsMonitor() {
   const [metrics, setMetrics] = useState(null);
   const [error, setError] = useState("");
   const [wsUpdated, setWsUpdated] = useState(0);
+  const [statusNow, setStatusNow] = useState(Date.now());
   const [history, setHistory] = useState([]);
   const wsLast = useRef(0);
   const restBusy = useRef(false);
+  const restLast = useRef(0);
   const mounted = useRef(false);
   const lastId = useRef(null);
 
@@ -59,12 +66,13 @@ export default function VpsMonitor() {
     if (source === "ws") { wsLast.current = Date.now(); setWsUpdated(wsLast.current); }
     if (lastId.current !== data.sampledAt) {
       lastId.current = data.sampledAt;
-      setHistory((old) => [...old.filter(row => row.at >= at - 120000).slice(-119), { at, cpu: data.cpu?.percent, memory: percent(data.memory?.used, data.memory?.total), receiveMbps: mbps(data.network?.receiveBytesPerSecond), sendMbps: mbps(data.network?.sendBytesPerSecond) }]);
+      setHistory((old) => [...old.filter(row => row.at >= at - 120000).slice(-299), { at, cpu: data.cpu?.percent, memory: percent(data.memory?.used, data.memory?.total), receiveMbps: mbps(data.network?.receiveBytesPerSecond), sendMbps: mbps(data.network?.sendBytesPerSecond) }]);
     }
   }, []);
   const refresh = useCallback(async () => {
     if (restBusy.current) return;
     restBusy.current = true;
+    restLast.current = Date.now();
     try {
       const data = await api("/admin/system/metrics");
       if (mounted.current) push(data, "rest");
@@ -81,11 +89,13 @@ export default function VpsMonitor() {
     document.addEventListener("visibilitychange", onVisibility);
     subscribe(!document.hidden);
     void refresh();
+    // Fallback HTTP somente se o fluxo WebSocket estiver sem amostras.
+    // Limita a uma tentativa a cada 5 segundos durante falha de rede.
     const timer = setInterval(() => {
       if (document.hidden) return;
-      // Se os eventos estiverem chegando, não criar requisições REST desnecessárias.
-      if (Date.now() - wsLast.current > 13000) void refresh();
-    }, 20000);
+      setStatusNow(Date.now());
+      if (Date.now() - wsLast.current > 3000 && Date.now() - restLast.current >= 5000) void refresh();
+    }, 1000);
     return () => {
       mounted.current = false;
       clearInterval(timer);
@@ -99,7 +109,7 @@ export default function VpsMonitor() {
   const memoryUse = percent(metrics?.memory?.used, metrics?.memory?.total);
   const diskUse = percent(metrics?.storage?.used, metrics?.storage?.total);
   const swapUse = percent(metrics?.swap?.used, metrics?.swap?.total);
-  const live = wsUpdated > 0 && Date.now() - wsUpdated < 15000;
+  const live = wsUpdated > 0 && statusNow - wsUpdated < 3000;
 
   return <div className="vps-page">
     <div className="page-head vps-heading">
@@ -116,8 +126,8 @@ export default function VpsMonitor() {
         <UsageCard name="Swap" icon="⇄" color={swapUse >= 70 ? "amber" : "violet"} value={size(metrics.swap?.used)} usage={swapUse} help={`Total: ${size(metrics.swap?.total)}`} extra={metrics.swap?.total ? "Memória de troca" : "Sem swap detectada"} />
       </div>
       <div className="vps-trends">
-        <Trend values={history.map((v) => v.cpu)} label="Histórico de CPU" />
-        <Trend values={history.map((v) => v.memory)} label="Histórico de RAM" />
+        <Trend history={history} metricKey="cpu" label="Histórico de CPU" />
+        <Trend history={history} metricKey="memory" label="Histórico de RAM" />
       </div>
       <VpsNetwork network={metrics.network} transmission={metrics.transmission} history={history}/>
       <div className="card vps-details">
@@ -129,7 +139,7 @@ export default function VpsMonitor() {
           <div><small>Tempo ativo da VPS</small><strong>{uptime(metrics.uptimeSeconds)}</strong></div>
         </div>
       </div>
-      <p className="vps-note">Última medição: {new Date(metrics.sampledAt).toLocaleString("pt-BR")} · Atualização WebSocket a cada 5 segundos enquanto esta página estiver aberta. CPU inicial pode levar uma amostra para aparecer. O disco representa o sistema de arquivos raiz da VPS.</p>
+      <p className="vps-note">Última medição: {new Date(metrics.sampledAt).toLocaleTimeString("pt-BR", { hour12: false, fractionalSecondDigits: 3 })} · {live ? `WebSocket: amostra a cada ${metrics.streamIntervalMs || 500} ms.` : "Sem amostras WebSocket recentes; fallback HTTP habilitado."} CPU e rede representam médias entre amostras; disco é coletado aproximadamente a cada segundo. CPU inicial pode levar uma amostra para aparecer. O disco representa o sistema de arquivos raiz da VPS.</p>
     </>}
   </div>;
 }
