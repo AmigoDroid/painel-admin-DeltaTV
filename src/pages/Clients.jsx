@@ -72,11 +72,17 @@ export function ClientsPanel({ partnerId: fixedPartnerId }) {
             <td><DueBadge c={c} /></td>
             <td>{c.device ? <><Badge status={c.device.status} />{c.device.licenseExpiresAt && <div className="muted">licença até {fmtDate(c.device.licenseExpiresAt)}</div>}</> : <span className="muted">Só cadastro</span>}</td>
             <td className="actions">
-              <RowMenu items={!canWrite ? [] : c.clientId ? [
-                { label: "Editar", onClick: () => setForm({ client: c }) },
-                { label: "Excluir", danger: true, onClick: () => remove(c) },
-              ] : [
-                { label: "Cadastrar", onClick: () => setForm({ prefill: { partnerId: c.partnerId, mac: c.mac } }) },
+              <RowMenu items={[
+                ...(c.clientId || c.device?.activationId ? [{ label: "Diagnosticar / ficha única", onClick: () => {
+                  const target = c.clientId ? { type: 'client', id: c.clientId } : { type: 'activation', id: c.device.activationId };
+                  sessionStorage.setItem('deltatv-support-open', JSON.stringify(target));
+                  location.hash = 'support';
+                } }] : []),
+                ...(canWrite && c.clientId ? [
+                  { label: "Editar", onClick: () => setForm({ client: c }) },
+                  { label: "Excluir", danger: true, onClick: () => remove(c) },
+                ] : []),
+                ...(canWrite && !c.clientId ? [{ label: "Cadastrar", onClick: () => setForm({ prefill: { partnerId: c.partnerId, mac: c.mac } }) }] : []),
               ]} />
             </td>
           </tr>))}</tbody>

@@ -19,6 +19,7 @@ import Credits from "./pages/Credits.jsx";
 import Audit from "./pages/Audit.jsx";
 import DeviceAccess from "./pages/DeviceAccess.jsx";
 import Clients from "./pages/Clients.jsx";
+import SupportCenter from "./pages/SupportCenter.jsx";
 import Users from "./pages/Users.jsx";
 import LoginHistory from "./pages/LoginHistory.jsx";
 import Mail from "./pages/Mail.jsx";
@@ -35,7 +36,7 @@ const PAGES = {
   webaccess: ["Player Web", WebAccess], whiteLabel: ["Aplicativos white-label", WhiteLabel],
   licenses: ["Licenças", Licenses], devices: ["Dispositivos", Devices], unlinked: ["Sem vínculo", Unlinked],
   partners: ["Parceiros", Partners], servermonitor: ["Monitoramento", ServerMonitor], sources: ["Fontes de conteúdo", Sources],
-  resellers: ["Revendas", Resellers], trash: ["Lixeira", PartnerTrash], clients: ["Clientes", Clients], credits: ["Créditos", Credits], downloads: ["Downloads e links", Downloads],
+  resellers: ["Revendas", Resellers], support: ["Atendimento simples", () => <SupportCenter base="/admin" />], trash: ["Lixeira", PartnerTrash], clients: ["Clientes", Clients], credits: ["Créditos", Credits], downloads: ["Downloads e links", Downloads],
   billing: ["Financeiro", Billing], pix: ["Pix", Pix], pricing: ["Planos e valores", PlansAndPricing],
   help: ["Central de Ajuda", HelpManagement], users: ["Usuários", Users], loginhistory: ["Histórico de login", LoginHistory], notifications: ["Notificações", Notifications], mail: ["E-mails", Mail], audit: ["Auditoria", Audit],
 };
@@ -43,9 +44,10 @@ const PAGES = {
 // Menu por área: quem é de conteúdo (Parceiros) fica separado de quem vende licença (Revendas e seus clientes).
 const GROUPS = [
   { label: null, items: ["dashboard"] },
-  { label: "Licenciamento", items: ["licenses", "devices", "unlinked", "webaccess"] },
+  { label: "Licenciamento", items: ["licenses", "unlinked", "webaccess"] },
   { label: "Parceiros", items: ["partners", "servermonitor", "sources", "whiteLabel"] },
-  { label: "Revendas", items: ["resellers", "clients", "credits", "downloads"] },
+  { label: "Atendimento", items: ["support", "clients", "devices"] },
+  { label: "Revendas", items: ["resellers", "credits", "downloads"] },
   { label: "Financeiro", items: ["pricing", "billing", "pix"] },
   { label: "Sistema", items: ["vpsmonitor", "vpsfiles", "trash", "help", "users", "loginhistory", "notifications", "mail", "audit"] },
 ];
@@ -60,6 +62,7 @@ const ICONS = {
   servermonitor: <><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M6 14h3l2-5 3 8 2-4h2"/></>,
   resellers: <><path d="M4 9l1.5-5h13L20 9" /><path d="M4 9a2.5 2.5 0 005 0 2.5 2.5 0 005 0 2.5 2.5 0 005 0" /><path d="M5 12v8h14v-8M10 20v-5h4v5" /></>,
   clients: <><circle cx="12" cy="8" r="4" /><path d="M4 21c.8-4 4-6 8-6s7.2 2 8 6" /></>,
+  support: <><circle cx="10" cy="10" r="7"/><path d="m15 15 6 6M7 10h6M10 7v6"/></>,
   devices: <><rect x="3" y="5" width="18" height="12" rx="2" /><path d="M8 21h8M12 17v4" /></>,
   unlinked: <><path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1" /><path d="M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1" /><path d="M4 4l16 16" /></>,
   sources: <><ellipse cx="12" cy="6" rx="8" ry="3" /><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6" /></>,
