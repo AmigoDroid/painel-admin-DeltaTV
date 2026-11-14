@@ -1,3 +1,5 @@
+import WizardProgress from "@deltatv/ui/WizardProgress";
+import { useTaskIntent } from "@deltatv/ui/task-intent";
 import PartnerPicker from "../PartnerPicker.jsx";
 import ExpiryNoticeSettingsAdmin from "./ExpiryNoticeSettingsAdmin.jsx";
 import { useEffect, useState } from "react";
@@ -29,6 +31,7 @@ export function ClientsPanel({ partnerId: fixedPartnerId }) {
   const dq = useDebounced(q);
   const list = useList("/admin/clients", { q: "", filter: "", partnerId: fixedPartnerId || "" });
   const [form, setForm] = useState(null); // null | { client? , prefill? }
+  useTaskIntent("clients", "client.create", () => { if (canWrite) setForm({}); });
   const partnerId = fixedPartnerId || list.params.partnerId;
   const { data: sum, reload: reloadSum } = useLoad(() => api("/admin/clients/summary", { query: { partnerId } }), [partnerId]);
   useEffect(() => { list.filter({ q: dq }); /* eslint-disable-next-line */ }, [dq]);
@@ -98,12 +101,20 @@ function ClientForm({ client, prefill, fixedPartnerId, defaultPartnerId, onClose
   const run = useAction();
   const { toast } = useUi();
   const edit = !!client;
+  const [step, setStep] = useState(0);
   const [f, setF] = useState({
     partnerId: client?.partnerId || prefill?.partnerId || fixedPartnerId || defaultPartnerId || "",
     mac: client?.mac || prefill?.mac || "", name: client?.name || "", phone: client?.phone || "", address: client?.address || "", notes: client?.notes || "",
     price: client?.priceCents != null ? (client.priceCents / 100).toFixed(2).replace(".", ",") : "", dueDate: client?.dueDate || "",
   });
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  const nextStep = () => {
+    if (f.name.trim().length < 2) return toast('Informe o nome do cliente.', 'bad');
+    if (!formatMac(f.mac)) return toast('MAC inválido. Ex.: AA:BB:CC:DD:EE:FF.', 'bad');
+    if (!f.partnerId) return toast('Escolha a revenda responsável.', 'bad');
+    if (step===1 && f.price.trim() && toCents(f.price) === null) return toast('Valor inválido. Ex.: 35,00.', 'bad');
+    setStep(v=>Math.min(2,v+1));
+  };
   const submit = async () => {
     const mac = formatMac(f.mac);
     if (!mac) return toast("MAC inválido. Use o formato AA:BB:CC:DD:EE:FF.", "bad");
@@ -117,18 +128,25 @@ function ClientForm({ client, prefill, fixedPartnerId, defaultPartnerId, onClose
     if (r) onSaved();
   };
   return (
-    <Modal title={edit ? "Editar cliente" : "Novo cliente"} onClose={onClose}>
+    <Modal title={edit ? "Editar cliente" : "Cadastrar cliente"} onClose={onClose}>
+      {!edit && <><WizardProgress steps={['Identificação','Informações opcionais','Confirmar']} step={step}/><p className="muted">Associe o cliente ao MAC da TV. A ativação e a licença são operações separadas.</p></>}
+      {(edit || step === 0) && <>
       {!fixedPartnerId && (
         <Field label="Revenda" hint={edit ? "Trocar a revenda move a ficha (o MAC não pode já ter ficha na revenda de destino)." : undefined}>
           <PartnerPicker value={f.partnerId} onChange={(v) => setF((f) => ({ ...f, partnerId: v }))} />
         </Field>
       )}
       <div className="row"><Field label="Nome"><input value={f.name} onChange={set("name")} /></Field><Field label="MAC"><input value={f.mac} onChange={set("mac")} placeholder="AA:BB:CC:DD:EE:FF" /></Field></div>
+      </>}
+      {(edit || step === 1) && <>
       <div className="row"><Field label="Telefone"><input value={f.phone} onChange={set("phone")} /></Field><Field label="Valor mensal (R$)"><input value={f.price} onChange={set("price")} placeholder="35,00" /></Field></div>
       <Field label="Endereço"><input value={f.address} onChange={set("address")} /></Field>
       <Field label="Vencimento"><input type="date" value={f.dueDate} onChange={set("dueDate")} /></Field>
       <Field label="Observações"><textarea rows={3} value={f.notes} onChange={set("notes")} /></Field>
-      <div className="actions"><button className="btn" onClick={onClose}>Cancelar</button><button className="btn primary" disabled={!f.name || !f.mac} onClick={submit}>Salvar</button></div>
+      </>}
+      {!edit && step === 2 && <section className="card" aria-label="Revisar dados"><h3>Confira antes de salvar</h3><p><b>Cliente:</b> {f.name}</p><p><b>MAC:</b> {f.mac}</p><p><b>Valor mensal:</b> {f.price || 'Não informado'}</p><p><b>Vencimento:</b> {f.dueDate || 'Não informado'}</p><p className="muted">Esta etapa cadastra a ficha. Ela não gera cobranças nem ativa automaticamente a TV.</p></section>}
+      <div className="actions"><button type="button" className="btn" onClick={step > 0 && !edit ? () => setStep(v=>v-1) : onClose}>{step > 0 && !edit ? 'Voltar' : 'Cancelar'}</button>
+      {edit || step===2 ? <button type="button" className="btn primary" disabled={!f.name || !f.mac} onClick={submit}>Salvar cliente</button> : <button type="button" className="btn primary" onClick={nextStep}>Continuar</button>}</div>
     </Modal>
   );
 }

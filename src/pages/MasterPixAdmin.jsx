@@ -1,7 +1,8 @@
 import {useCallback,useEffect,useState} from 'react';
 import {api} from '../api.js';
+import { toCents } from '@deltatv/ui/money';
 const brl=v=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(v||0)/100);
-const centsOf=s=>{const p=String(s).trim().replace(',','.');if(!/^\d+([.]\d{1,2})?$/.test(p))return 0;const [a,b='']=p.split('.');return Number(a)*100+Number(b.padEnd(2,'0'));};
+const centsOf = value => toCents(value);
 export default function MasterPixAdmin({id}){
   const [settings,setSettings]=useState(null),[prices,setPrices]=useState([]),[orders,setOrders]=useState([]);
   const [token,setToken]=useState(''),[secret,setSecret]=useState(''),[currentPassword,setCurrentPassword]=useState(''),[form,setForm]=useState({months:'12',price:'10,00'});
@@ -37,7 +38,7 @@ export default function MasterPixAdmin({id}){
     <div className="row" style={{gap:8,flexWrap:'wrap',alignItems:'end'}}>
       <label>Meses<input type="number" min="1" max="120" value={form.months} onChange={e=>setForm(v=>({...v,months:e.target.value}))}/></label>
       <label>R$ por licença<input value={form.price} onChange={e=>setForm(v=>({...v,price:e.target.value}))}/></label>
-      <button className="btn primary" disabled={busy||!centsOf(form.price)} onClick={()=>act(()=>api(`/admin/network/master-pix/accounts/${id}/prices`,{method:'PUT',body:{months:Number(form.months),unitPriceCents:centsOf(form.price),active:true}}),'Preço atualizado.')}>Salvar</button>
+      <button className="btn primary" disabled={busy||!(centsOf(form.price) > 0)} onClick={()=>act(()=>api(`/admin/network/master-pix/accounts/${id}/prices`,{method:'PUT',body:{months:Number(form.months),unitPriceCents:centsOf(form.price),active:true}}),'Preço atualizado.')}>Salvar</button>
     </div>
     <div>{prices.map(p=><span key={p.months} style={{display:'inline-block',padding:6}}>{p.months} meses: {brl(p.unitPriceCents)} ({p.active?'ativo':'pausado'})</span>)}</div>
     <details><summary>Cobranças Pix deste Master ({orders.length})</summary>

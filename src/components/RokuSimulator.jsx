@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import './roku-simulator.css';
-import { SCREEN_DEFAULTS } from '../appearance-screen-settings.js';
+import { SCREEN_DEFAULTS } from '@deltatv/ui/appearance';
 
 // This is a browser-based visual/navigation prototype. It does not execute BrightScript,
 // contact IPTV servers or claim to be the Roku emulator/certification environment.

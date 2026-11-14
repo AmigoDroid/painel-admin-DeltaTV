@@ -394,3 +394,8 @@ pre,code,.mono{overflow-wrap:anywhere;word-break:break-word}
 .partner-list-name{min-width:0;overflow-wrap:anywhere}
 .partner-list-name .muted{font-size:12px;margin-top:3px}
 @media(max-width:700px){.partner-list-avatar{width:34px;height:34px;min-width:34px;font-size:12px}.partner-list-identity{gap:8px}}
+
+/* Contraste consistente da busca compartilhada no tema escuro. */
+.task-finder{--ui-surface:#19263e;--ui-text:#f1f6ff;--ui-border:#5b7096;--ui-accent:#a49af9;--ui-hover:#304267}
+
+.device-workspace{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:14px}.device-license-summary{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid var(--line-soft)}.device-license-summary:last-child{border-bottom:0}

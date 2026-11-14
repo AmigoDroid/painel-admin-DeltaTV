@@ -1,6 +1,6 @@
 /** Catálogo de ações e sinônimos. Rotas existentes, nunca cria autorizações. */
 export const TASKS = [
-  {"label": "Cadastrar cliente", "route": "clients", "description": "Adicionar ou localizar um cliente e seus dispositivos", "keywords": ["novo", "cliente", "usuario", "cadastro", "cliente"]},
+  {"label": "Cadastrar cliente", "actionId":"client.create", "route": "clients", "description": "Adicionar ou localizar um cliente e seus dispositivos", "keywords": ["novo", "cliente", "usuario", "cadastro", "cliente"]},
   {"label": "Cadastrar revenda", "route": "resellers", "description": "Cadastrar ou aprovar uma revenda", "keywords": ["nova", "revenda", "revendedor", "registro", "convite"]},
   {"label": "Cadastrar parceiro", "route": "partners", "description": "Gerenciar parceiros de conteúdo e pré-cadastros", "keywords": ["novo", "parceiro", "servidor"]},
   {"label": "Localizar dispositivo por MAC", "route": "devices", "description": "Buscar TVs e consultar detalhes", "keywords": ["mac", "aparelho", "tv", "localizar"]},
@@ -17,5 +17,6 @@ export const TASKS = [
   {"label": "Consultar conexões dos servidores", "route": "servermonitor", "description": "Saúde e latência das fontes", "keywords": ["link", "url", "origem", "offline"]},
   {"label": "Alterar usuários e permissões", "route": "users", "description": "Contas administrativas e acessos", "keywords": ["equipe", "login", "conta"]},
   {"label": "Consultar histórico e auditoria", "route": "audit", "description": "Registro de operações", "keywords": ["logs", "usuario", "historico"]},
+  {"label": "Alterar minha conta", "route": "conta", "description": "Meu perfil, senha, sessões e segurança", "keywords": ["minha conta", "perfil", "senha", "email"]},
   {"label": "Abrir Central de Ajuda", "route": "help", "description": "Manuais e tutoriais", "keywords": ["duvida", "orientacoes", "tutorial"]},
 ];

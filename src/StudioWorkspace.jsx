@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import RokuSimulator from './components/RokuSimulator.jsx';
-import { STUDIO_FIELDS, STUDIO_SCREENS, TEMPLATE_CHOICES, normalizeAppearance } from './appearance-screen-settings.js';
+import { STUDIO_FIELDS, STUDIO_SCREENS, TEMPLATE_CHOICES, normalizeAppearance } from '@deltatv/ui/appearance';
 import './studio-workspace.css';
 
 function contrastRatio(a,b){

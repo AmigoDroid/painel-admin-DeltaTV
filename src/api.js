@@ -1,6 +1,9 @@
 // Cliente da API. Tokens de acesso são curtos; o refresh é rotacionado a cada uso.
 // A autorização real acontece no backend: esconder botões aqui é só conveniência de UI.
-const API = (import.meta.env.VITE_API_URL || "http://localhost:3000").replace(/\/+$/, "");
+const API = (import.meta.env.VITE_API_URL || (import.meta.env.DEV ? "http://localhost:3000" : "")).replace(/\/+$/, "");
+if (!API || !/^https?:\/\//i.test(API) || (import.meta.env.PROD && !API.startsWith("https://"))) {
+  throw new Error("VITE_API_URL deve apontar para uma API válida via HTTPS em produção.");
+}
 const KEY = "iptv-admin-auth";
 
 let auth = (() => { try { return JSON.parse(localStorage.getItem(KEY)); } catch { return null; } })();
@@ -10,6 +13,7 @@ const save = (a) => {
   window.dispatchEvent(new Event("auth-changed"));
 };
 export const getAuth = () => auth;
+export const updateAuthUser = user => { if (auth?.user && user?.id === auth.user.id) save({ ...auth, user: { ...auth.user, ...user } }); };
 
 export class ApiError extends Error {
   constructor(status, data) {

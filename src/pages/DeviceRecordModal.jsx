@@ -23,7 +23,7 @@ const detailOf = event => [event.metadata?.reason, event.metadata?.days ? `Teste
   ? `${STATUS[event.metadata.from] || event.metadata.from} → ${STATUS[event.metadata.to] || event.metadata.to}` : null,
   event.metadata?.listName, event.metadata?.webAutoHttps !== undefined ? `HTTPS automático: ${event.metadata.webAutoHttps ? "ativado" : "desativado"}` : null].filter(Boolean).join(" · ");
 
-export default function DeviceRecordModal({ device, initialTab = "lists", onClose, onChanged, onManage }) {
+export default function DeviceRecordModal({ device, initialTab = "summary", onClose, onChanged, onManage }) {
   const [auditId, setAuditId] = useState(null);
   const [credentials, setCredentials] = useState(null);
   const [tab, setTab] = useState(initialTab);
@@ -52,7 +52,10 @@ export default function DeviceRecordModal({ device, initialTab = "lists", onClos
   return <Modal title={`Dispositivo ${device.mac}`} onClose={onClose} wide>
     <div className="device-record-head"><p className="muted">Listas e histórico deste MAC. Cada ação de vínculo afeta somente a lista indicada.</p>
       <button type="button" className="btn primary" onClick={onManage}>Adicionar / configurar listas</button></div>
-    <div className="tabs">
+    <div className="tabs" role="group" aria-label="Seções da ficha do dispositivo">
+      <button type="button" aria-pressed={tab==='summary'} className={`tab ${tab === 'summary' ? 'active' : ''}`} onClick={() => setTab('summary')}>Resumo</button>
+      <button type="button" aria-pressed={tab==='connection'} className={`tab ${tab === 'connection' ? 'active' : ''}`} onClick={() => setTab('connection')}>Conexão e URL</button>
+      <button type="button" aria-pressed={tab==='licenses'} className={`tab ${tab === 'licenses' ? 'active' : ''}`} onClick={() => setTab('licenses')}>Licenças</button>
       <button type="button" className={`tab ${tab === "lists" ? "active" : ""}`} onClick={() => setTab("lists")}>Listas atuais ({current.length})</button>
       <button type="button" className={`tab ${tab === "removed" ? "active" : ""}`} onClick={() => setTab("removed")}>Removidas ({removed.length})</button>
       <button type="button" className={`tab ${tab === "history" ? "active" : ""}`} onClick={() => setTab("history")}>Histórico ({data?.eventsMeta?.total ?? 0})</button>
@@ -60,7 +63,17 @@ export default function DeviceRecordModal({ device, initialTab = "lists", onClos
     {auditId && <ConnectionAudit path={`/admin/devices/activations/${auditId}/connection-audit`} onClose={()=>setAuditId(null)} />}
     {credentials && <CredentialsModal path={`/admin/devices/activations/${credentials}/credentials`} onClose={()=>setCredentials(null)} />}
     {error && <p className="error" role="alert">{error} <button type="button" className="btn" onClick={reload}>Tentar novamente</button></p>}
-    {!data ? <p className="muted">Carregando ficha…</p> : tab === "history" ? <>
+    {!data ? <p className="muted">Carregando ficha…</p> : tab === 'summary' ? <section className="device-workspace" aria-label="Resumo da TV">
+      <div className="card"><h3>Dispositivo {device.mac}</h3><p><b>Plataforma:</b> {device.platform || 'Não informada'}</p><p><b>Situação:</b> {device.online ? 'Online (último sinal)' : 'Offline ou sem sinal recente'}</p><p><b>Última comunicação:</b> {fmtDateTime(device.lastSeenAt)}</p><p><b>Listas atuais:</b> {current.length} · <b>removidas:</b> {removed.length}</p></div>
+      <div className="card"><h3>Próximos passos</h3><p className="muted">Consulte primeiro o sinal da TV e depois a conexão de cada lista. O status da licença pode impedir o acesso mesmo com internet funcionando.</p><button type="button" className="btn primary" onClick={()=>setTab('connection')}>Ver conexão</button> <button type="button" className="btn" onClick={()=>setTab('lists')}>Gerenciar listas</button></div>
+    </section> : tab === 'connection' ? <section className="card" aria-label="Diagnóstico de conexão">
+      <h3>Conexão e URL em uso</h3><p><b>Última comunicação:</b> {fmtDateTime(device.lastSeenAt)}</p><p><b>Estado informado:</b> {device.online ? 'Com sinal recente' : 'Sem sinal recente'}</p><p><b>Reprodução informada:</b> {device.live?.playback?.title || 'Não disponível'}</p><p className="muted">A URL exata em uso na TV só é exibida quando confirmada pela auditoria do vínculo. Não é possível deduzi-la a partir de uma URL cadastrada no servidor.</p>
+      <div className="device-record-actions">{current.map(a=><button key={a.id} className="btn" onClick={()=>setAuditId(a.id)}>Ver auditoria: {labelOf(a)}</button>)}</div>
+      {!current.length && <p className="muted">Nenhuma lista ativa neste MAC.</p>}
+    </section> : tab === 'licenses' ? <section className="card" aria-label="Licenças do dispositivo"><h3>Licenças associadas</h3>
+      {all.map(a=><div key={a.id} className="device-license-summary"><b>{labelOf(a)}</b><Badge status={accessStatus(a)}/><span>{a.grantedLicense?.expiresAt ? `Vence: ${fmtDateTime(a.grantedLicense.expiresAt)}` : a.license?.expiresAt ? `Vence: ${fmtDateTime(a.license.expiresAt)}` : 'Vencimento não informado'}</span></div>)}
+      {!all.length && <p className="muted">Sem licenças associadas.</p>}
+    </section> : tab === "history" ? <>
       <Table><thead><tr><th>Quando</th><th>Alteração</th><th>Responsável</th><th>Resultado</th></tr></thead><tbody>
         {data.events.map(event => <tr key={event.id}><td>{fmtDateTime(event.createdAt)}</td>
           <td>{EVENTS[event.action] || event.action}<div className="muted">{detailOf(event)}</div></td>

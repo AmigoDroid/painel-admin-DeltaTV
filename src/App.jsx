@@ -1,4 +1,4 @@
-import TaskFinder from "./TaskFinder.jsx";
+import TaskFinder from "@deltatv/ui/TaskFinder";
 import { TASKS } from "./task-directory.js";
 import { connectRealtime } from "./realtime.js";
 import { useEffect, useRef, useState } from "react";
@@ -6,9 +6,8 @@ import { api, getAuth, login, logout } from "./api.js";
 import { UiProvider, Field, useAction, BrandMark } from "./ui.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import { OperationCenter, CENTER_CONFIG } from "./OperationCenter.jsx";
-import { useSimpleMode } from "./useSimpleMode.js";
-import { EasyPageGuide } from "./EasyStart.jsx";
-import "./easy-start.css";
+import { useSimpleMode } from "@deltatv/ui/useSimpleMode";
+import { EasyPageGuide } from "@deltatv/ui/EasyStart";
 import ServerMonitor from "./pages/ServerMonitor.jsx";
 import VpsMonitor from "./pages/VpsMonitor.jsx";
 import VpsFiles from "./pages/VpsFiles.jsx";
@@ -33,13 +32,14 @@ import Mail from "./pages/Mail.jsx";
 import Notifications from "./pages/Notifications.jsx";
 import WebAccessPage from "./pages/WebAccess.jsx";
 import Downloads from "./pages/Downloads.jsx";
+import ProfilePage from "./ProfilePage.jsx";
 import WhiteLabel from "./pages/WhiteLabel.jsx";
 import HelpManagement from "./pages/HelpManagement.jsx";
 
 const WebAccess = () => <WebAccessPage admin />;
 
 const PAGES = {
-  pagamentos: ["Pagamentos", () => null], dispositivos: ["Dispositivos", () => null], licenciamento: ["Licenças", () => null], ativacao: ["Ativar aplicativo", () => null], conta: ["Minha conta", () => null],
+  pagamentos: ["Pagamentos", () => null], dispositivos: ["Dispositivos", () => null], licenciamento: ["Licenças", () => null], ativacao: ["Ativar aplicativo", () => null], conta: ["Minha conta", ProfilePage],
   dashboard: ["Visão geral", Dashboard], vpsmonitor: ["Servidor / VPS", VpsMonitor], vpsfiles: ["Arquivos da VPS", VpsFiles],
   webaccess: ["Player Web", WebAccess], whiteLabel: ["Aplicativos white-label", WhiteLabel],
   licenses: ["Licenças das TVs", Licenses], devices: ["TVs e dispositivos", Devices], unlinked: ["TVs sem configuração", Unlinked],
@@ -196,7 +196,7 @@ function Shell({ user }) {
     return () => observer.disconnect();
   }, []);
   const Current = PAGES[page][1];
-  const isCenter = Object.prototype.hasOwnProperty.call(CENTER_CONFIG, page);
+  const isCenter = page !== "conta" && Object.prototype.hasOwnProperty.call(CENTER_CONFIG, page);
   const go = (k) => { setPage(k); setOpen(false); window.scrollTo(0, 0); };
   // Esc fecha a gaveta; ao voltar para tela grande ela não fica "aberta" escondida.
   useEffect(() => {

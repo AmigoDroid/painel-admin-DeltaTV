@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { api, downloadRokuZip, uploadRokuImage } from '../api.js';
 import StudioWorkspace from '../StudioWorkspace.jsx';
-import {normalizeAppearance, updateAppearanceScreen, SCREEN_DEFAULTS} from '../appearance-screen-settings.js';
+import {normalizeAppearance, updateAppearanceScreen, SCREEN_DEFAULTS} from '@deltatv/ui/appearance';
 
 const ROOT='/admin/white-label';
 const defaults={screens:SCREEN_DEFAULTS,template:'classic',brandName:'Meu aplicativo',tagline:'Seu entretenimento em um só lugar.',

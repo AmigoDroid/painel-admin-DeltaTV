@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, getAuth } from "../api.js";
-import EasyStart from "../EasyStart.jsx";
+import EasyStart from "@deltatv/ui/EasyStart";
 import { Badge, Table, fmtDate, fmtDateTime, fmtMoney } from "../ui.jsx";
 
 /* Ícones de traço simples, no mesmo estilo do menu. */

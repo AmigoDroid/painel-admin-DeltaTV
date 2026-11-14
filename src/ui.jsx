@@ -1,3 +1,4 @@
+import SharedDialog from "@deltatv/ui/Dialog";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { api } from "./api.js";
@@ -21,7 +22,7 @@ export const fmtMoney = (cents) =>
  * Valor em reais digitado -> centavos. Aceita "10", "10,5", "10.50", "1.234,56", "R$ 1.234,56". Devolve null se não for número
  * (antes virava NaN -> null no JSON, e "1.234,56" não era entendido).
  */
-export { toCents } from "./money.js";
+export { toCents } from "@deltatv/ui/money";
 // Datas de calendário no fuso de São Paulo (UTC-3 fixo desde 2019), o mesmo usado na exibição (fmtDate).
 const SP_DATE = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" });
 export const dateInput = (v) => (v ? SP_DATE.format(new Date(v)) : "");
@@ -53,7 +54,7 @@ export function Badge({ status, label }) {
 /**
  * Modo de entrega EFETIVO de uma ativação (campos deliveryMode/deliveryModeFixed devolvidos pelo backend):
  * "proxy" = o servidor serve o conteúdo e o app nunca vê a URL/credencial real; "redirect" = o servidor autoriza e manda o
- * app para a origem (302), que recebe as credenciais reais. Lista própria do cliente é sempre proxy ("fixo").
+ * app para a origem (302), que recebe as credenciais reais. "fixo" indica restrição da configuração, não o transporte.
  */
 /** Tipo do aparelho, como o servidor guarda em devices.platform (rokutv vira roku; webtv vira web). */
 export const PLATFORM_LABEL = { roku: "Roku", android: "Android TV", tizen: "Samsung", webos: "LG", web: "Web" };
@@ -74,10 +75,15 @@ export function PlatformBadge({ platform }) {
 
 export function DeliveryBadge({ mode, fixed }) {
   if (!mode) return <span className="muted">—</span>;
-  const proxy = mode === "proxy";
+  const known = mode === "proxy" || mode === "redirect";
+  const detail = mode === "proxy"
+    ? "O servidor entrega o conteúdo por proxy; o aplicativo não acessa diretamente a origem."
+    : mode === "redirect"
+      ? "O servidor autoriza e redireciona (302) à origem; a origem pode receber as credenciais da lista."
+      : "Modo não reconhecido. Verifique as configurações e a resposta do servidor.";
   return (
-    <span title={fixed ? "Lista própria do cliente: redirect automático (o superadmin pode forçar outro modo em Editar)." : proxy ? "O servidor serve o conteúdo; o app não vê a URL nem a credencial do provedor." : "O servidor autoriza e redireciona (302) para o provedor; o app recebe as credenciais reais."}>
-      <Badge status={proxy ? "proxy" : "redirect"} />{fixed && <span className="muted"> fixo</span>}
+    <span title={`${detail}${fixed ? " Configuração fixa nesta ativação." : ""}`}>
+      {known ? <Badge status={mode} /> : <Badge status="unknown" label={String(mode)} />}{fixed && <span className="muted"> fixo</span>}
     </span>
   );
 }
@@ -133,30 +139,7 @@ function ConfirmDialog({ opts, resolve, onClose }) {
 }
 
 /* ---------- Componentes básicos ---------- */
-// Pilha de modais abertos: o Esc fecha só o do topo (antes fechava todos de uma vez — ex.: a confirmação e a janela de trás).
-const modalStack = [];
-export function Modal({ title, onClose, children, wide }) {
-  const closeRef = useRef(onClose);
-  closeRef.current = onClose;
-  useEffect(() => {
-    const me = Symbol("modal");
-    modalStack.push(me);
-    const onKey = (e) => e.key === "Escape" && modalStack[modalStack.length - 1] === me && closeRef.current();
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      modalStack.splice(modalStack.indexOf(me), 1);
-    };
-  }, []);
-  return (
-    <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className={`modal ${wide ? "wide" : ""}`} role="dialog" aria-modal="true" aria-label={title}>
-        <header><h3>{title}</h3><button className="icon" aria-label="Fechar" onClick={onClose}>×</button></header>
-        <div className="modal-body">{children}</div>
-      </div>
-    </div>
-  );
-}
+export const Modal = SharedDialog;
 
 export const Field = ({ label, hint, children }) => (
   <label className="field"><span>{label}</span>{children}{hint && <small>{hint}</small>}</label>
