@@ -25,6 +25,7 @@ import DistributionNetwork from "./pages/DistributionNetwork.jsx";
 import Audit from "./pages/Audit.jsx";
 import DeviceAccess from "./pages/DeviceAccess.jsx";
 import Clients from "./pages/Clients.jsx";
+import Commerce3 from "./pages/Commerce3.jsx";
 import SupportCenter from "./pages/SupportCenter.jsx";
 import Users from "./pages/Users.jsx";
 import LoginHistory from "./pages/LoginHistory.jsx";
@@ -45,16 +46,18 @@ const PAGES = {
   licenses: ["Licenças das TVs", Licenses], devices: ["TVs e dispositivos", Devices], unlinked: ["TVs sem configuração", Unlinked],
   partners: ["Parceiros", Partners], servermonitor: ["Monitoramento", ServerMonitor], sources: ["Fontes de conteúdo", Sources],
   resellers: ["Revendas", Resellers], network: ["Rede de distribuição", DistributionNetwork], support: ["Resolver problema da TV", () => <SupportCenter base="/admin" />], trash: ["Lixeira", PartnerTrash], clients: ["Clientes", Clients], credits: ["Créditos", Credits], downloads: ["Downloads e links", Downloads],
-  billing: ["Financeiro", Billing], pix: ["Pix", Pix], pricing: ["Planos e valores", PlansAndPricing],
+  billing: ["Financeiro", Billing], pix: ["Pix", Pix], pricing: ["Planos e valores", PlansAndPricing], commerce3: ["Planos SaaS e comissões", Commerce3],
   help: ["Central de Ajuda", HelpManagement], users: ["Usuários", Users], loginhistory: ["Histórico de login", LoginHistory], notifications: ["Notificações", Notifications], mail: ["E-mails", Mail], audit: ["Auditoria", Audit],
 };
 
 // Menu por área: quem é de conteúdo (Parceiros) fica separado de quem vende licença (Revendas e seus clientes).
 const GROUPS = [
   { label: null, items: ["dashboard"] },
-  { label: "Centrais de trabalho", items: ["pagamentos", "dispositivos", "licenciamento", "ativacao", "conta"] },
-  { label: "Comercial e parceiros", items: ["partners", "resellers", "network", "servermonitor", "sources"] },
-  { label: "Ferramentas avançadas", items: ["licenses", "unlinked", "webaccess", "devices", "clients", "support", "credits", "billing", "pix", "pricing", "downloads", "whiteLabel"] },
+  { label: "Atendimento e operação", items: ["clients", "devices", "support", "unlinked"] },
+  { label: "Planos e licenças", items: ["commerce3", "licenses", "pricing", "credits"] },
+  { label: "Financeiro", items: ["billing", "pix"] },
+  { label: "Rede comercial", items: ["resellers", "partners", "network"] },
+  { label: "Aplicativos e servidores", items: ["whiteLabel", "webaccess", "downloads", "sources", "servermonitor"] },
   { label: "Administração", items: ["vpsmonitor", "vpsfiles", "trash", "help", "users", "loginhistory", "notifications", "mail", "audit"] },
 ];
 
@@ -71,6 +74,7 @@ const ICONS = {
   licenses: <><circle cx="8" cy="15" r="4" /><path d="M11 12l9-9M16 7l3 3M14 9l2 2" /></>,
   partners: <><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5" /><path d="M16 4.8a3.5 3.5 0 010 6.4M18.5 14.8c1.7.7 2.8 2.3 3 5.2" /></>,
   servermonitor: <><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M6 14h3l2-5 3 8 2-4h2"/></>,
+  commerce3: <><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 10h10M7 14h8"/></>,
   network: <><circle cx="12" cy="5" r="2"/><circle cx="5" cy="18" r="2"/><circle cx="19" cy="18" r="2"/><path d="M12 7v5M5 16l7-4 7 4"/></>,
   resellers: <><path d="M4 9l1.5-5h13L20 9" /><path d="M4 9a2.5 2.5 0 005 0 2.5 2.5 0 005 0 2.5 2.5 0 005 0" /><path d="M5 12v8h14v-8M10 20v-5h4v5" /></>,
   clients: <><circle cx="12" cy="8" r="4" /><path d="M4 21c.8-4 4-6 8-6s7.2 2 8 6" /></>,
@@ -156,11 +160,11 @@ function UserMenu({ user, onAccount }) {
   );
 }
 
-const SIMPLE_ADMIN = new Set(["pagamentos", "dispositivos", "licenciamento", "ativacao", "conta", "dashboard", "support", "clients", "devices", "resellers", "network", "licenses", "billing", "servermonitor", "help"]);
+const SIMPLE_ADMIN = new Set(["pagamentos", "dispositivos", "licenciamento", "ativacao", "conta", "dashboard", "support", "clients", "devices", "resellers", "network", "commerce3", "licenses", "billing", "servermonitor", "help"]);
 function Shell({ user }) {
   const [simpleMode, setSimpleMode] = useSimpleMode("admin");
   // Itens do menu são conveniência: cada rota é protegida por permissão no backend.
-  const hidden = (k) => ((k === "network") && user.role !== "superadmin") || ((k === "whiteLabel" || k === "help") && user.role !== "superadmin") || ((k === "vpsmonitor" || k === "vpsfiles" || k === "pricing" || k === "trash") && user.role !== "superadmin") || (user.role === "support" && k === "audit") || ((k === "users" || k === "loginhistory" || k === "mail" || k === "notifications") && user.role !== "superadmin");
+  const hidden = (k) => ((k === "network") && user.role !== "superadmin") || ((k === "whiteLabel" || k === "help") && user.role !== "superadmin") || ((k === "vpsmonitor" || k === "vpsfiles" || k === "pricing" || k === "commerce3" || k === "trash") && user.role !== "superadmin") || (user.role === "support" && k === "audit") || ((k === "users" || k === "loginhistory" || k === "mail" || k === "notifications") && user.role !== "superadmin");
   const menu = Object.entries(PAGES).filter(([k]) => !hidden(k));
   const allowed = (h) => menu.some(([k]) => k === h);
   const fromHash = () => (allowed(location.hash.slice(1)) ? location.hash.slice(1) : "dashboard");
