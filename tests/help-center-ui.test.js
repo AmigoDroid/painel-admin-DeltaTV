@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync } from './read-source.js';
 const read = f => readFileSync(new URL(f, import.meta.url), 'utf8');
 test('superadmin tem menu, formulário e API de tutoriais', () => {
   const app=read('../src/App.jsx'); const page=read('../src/pages/HelpManagement.jsx');

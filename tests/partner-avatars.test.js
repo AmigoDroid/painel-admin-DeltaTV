@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync } from "./read-source.js";
 const code = readFileSync(new URL("../src/pages/Partners.jsx", import.meta.url), "utf8");
 const css = readFileSync(new URL("../src/style.css", import.meta.url), "utf8");
 const routes = readFileSync(new URL("../../backend/src/modules/partners/partner.routes.js", import.meta.url), "utf8");

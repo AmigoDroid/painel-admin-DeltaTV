@@ -1,5 +1,6 @@
 /** Catálogo de ações e sinônimos. Rotas existentes, nunca cria autorizações. */
 export const TASKS = [
+  {label:"Enviar mensagem para TVs",route:"tvmessages",description:"Selecionar clientes, revisar comunicado e acompanhar leituras",keywords:["mensagem","comunicado","aviso","tv","clientes"]},
   {"label": "Cadastrar cliente", "actionId":"client.create", "route": "clients", "description": "Adicionar ou localizar um cliente e seus dispositivos", "keywords": ["novo", "cliente", "usuario", "cadastro", "cliente"]},
   {"label": "Cadastrar revenda", "route": "resellers", "description": "Cadastrar ou aprovar uma revenda", "keywords": ["nova", "revenda", "revendedor", "registro", "convite"]},
   {"label": "Cadastrar parceiro", "route": "partners", "description": "Gerenciar parceiros de conteúdo e pré-cadastros", "keywords": ["novo", "parceiro", "servidor"]},

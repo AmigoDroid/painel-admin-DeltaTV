@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {toCents,moneyInput} from '../src/money.js';
-const source=fs.readFileSync(new URL('../src/api.js',import.meta.url),'utf8').replaceAll('import.meta.env.VITE_API_URL','undefined');
+const source=fs.readFileSync(new URL('../src/api.js',import.meta.url),'utf8').replaceAll('import.meta.env',JSON.stringify({VITE_API_URL:'https://api.example.test',DEV:false,PROD:true}));
 const defer=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b});return {promise,resolve,reject}};
 const response=(status,data)=>({ok:status<400,status,json:async()=>data});
 const initial={accessToken:'old',refreshToken:'refresh-old',user:{id:'test'}};

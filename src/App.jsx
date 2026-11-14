@@ -1,3 +1,4 @@
+import TvMessages from "./TvMessages.jsx";
 import TaskFinder from "@deltatv/ui/TaskFinder";
 import { TASKS } from "./task-directory.js";
 import { connectRealtime } from "./realtime.js";
@@ -40,6 +41,7 @@ import HelpManagement from "./pages/HelpManagement.jsx";
 const WebAccess = () => <WebAccessPage admin />;
 
 const PAGES = {
+  tvmessages: ["Mensagens para TVs", TvMessages],
   pagamentos: ["Pagamentos", () => null], dispositivos: ["Dispositivos", () => null], licenciamento: ["Licenças", () => null], ativacao: ["Ativar aplicativo", () => null], conta: ["Minha conta", ProfilePage],
   dashboard: ["Visão geral", Dashboard], vpsmonitor: ["Servidor / VPS", VpsMonitor], vpsfiles: ["Arquivos da VPS", VpsFiles],
   webaccess: ["Player Web", WebAccess], whiteLabel: ["Aplicativos white-label", WhiteLabel],
@@ -53,7 +55,7 @@ const PAGES = {
 // Menu por área: quem é de conteúdo (Parceiros) fica separado de quem vende licença (Revendas e seus clientes).
 const GROUPS = [
   { label: null, items: ["dashboard"] },
-  { label: "Atendimento e operação", items: ["clients", "devices", "support", "unlinked"] },
+  { label: "Atendimento e operação", items: ["clients", "devices", "ativacao", "tvmessages", "support", "unlinked"] },
   { label: "Planos e licenças", items: ["commerce3", "licenses", "pricing", "credits"] },
   { label: "Financeiro", items: ["billing", "pix"] },
   { label: "Rede comercial", items: ["resellers", "partners", "network"] },
@@ -63,6 +65,7 @@ const GROUPS = [
 
 // Ícones do menu (traço simples, herdam a cor do texto).
 const ICONS = {
+  tvmessages: <><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4M7 8h10M7 12h6"/></>,
   pagamentos: <><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 11h18M8 16h3"/></>,
   dispositivos: <><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8M12 17v4"/></>,
   licenciamento: <><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9"/></>,
@@ -164,7 +167,7 @@ const SIMPLE_ADMIN = new Set(["pagamentos", "dispositivos", "licenciamento", "at
 function Shell({ user }) {
   const [simpleMode, setSimpleMode] = useSimpleMode("admin");
   // Itens do menu são conveniência: cada rota é protegida por permissão no backend.
-  const hidden = (k) => ((k === "network") && user.role !== "superadmin") || ((k === "whiteLabel" || k === "help") && user.role !== "superadmin") || ((k === "vpsmonitor" || k === "vpsfiles" || k === "pricing" || k === "commerce3" || k === "trash") && user.role !== "superadmin") || (user.role === "support" && k === "audit") || ((k === "users" || k === "loginhistory" || k === "mail" || k === "notifications") && user.role !== "superadmin");
+  const hidden = (k) => (k === "tvmessages" && user.role !== "superadmin") || ((k === "network") && user.role !== "superadmin") || ((k === "whiteLabel" || k === "help") && user.role !== "superadmin") || ((k === "vpsmonitor" || k === "vpsfiles" || k === "pricing" || k === "commerce3" || k === "trash") && user.role !== "superadmin") || (user.role === "support" && k === "audit") || ((k === "users" || k === "loginhistory" || k === "mail" || k === "notifications") && user.role !== "superadmin");
   const menu = Object.entries(PAGES).filter(([k]) => !hidden(k));
   const allowed = (h) => menu.some(([k]) => k === h);
   const fromHash = () => (allowed(location.hash.slice(1)) ? location.hash.slice(1) : "dashboard");
@@ -226,10 +229,10 @@ function Shell({ user }) {
     <div className="layout">
       <aside className={`sidebar ${open ? "open" : ""}`} id="menu-principal">
         <div className="brand"><BrandMark size={32} /><div><strong>DeltaTV</strong><span>Administração</span></div><button type="button" className="sidebar-close" aria-label="Fechar menu" onClick={() => setOpen(false)}>×</button></div>
-        <button type="button" className="easy-mode-button" aria-pressed={!simpleMode} onClick={() => setSimpleMode((s) => !s)}>{simpleMode ? "⚙ Ver todas as opções" : "✓ Voltar ao modo simples"}</button>
+        
         <nav className="nav-scroll" aria-label="Menu principal">
           {GROUPS.map((g) => {
-            const items = g.items.filter((k) => allowed(k) && (!simpleMode || SIMPLE_ADMIN.has(k) || page === k));
+            const items = g.items.filter((k) => allowed(k));
             if (!items.length) return null;
             return (
               <div className="nav-group" key={g.label || "top"}>
@@ -253,7 +256,7 @@ function Shell({ user }) {
           </button>
           <strong className="topbar-title">{PAGES[page][0]}</strong>
           {badges.unlinked > 0 || badges.resellers > 0 ? <span className="count" aria-label="Itens aguardando">{(badges.unlinked || 0) + (badges.resellers || 0)}</span> : null}
-          <button type="button" className="easy-mode-button" aria-pressed={!simpleMode} onClick={() => setSimpleMode((s) => !s)}>{simpleMode ? "Modo simples · mostrar tudo" : "Modo completo · simplificar"}</button>
+          
           <UserMenu user={user} onAccount={() => go("conta")} />
         </div>
         <main className="content">

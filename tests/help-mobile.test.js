@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync } from './read-source.js';
 const css = readFileSync(new URL('../src/pages/help-management.css', import.meta.url), 'utf8');
 test('editor de tutoriais do Superadmin ocupa tela móvel com formulário rolável e rodapé acessível', () => {
   assert.match(css, /\.hm15-editor\s*\{\s*width:100%;max-height:100dvh;height:100dvh/);

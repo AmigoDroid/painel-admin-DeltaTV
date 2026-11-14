@@ -30,7 +30,9 @@
     "./LoginHistory": "./src/LoginHistory.jsx",
     "./realtime": "./src/realtime.js",
     "./StudioWorkspace": "./src/StudioWorkspace.jsx",
-    "./ConfigureForm": "./src/ConfigureForm.jsx"
+    "./ConfigureForm": "./src/ConfigureForm.jsx",
+    "./TvMessages": "./src/TvMessages.jsx",
+    "./workspace.css": "./src/workspace.css"
   },
   "peerDependencies": {
     "react": "^18.3.1"

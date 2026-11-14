@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync } from "./read-source.js";
 const app = readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
 const ui = readFileSync(new URL("../src/pages/PartnerTrash.jsx", import.meta.url), "utf8");
 const routes = readFileSync(new URL("../../backend/src/modules/partners/partner.routes.js", import.meta.url), "utf8");
@@ -11,7 +11,7 @@ test("Lixeira aparece no menu só para o superadmin", () => {
   assert.match(app, /trash: \["Lixeira", PartnerTrash\]/);
   assert.match(app, /user\.role !== "superadmin"/);
   assert.match(app, /k === "trash"/);
-  assert.match(app, /items: \["vpsmonitor", "trash",/);
+  assert.match(app, /items: \["vpsmonitor", "vpsfiles", "trash",/);
 });
 test("rotas de lixeira exigem override e id validado", () => {
   for (const endpoint of ["/trash", "/trash/:id/preview", "/trash/:id/restore", "/trash/:id/permanent"])

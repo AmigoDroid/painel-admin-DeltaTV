@@ -1,2 +1,2 @@
-import test from 'node:test';import assert from 'node:assert/strict';import {existsSync,readFileSync} from 'node:fs';
+import test from 'node:test';import assert from 'node:assert/strict';import {existsSync,readFileSync} from './read-source.js';
 test('pacote standalone auto-contido',()=>{for(const f of ['scripts/verify-env.mjs','vendor/deltatv-ui/src/Dialog.jsx','vendor/deltatv-ui/src/money.js','vite.config.js','src/main.jsx'])assert.ok(existsSync(f),f);assert.match(readFileSync('package.json','utf8'),/scripts\/verify-env\.mjs/);});
