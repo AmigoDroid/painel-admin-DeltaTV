@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { api, getAuth, login, logout } from "./api.js";
 import { UiProvider, Field, useAction, BrandMark } from "./ui.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
+import { OperationCenter, CENTER_CONFIG } from "./OperationCenter.jsx";
 import { useSimpleMode } from "./useSimpleMode.js";
 import { EasyPageGuide } from "./EasyStart.jsx";
 import "./easy-start.css";
@@ -36,6 +37,7 @@ import HelpManagement from "./pages/HelpManagement.jsx";
 const WebAccess = () => <WebAccessPage admin />;
 
 const PAGES = {
+  pagamentos: ["Pagamentos", () => null], dispositivos: ["Dispositivos", () => null], licenciamento: ["Licenças", () => null], ativacao: ["Ativar aplicativo", () => null], conta: ["Minha conta", () => null],
   dashboard: ["Visão geral", Dashboard], vpsmonitor: ["Servidor / VPS", VpsMonitor], vpsfiles: ["Arquivos da VPS", VpsFiles],
   webaccess: ["Player Web", WebAccess], whiteLabel: ["Aplicativos white-label", WhiteLabel],
   licenses: ["Licenças das TVs", Licenses], devices: ["TVs e dispositivos", Devices], unlinked: ["TVs sem configuração", Unlinked],
@@ -48,16 +50,19 @@ const PAGES = {
 // Menu por área: quem é de conteúdo (Parceiros) fica separado de quem vende licença (Revendas e seus clientes).
 const GROUPS = [
   { label: null, items: ["dashboard"] },
-  { label: "Licenciamento", items: ["licenses", "unlinked", "webaccess"] },
-  { label: "Parceiros", items: ["partners", "servermonitor", "sources", "whiteLabel"] },
-  { label: "Atendimento", items: ["support", "clients", "devices"] },
-  { label: "Revendas", items: ["resellers", "network", "credits", "downloads"] },
-  { label: "Financeiro", items: ["pricing", "billing", "pix"] },
-  { label: "Sistema", items: ["vpsmonitor", "vpsfiles", "trash", "help", "users", "loginhistory", "notifications", "mail", "audit"] },
+  { label: "Centrais de trabalho", items: ["pagamentos", "dispositivos", "licenciamento", "ativacao", "conta"] },
+  { label: "Comercial e parceiros", items: ["partners", "resellers", "network", "servermonitor", "sources"] },
+  { label: "Ferramentas avançadas", items: ["licenses", "unlinked", "webaccess", "devices", "clients", "support", "credits", "billing", "pix", "pricing", "downloads", "whiteLabel"] },
+  { label: "Administração", items: ["vpsmonitor", "vpsfiles", "trash", "help", "users", "loginhistory", "notifications", "mail", "audit"] },
 ];
 
 // Ícones do menu (traço simples, herdam a cor do texto).
 const ICONS = {
+  pagamentos: <><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 11h18M8 16h3"/></>,
+  dispositivos: <><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8M12 17v4"/></>,
+  licenciamento: <><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9"/></>,
+  ativacao: <><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 12l2 2 4-5"/></>,
+  conta: <><circle cx="12" cy="8" r="4"/><path d="M4 21c1-8 15-8 16 0"/></>,
   dashboard: <><rect x="3" y="3" width="7.5" height="7.5" rx="2" /><rect x="13.5" y="3" width="7.5" height="7.5" rx="2" /><rect x="3" y="13.5" width="7.5" height="7.5" rx="2" /><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2" /></>,
   vpsmonitor: <><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h10M7 13h4m3 0h3M7 17h10"/></>,
   vpsfiles: <><path d="M3 6h6l2 2h10v12H3z"/><path d="M3 10h18"/></>,
@@ -119,7 +124,7 @@ function Login({ onDeviceAccess }) {
 }
 
 /** Perfil no canto superior direito: avatar + nome; ao clicar abre e-mail e "Sair". */
-function UserMenu({ user }) {
+function UserMenu({ user, onAccount }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   useEffect(() => {
@@ -141,6 +146,7 @@ function UserMenu({ user }) {
       {open && (
         <div className="usermenu-pop" role="menu">
           <div className="who"><strong>{user.name}</strong><span>{user.email}</span></div>
+          <button type="button" className="btn sm" role="menuitem" onClick={() => {setOpen(false);onAccount();}}>Minha conta</button>
           <button type="button" className="btn sm" role="menuitem" onClick={logout}>Sair</button>
         </div>
       )}
@@ -148,7 +154,7 @@ function UserMenu({ user }) {
   );
 }
 
-const SIMPLE_ADMIN = new Set(["dashboard", "support", "clients", "devices", "resellers", "network", "licenses", "billing", "servermonitor", "help"]);
+const SIMPLE_ADMIN = new Set(["pagamentos", "dispositivos", "licenciamento", "ativacao", "conta", "dashboard", "support", "clients", "devices", "resellers", "network", "licenses", "billing", "servermonitor", "help"]);
 function Shell({ user }) {
   const [simpleMode, setSimpleMode] = useSimpleMode("admin");
   // Itens do menu são conveniência: cada rota é protegida por permissão no backend.
@@ -188,6 +194,7 @@ function Shell({ user }) {
     return () => observer.disconnect();
   }, []);
   const Current = PAGES[page][1];
+  const isCenter = Object.prototype.hasOwnProperty.call(CENTER_CONFIG, page);
   const go = (k) => { setPage(k); setOpen(false); window.scrollTo(0, 0); };
   // Esc fecha a gaveta; ao voltar para tela grande ela não fica "aberta" escondida.
   useEffect(() => {
@@ -241,11 +248,11 @@ function Shell({ user }) {
           <strong className="topbar-title">{PAGES[page][0]}</strong>
           {badges.unlinked > 0 || badges.resellers > 0 ? <span className="count" aria-label="Itens aguardando">{(badges.unlinked || 0) + (badges.resellers || 0)}</span> : null}
           <button type="button" className="easy-mode-button" aria-pressed={!simpleMode} onClick={() => setSimpleMode((s) => !s)}>{simpleMode ? "Modo simples · mostrar tudo" : "Modo completo · simplificar"}</button>
-          <UserMenu user={user} />
+          <UserMenu user={user} onAccount={() => go("conta")} />
         </div>
         <main className="content">
           {simpleMode && page !== "dashboard" && <EasyPageGuide role="admin" page={page} onBack={() => go("dashboard")} />}
-          <Current onChanged={refreshCounts} />
+          {isCenter ? <OperationCenter section={page} onNavigate={go} allowed={allowed} /> : <Current onChanged={refreshCounts} />}
         </main>
       </div>
     </div>
