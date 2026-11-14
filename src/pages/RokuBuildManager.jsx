@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { api, downloadRokuZip, uploadRokuImage } from '../api.js';
-import StudioWorkspace from '../StudioWorkspace.jsx';
+import StudioWorkspace from '@deltatv/ui/StudioWorkspace';
 import {normalizeAppearance, updateAppearanceScreen, SCREEN_DEFAULTS} from '@deltatv/ui/appearance';
 
 const ROOT='/admin/white-label';

@@ -16,7 +16,21 @@
     "./WizardProgress": "./src/WizardProgress.jsx",
     "./HelpExperience": "./src/HelpExperience.jsx",
     "./WhiteLabelApps": "./src/WhiteLabelApps.jsx",
-    "./ConnectionAudit": "./src/ConnectionAudit.jsx"
+    "./ConnectionAudit": "./src/ConnectionAudit.jsx",
+    "./ContentSourcesWorkspace": "./src/ContentSourcesWorkspace.jsx",
+    "./server-health": "./src/server-health.js",
+    "./ServerMonitorView": "./src/ServerMonitorView.jsx",
+    "./commerce-workspace.css": "./src/commerce-workspace.css",
+    "./RokuSimulator": "./src/RokuSimulator.jsx",
+    "./studio-workspace.css": "./src/studio-workspace.css",
+    "./operation-center.css": "./src/operation-center.css",
+    "./support-center.css": "./src/support-center.css",
+    "./PasswordResetView": "./src/PasswordResetView.jsx",
+    "./password-reset.css": "./src/password-reset.css",
+    "./LoginHistory": "./src/LoginHistory.jsx",
+    "./realtime": "./src/realtime.js",
+    "./StudioWorkspace": "./src/StudioWorkspace.jsx",
+    "./ConfigureForm": "./src/ConfigureForm.jsx"
   },
   "peerDependencies": {
     "react": "^18.3.1"

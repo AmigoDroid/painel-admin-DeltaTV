@@ -1,5 +1,5 @@
 import React from 'react';
-import './operation-center.css';
+import '@deltatv/ui/operation-center.css';
 import { MasterPixGlobal } from './pages/MasterPixAdmin.jsx';
 import { getAuth } from './api.js';
 /** Centralização de navegação, sem replicar operações nem contornar permissões. */

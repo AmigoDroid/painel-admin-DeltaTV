@@ -12,3 +12,6 @@ export function toCents(input) {
   return Number.isSafeInteger(cents) ? cents : null;
 }
 export const moneyInput = cents => cents == null ? "" : (Number(cents) / 100).toFixed(2).replace(".", ",");
+
+/** Exibe centavos do backend, sem converter valores por conta própria na interface. */
+export const formatBRL = cents => new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(cents||0)/100);

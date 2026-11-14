@@ -14,7 +14,7 @@ export const TASKS = [
   {"label": "Configurar Player Web", "route": "webaccess", "description": "Acessos pelo navegador", "keywords": ["web", "roku", "webroku", "playerweb"]},
   {"label": "Consultar aplicativos", "route": "downloads", "description": "Links e instruções de instalação", "keywords": ["roku", "lg", "samsung", "android", "download"]},
   {"label": "Aplicativos personalizados", "route": "whiteLabel", "description": "Configurações white-label", "keywords": ["app", "customizar", "tema"]},
-  {"label": "Consultar conexões dos servidores", "route": "servermonitor", "description": "Saúde e latência das fontes", "keywords": ["link", "url", "origem", "offline"]},
+  {"label": "Consultar qualidade dos servidores", "route": "servermonitor", "description": "Saúde e latência das fontes", "keywords": ["link", "url", "origem", "offline"]},
   {"label": "Alterar usuários e permissões", "route": "users", "description": "Contas administrativas e acessos", "keywords": ["equipe", "login", "conta"]},
   {"label": "Consultar histórico e auditoria", "route": "audit", "description": "Registro de operações", "keywords": ["logs", "usuario", "historico"]},
   {"label": "Alterar minha conta", "route": "conta", "description": "Meu perfil, senha, sessões e segurança", "keywords": ["minha conta", "perfil", "senha", "email"]},

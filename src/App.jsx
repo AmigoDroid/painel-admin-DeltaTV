@@ -44,7 +44,7 @@ const PAGES = {
   dashboard: ["Visão geral", Dashboard], vpsmonitor: ["Servidor / VPS", VpsMonitor], vpsfiles: ["Arquivos da VPS", VpsFiles],
   webaccess: ["Player Web", WebAccess], whiteLabel: ["Aplicativos white-label", WhiteLabel],
   licenses: ["Licenças das TVs", Licenses], devices: ["TVs e dispositivos", Devices], unlinked: ["TVs sem configuração", Unlinked],
-  partners: ["Parceiros", Partners], servermonitor: ["Monitoramento", ServerMonitor], sources: ["Fontes de conteúdo", Sources],
+  partners: ["Parceiros", Partners], servermonitor: ["Qualidade dos servidores", ServerMonitor], sources: ["Fontes globais de conteúdo", Sources],
   resellers: ["Revendas", Resellers], network: ["Rede de distribuição", DistributionNetwork], support: ["Resolver problema da TV", () => <SupportCenter base="/admin" />], trash: ["Lixeira", PartnerTrash], clients: ["Clientes", Clients], credits: ["Créditos", Credits], downloads: ["Downloads e links", Downloads],
   billing: ["Financeiro", Billing], pix: ["Pix", Pix], pricing: ["Planos e valores", PlansAndPricing], commerce3: ["Planos SaaS e comissões", Commerce3],
   help: ["Central de Ajuda", HelpManagement], users: ["Usuários", Users], loginhistory: ["Histórico de login", LoginHistory], notifications: ["Notificações", Notifications], mail: ["E-mails", Mail], audit: ["Auditoria", Audit],

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../api.js';
-import './support-center.css';
+import '@deltatv/ui/support-center.css';
 
 const isUuid = v => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(v || '').trim());
 const niceDate = v => v ? new Date(v).toLocaleString('pt-BR') : 'Não informado';
