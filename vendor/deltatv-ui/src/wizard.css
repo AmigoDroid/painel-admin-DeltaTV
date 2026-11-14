@@ -1,0 +1,4 @@
+.deltatv-wizard{margin:2px 0 18px}.deltatv-wizard ol{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:0;margin:0;list-style:none}
+.deltatv-wizard li{border-bottom:3px solid #68758c;color:inherit;opacity:.68;padding:8px 6px;display:flex;align-items:center;gap:7px;min-width:0}.deltatv-wizard li.current{opacity:1;border-color:#9a8dfb;font-weight:700}.deltatv-wizard li.done{border-color:#39bda5;opacity:1}
+.deltatv-wizard li>span{display:grid;place-items:center;flex:none;width:23px;height:23px;border:1px solid currentColor;border-radius:50%;font-size:12px}.deltatv-wizard small{font-size:12px;overflow-wrap:anywhere}
+@media(max-width:500px){.deltatv-wizard li{flex-direction:column;align-items:start}.deltatv-wizard small{font-size:11px}}

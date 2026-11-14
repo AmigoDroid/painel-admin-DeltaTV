@@ -1,0 +1,16 @@
+DeltaTV Admin — pacote standalone para npm run build no Nginx
+
+O ZIP foi criado com arquivos na raiz (package.json, vite.config.js, scripts/, vendor/ e src/).
+Para evitar qualquer alteração acidental no site de produção, extraia em uma pasta de homologação:
+
+  mkdir -p /var/www/painel-admin-DeltaTV-teste
+  unzip DeltaTV-admin-standalone-build-corrigido.zip -d /var/www/painel-admin-DeltaTV-teste
+  cd /var/www/painel-admin-DeltaTV-teste
+  printf 'VITE_API_URL=https://api.deltatv.com.br\n' > .env.production
+  npm install
+  npm run build
+
+Se o build passar, valide os fluxos do painel antes de publicar dist/ no Nginx.
+Não sobrescreva sua instalação atual nem credenciais sem backup.
+
+Correções: scripts.build usa scripts/verify-env.mjs na raiz do projeto, e vite.config.js resolve diretamente os imports @deltatv/ui pelo vendor/deltatv-ui/src.

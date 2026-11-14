@@ -1,0 +1,24 @@
+{
+  "name": "@deltatv/ui",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.js",
+    "./TaskFinder": "./src/TaskFinder.jsx",
+    "./EasyStart": "./src/EasyStart.jsx",
+    "./useSimpleMode": "./src/useSimpleMode.js",
+    "./money": "./src/money.js",
+    "./appearance": "./src/appearance-screen-settings.js",
+    "./task-intent": "./src/task-intent.js",
+    "./ProfilePage": "./src/ProfilePage.jsx",
+    "./Dialog": "./src/Dialog.jsx",
+    "./WizardProgress": "./src/WizardProgress.jsx",
+    "./HelpExperience": "./src/HelpExperience.jsx",
+    "./WhiteLabelApps": "./src/WhiteLabelApps.jsx",
+    "./ConnectionAudit": "./src/ConnectionAudit.jsx"
+  },
+  "peerDependencies": {
+    "react": "^18.3.1"
+  }
+}

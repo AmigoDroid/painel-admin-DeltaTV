@@ -5,14 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port 5174",
-    "build": "node ../../scripts/verify-env.mjs && vite build",
+    "build": "node scripts/verify-env.mjs && vite build",
     "preview": "vite preview",
     "test": "node --test tests/*.test.js"
   },
   "dependencies": {
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "@deltatv/ui": "file:../../packages/ui"
+    "@deltatv/ui": "file:vendor/deltatv-ui"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",

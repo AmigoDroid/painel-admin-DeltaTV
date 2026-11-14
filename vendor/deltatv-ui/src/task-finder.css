@@ -1,0 +1,15 @@
+/* Design tokens isolados: não dependem de --surface/--text dos três temas. */
+.task-finder{--task-bg:var(--ui-surface,var(--panel,var(--card,#19263e)));--task-text:var(--ui-text,#f0f5ff);--task-border:var(--ui-border,#51607a);--task-accent:var(--ui-accent,#978cf3);--task-hover:var(--ui-hover,#33446a);position:relative;width:min(100%,620px);min-width:0;z-index:12;color:var(--task-text)}
+.task-finder-label{display:block;font-size:12px;font-weight:650;margin-bottom:6px;color:var(--task-text)}
+.task-finder-input-wrap{display:flex;align-items:center;gap:9px;border:1px solid var(--task-border);border-radius:12px;background:var(--task-bg);color:var(--task-text);padding:8px 12px;min-height:42px}
+.task-finder-input-wrap:focus-within{outline:3px solid color-mix(in srgb,var(--task-accent) 36%,transparent);border-color:var(--task-accent)}
+.task-finder-input-wrap input{background:transparent!important;color:inherit!important;border:0!important;outline:none!important;box-shadow:none!important;min-width:0;flex:1;width:100%;font-size:14px;padding:0!important}
+.task-finder-input-wrap input::placeholder{color:var(--task-text);opacity:.66}
+.task-finder-input-wrap kbd{font-size:11px;white-space:nowrap;opacity:.7;color:inherit}
+.task-finder-results{position:absolute;top:100%;left:0;right:0;margin-top:5px;max-height:min(65vh,410px);overflow-y:auto;border:1px solid var(--task-border);border-radius:12px;background:var(--task-bg);color:var(--task-text);box-shadow:0 15px 35px #050b19a8;padding:5px}
+.task-finder-results button{width:100%;display:flex;flex-direction:column;gap:3px;align-items:flex-start;text-align:left;padding:10px 12px;border:0;border-radius:8px;color:inherit;background:transparent;cursor:pointer}
+.task-finder-results button:hover,.task-finder-results button.selected{background:var(--task-hover)}
+.task-finder-results button small{font-size:12px;opacity:.85}
+.task-finder-results p{padding:12px;font-size:13px}
+.task-finder-results button:focus-visible{outline:2px solid var(--task-accent)}
+@media(max-width:700px){.task-finder-input-wrap kbd{display:none}.task-finder{width:100%}}
