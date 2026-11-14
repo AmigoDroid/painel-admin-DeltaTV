@@ -1,3 +1,5 @@
+import TaskFinder from "./TaskFinder.jsx";
+import { TASKS } from "./task-directory.js";
 import { connectRealtime } from "./realtime.js";
 import { useEffect, useRef, useState } from "react";
 import { api, getAuth, login, logout } from "./api.js";
@@ -251,6 +253,7 @@ function Shell({ user }) {
           <UserMenu user={user} onAccount={() => go("conta")} />
         </div>
         <main className="content">
+          <TaskFinder tasks={TASKS.filter(task => allowed(task.route))} onNavigate={go} />
           {simpleMode && page !== "dashboard" && <EasyPageGuide role="admin" page={page} onBack={() => go("dashboard")} />}
           {isCenter ? <OperationCenter section={page} onNavigate={go} allowed={allowed} /> : <Current onChanged={refreshCounts} />}
         </main>

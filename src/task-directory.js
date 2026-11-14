@@ -1,0 +1,21 @@
+/** Catálogo de ações e sinônimos. Rotas existentes, nunca cria autorizações. */
+export const TASKS = [
+  {"label": "Cadastrar cliente", "route": "clients", "description": "Adicionar ou localizar um cliente e seus dispositivos", "keywords": ["novo", "cliente", "usuario", "cadastro", "cliente"]},
+  {"label": "Cadastrar revenda", "route": "resellers", "description": "Cadastrar ou aprovar uma revenda", "keywords": ["nova", "revenda", "revendedor", "registro", "convite"]},
+  {"label": "Cadastrar parceiro", "route": "partners", "description": "Gerenciar parceiros de conteúdo e pré-cadastros", "keywords": ["novo", "parceiro", "servidor"]},
+  {"label": "Localizar dispositivo por MAC", "route": "devices", "description": "Buscar TVs e consultar detalhes", "keywords": ["mac", "aparelho", "tv", "localizar"]},
+  {"label": "Ver TV sem configuração", "route": "unlinked", "description": "Localizar uma TV aguardando vínculo", "keywords": ["ativar", "configurar", "pendente"]},
+  {"label": "Diagnosticar TV offline", "route": "support", "description": "Investigar falhas de conexão", "keywords": ["erro", "falha", "internet", "diagnostico", "suporte"]},
+  {"label": "Ver licenças e renovações", "route": "licenses", "description": "Consulte vencimento e estado das licenças", "keywords": ["renovar", "ativar", "estoque"]},
+  {"label": "Consultar pagamentos", "route": "billing", "description": "Faturas e histórico financeiro", "keywords": ["financeiro", "extrato", "fatura", "cobrança"]},
+  {"label": "Consultar Pix", "route": "pix", "description": "Cobranças e confirmações Pix", "keywords": ["pagamento", "qr", "code"]},
+  {"label": "Gerenciar crédito", "route": "credits", "description": "Saldos e movimentos", "keywords": ["recarga", "credito"]},
+  {"label": "Gerenciar Masters e Submasters", "route": "network", "description": "Rede de distribuição e hierarquia", "keywords": ["master", "rede", "vendas", "revenda"]},
+  {"label": "Configurar Player Web", "route": "webaccess", "description": "Acessos pelo navegador", "keywords": ["web", "roku", "webroku", "playerweb"]},
+  {"label": "Consultar aplicativos", "route": "downloads", "description": "Links e instruções de instalação", "keywords": ["roku", "lg", "samsung", "android", "download"]},
+  {"label": "Aplicativos personalizados", "route": "whiteLabel", "description": "Configurações white-label", "keywords": ["app", "customizar", "tema"]},
+  {"label": "Consultar conexões dos servidores", "route": "servermonitor", "description": "Saúde e latência das fontes", "keywords": ["link", "url", "origem", "offline"]},
+  {"label": "Alterar usuários e permissões", "route": "users", "description": "Contas administrativas e acessos", "keywords": ["equipe", "login", "conta"]},
+  {"label": "Consultar histórico e auditoria", "route": "audit", "description": "Registro de operações", "keywords": ["logs", "usuario", "historico"]},
+  {"label": "Abrir Central de Ajuda", "route": "help", "description": "Manuais e tutoriais", "keywords": ["duvida", "orientacoes", "tutorial"]},
+];
