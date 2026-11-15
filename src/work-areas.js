@@ -3,6 +3,7 @@ export const WORK_AREAS = {
   'area/operacao': {id:'area/operacao',label:'Atendimento e TVs',icon:'devices',description:'Cadastre clientes, localize dispositivos, ative licenças e acompanhe atendimentos em um só ambiente.',items:[
     {id:'clients',page:'clients',label:'Clientes',description:'Cadastros comerciais e relacionamento com clientes',icon:'clients'},
     {id:'devices',page:'devices',label:'Dispositivos',description:'Localizar, configurar e auditar as TVs',icon:'devices'},
+    {id:'legados',page:'legados',label:'Migração de legados',description:'Inventariar, importar cadastros e vincular licenças existentes com segurança',icon:'devices'},
     {id:'ativar-tv',page:'ativar-tv',label:'Ativar TV com licença',description:'Informar MAC e aplicar licença conforme autorização',icon:'ativar-tv'},
     {id:'unlinked',page:'unlinked',label:'TVs sem configuração',description:'Dispositivos aguardando cadastro ou vínculo',icon:'unlinked'},
     {id:'support',page:'support',label:'Diagnóstico e suporte',description:'Verificar falhas e orientar atendimento',icon:'support'},

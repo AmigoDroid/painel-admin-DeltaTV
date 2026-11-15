@@ -1,5 +1,7 @@
+import { shouldRefreshList, canBackgroundRefresh } from "./list-refresh-policy.js";
+import { labelResponsiveTable } from "./responsive-table.js";
 import SharedDialog from "@deltatv/ui/Dialog";
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { Children, cloneElement, createContext, isValidElement, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { api } from "./api.js";
 
@@ -159,53 +161,80 @@ export function Pager({ meta, onPage }) {
   );
 }
 
-export const Table = ({ children }) => <div className="table-wrap"><table>{children}</table></div>;
+export const Table = ({ children }) => <div className="table-wrap labeled-table-wrap"><table>{labelResponsiveTable(children, { Children, isValidElement, cloneElement })}</table></div>;
 export const Empty = ({ loading, error, count }) =>
   error ? <p className="error">{error}</p> : loading ? <p className="muted">Carregando…</p> : count === 0 ? <p className="muted">Nada encontrado.</p> : null;
 
-/** Lista paginada: refaz a consulta quando os filtros mudam. */
+/** Lista paginada com proteção contra respostas atrasadas, eventos não relacionados e sobreposição. */
 export function useList(path, initial = {}) {
   const [params, setParams] = useState({ page: 1, ...initial });
   const [state, setState] = useState({ loading: true, data: [], meta: null, error: "" });
   const seq = useRef(0);
   const request = useRef(null);
+  const lastStarted = useRef(0);
   const key = JSON.stringify(params);
 
-  const reload = useCallback(async () => {
+  const reload = useCallback(async ({ passive = false } = {}) => {
+    // Polling e WebSocket não disputam a mesma consulta. Uma ação explícita pode renovar já.
+    if (passive && !canBackgroundRefresh({
+      hidden: document.hidden, inFlight: Boolean(request.current),
+      now: Date.now(), lastStarted: lastStarted.current,
+    })) return;
     const my = ++seq.current;
     request.current?.abort();
     const controller = new AbortController();
     request.current = controller;
-    setState((s) => ({ ...s, loading: true, error: "" }));
+    lastStarted.current = Date.now();
+    setState(s => ({ ...s, loading: true, error: "" }));
     try {
-      const r = await api(path, { query: params, signal: controller.signal });
-      if (my === seq.current) setState({ loading: false, data: r.data, meta: r.meta, error: "" });
-    } catch (e) {
-      if (my === seq.current) setState({ loading: false, data: [], meta: null, error: e.message });
+      const result = await api(path, { query: params, signal: controller.signal });
+      if (my === seq.current && !controller.signal.aborted) {
+        setState({ loading: false, data: result.data || [], meta: result.meta || null, error: "" });
+      }
+    } catch (error) {
+      if (my === seq.current && !controller.signal.aborted && error?.name !== 'AbortError') {
+        // Manter os registros visíveis durante falha de conexão, sem saltar a rolagem do celular.
+        setState(s => ({ ...s, loading: false, error: error?.message || 'Falha ao atualizar lista.' }));
+      }
+    } finally {
+      if (request.current === controller) request.current = null;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // key representa os filtros; o objeto `params` acompanha a mesma chave.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path, key]);
 
-  useEffect(() => { reload(); return () => { ++seq.current; request.current?.abort(); }; }, [reload]);
+  useEffect(() => {
+    reload();
+    return () => { ++seq.current; request.current?.abort(); request.current = null; };
+  }, [reload]);
   useEffect(() => {
     let timer;
-    const onChange = (event) => {
-      const msg = event?.detail;
-      if (msg?.type === "partner-presence" || msg?.type === "device-presence") return;
-      const section = path.split("/").filter(Boolean)[1];
-      const topic = msg?.topic;
-      if (msg?.type === "changed" && topic && topic !== "data" && topic !== section &&
-          !(section === "app-downloads" && topic === "downloads")) return;
-      clearTimeout(timer); timer = setTimeout(() => { if (!document.hidden) reload(); }, 300);
+    const schedule = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => reload({ passive: true }), 450);
     };
-    window.addEventListener("realtime-change", onChange);
-    window.addEventListener("realtime-ready", onChange);
-    return () => { clearTimeout(timer); window.removeEventListener("realtime-change", onChange); window.removeEventListener("realtime-ready", onChange); };
-  }, [reload]);
+    const onChange = event => { if (shouldRefreshList(path, event?.detail)) schedule(); };
+    const onReady = () => schedule();
+    // Ao retornar à aba, sincronizar sem transformar cada presença em consulta completa.
+    const onVisible = () => { if (!document.hidden) schedule(); };
+    window.addEventListener('realtime-change', onChange);
+    window.addEventListener('realtime-ready', onReady);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('realtime-change', onChange);
+      window.removeEventListener('realtime-ready', onReady);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [path, reload]);
+
   return {
     ...state, params, reload,
-    filter: (p) => setParams((prev) => ({ ...prev, ...p, page: 1 })),
-    setPage: (page) => setParams((prev) => ({ ...prev, page })),
+    filter: patch => setParams(prev => {
+      const next = { ...prev, ...patch, page: 1 };
+      return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
+    }),
+    setPage: page => setParams(prev => page === prev.page ? prev : { ...prev, page }),
   };
 }
 

@@ -17,6 +17,7 @@ import Licenses from "./pages/Licenses.jsx";
 import Partners, { Resellers } from "./pages/Partners.jsx";
 import PartnerTrash from "./pages/PartnerTrash.jsx";
 import Devices from "./pages/Devices.jsx";
+import LegacyMigration from "./pages/LegacyMigration.jsx";
 import LicenseActivation from "./pages/LicenseActivation.jsx";
 import Unlinked from "./pages/Unlinked.jsx";
 import Sources from "./pages/Sources.jsx";
@@ -46,6 +47,7 @@ const PAGES = {
   conta: ["Minha conta", ProfilePage],
   dashboard: ["Visão geral", Dashboard], vpsmonitor: ["Servidor / VPS", VpsMonitor], vpsfiles: ["Arquivos da VPS", VpsFiles],
   webaccess: ["Player Web", WebAccess], whiteLabel: ["Aplicativos white-label", WhiteLabel],
+  legados: ["Migração de legados", LegacyMigration],
   "ativar-tv": ["Ativar TV", LicenseActivation], licenses: ["Licenças das TVs", Licenses], devices: ["TVs e dispositivos", Devices], unlinked: ["TVs sem configuração", Unlinked],
   partners: ["Parceiros", Partners], servermonitor: ["Qualidade dos servidores", ServerMonitor], sources: ["Fontes globais de conteúdo", Sources],
   resellers: ["Revendas", Resellers], network: ["Rede de distribuição", DistributionNetwork], support: ["Resolver problema da TV", () => <SupportCenter base="/admin" />], trash: ["Lixeira", PartnerTrash], clients: ["Clientes", Clients], credits: ["Créditos", Credits], downloads: ["Downloads e links", Downloads],
@@ -59,7 +61,7 @@ const PAGES = {
 const GROUPS = [
  {label:null,items:['dashboard']},
  {label:'Dashboards',items:['area/operacao','area/rede','area/planos','area/financeiro','area/aplicativos','area/infra','area/administracao']},
- {label:'Atendimento e operação',items:['ativar-tv','clients','devices','support','unlinked'],legacy:true},
+ {label:'Atendimento e operação',items:['ativar-tv','clients','devices','legados','support','unlinked'],legacy:true},
  {label:'Planos e licenças',items:['commerce3','licenses','pricing','credits'],legacy:true},
  {label:'Financeiro',items:['billing','pix'],legacy:true},
  {label:'Rede comercial',items:['resellers','partners','network'],legacy:true},
@@ -171,7 +173,7 @@ const SIMPLE_ADMIN = new Set(['dashboard','area/operacao','area/rede','area/plan
 function Shell({ user }) {
   const [simpleMode, setSimpleMode] = useSimpleMode("admin");
   // Itens do menu são conveniência: cada rota é protegida por permissão no backend.
-  const hidden = (k) => ((k === "network" || k === "ativar-tv") && user.role !== "superadmin") || ((k === "whiteLabel" || k === "help") && user.role !== "superadmin") || ((k === "vpsmonitor" || k === "vpsfiles" || k === "pricing" || k === "commerce3" || k === "trash") && user.role !== "superadmin") || (user.role === "support" && k === "audit") || ((k === "users" || k === "loginhistory" || k === "mail" || k === "notifications") && user.role !== "superadmin");
+  const hidden = (k) => ((k === "network" || k === "ativar-tv" || k === "legados") && user.role !== "superadmin") || ((k === "whiteLabel" || k === "help") && user.role !== "superadmin") || ((k === "vpsmonitor" || k === "vpsfiles" || k === "pricing" || k === "commerce3" || k === "trash") && user.role !== "superadmin") || (user.role === "support" && k === "audit") || ((k === "users" || k === "loginhistory" || k === "mail" || k === "notifications") && user.role !== "superadmin");
   const canOpenPage = id => Boolean(PAGES[id]) && !hidden(id);
   const allowed = id => {
     const area = WORK_AREAS[id];
@@ -193,27 +195,6 @@ function Shell({ user }) {
     return () => window.removeEventListener("hashchange", onHash);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user.role]);
-  // Tabelas responsivas: reaproveita os títulos das colunas sem alterar os dados nem os componentes.
-  useEffect(() => {
-    const labelTables = () => {
-      document.querySelectorAll(".table-wrap table").forEach((table) => {
-        const headers = Array.from(table.querySelectorAll("thead tr:last-child th")).map((th) => th.textContent.trim());
-        if (!headers.length) return;
-        table.querySelectorAll("tbody tr").forEach((tr) => {
-          const cells = Array.from(tr.children).filter((el) => el.matches("td"));
-          if (cells.length !== headers.length) return; // não inventar rótulos em linhas combinadas
-          cells.forEach((td, i) => {
-            const label = headers[i] || (td.classList.contains("actions") ? "Ações" : "Detalhe");
-            if (td.dataset.label !== label) td.dataset.label = label;
-          });
-        });
-      });
-    };
-    labelTables();
-    const observer = new MutationObserver(labelTables);
-    observer.observe(document.body, { childList: true, subtree: true });
-    return () => observer.disconnect();
-  }, []);
   const Current = PAGES[page]?.[1] || Dashboard;
   const workArea = findWorkArea(page);
   const go = (k) => { setPage(k); setOpen(false); window.scrollTo(0, 0); };

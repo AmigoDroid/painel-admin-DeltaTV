@@ -6,7 +6,7 @@ import DeviceListsModal from "./DeviceListsModal.jsx";
 import DeviceRecordModal from "./DeviceRecordModal.jsx";
 import AdminDeleteModal from "./AdminDeleteModal.jsx";
 
-const REFRESH_MS = 20000;
+const REFRESH_MS = 60000; // fallback quando o WebSocket não informa mudanças; evita refazer a lista a cada 20 s
 
 export default function Devices({ onChanged }) {
   const { toast } = useUi();
@@ -25,9 +25,9 @@ export default function Devices({ onChanged }) {
   const busy = registering || viewing || adding || record || deleting;
   useEffect(() => {
     if (busy) return undefined;
-    const t = setInterval(() => { if (!document.hidden) list.reload(); }, REFRESH_MS);
+    const t = setInterval(() => { if (!document.hidden && !list.loading) list.reload({ passive: true }); }, REFRESH_MS);
     return () => clearInterval(t);
-  }, [busy, list.reload]);
+  }, [busy, list.reload, list.loading]);
 
 
   return (
@@ -43,7 +43,7 @@ export default function Devices({ onChanged }) {
           <option value="">Online e offline</option><option value="true">Só online</option><option value="false">Só offline</option>
         </select>
       </div>
-      <Table><thead><tr><th>MAC / aparelho</th><th>Tipo</th><th>Conexão</th><th>Assistindo / IP</th><th>Listas atuais</th><th>Parceiros</th><th>Situação dos vínculos</th><th /></tr></thead>
+      <div className="device-list"><Table><thead><tr><th>MAC / aparelho</th><th>Tipo</th><th>Conexão</th><th>Assistindo / IP</th><th>Listas atuais</th><th>Parceiros</th><th>Situação dos vínculos</th><th /><th className="mobile-details-header">Informações</th></tr></thead>
         <tbody>{list.data.map(device => <tr key={device.deviceId}>
           <td><button type="button" className="device-mac-link mono" onClick={() => setRecord({ device, tab: "summary" })}>{device.mac}</button></td>
           <td><PlatformBadge platform={device.platform} /></td><td><OnlineBadge online={device.online} lastSeenAt={device.lastSeenAt} /></td>
@@ -59,7 +59,13 @@ export default function Devices({ onChanged }) {
             { label: "Adicionar parceiro", onClick: () => setAdding(device) },
             { label: "Excluir aparelho e todos os vínculos", hidden: !isSuper, danger: true, onClick: () => setDeleting({ type: "device", id: device.deviceId }) },
           ]} /></td>
-        </tr>)}</tbody></Table>
+          <td className="mobile-device-details" data-label="Informações"><details><summary>Mais informações da TV</summary>
+            <div>Tipo: <PlatformBadge platform={device.platform}/></div>
+            <div>Reprodução: {device.live?.playback?.title || 'Sem telemetria atual'}</div>
+            <div>IP: {device.live?.online ? device.live.ip || 'indisponível' : 'offline'}</div>
+            <div>Parceiros: {device.partners?.join(' · ') || '—'}</div>
+          </details></td>
+        </tr>)}</tbody></Table></div>
       <Empty loading={list.loading} error={list.error} count={list.data.length} />
       <Pager meta={list.meta} onPage={list.setPage} />
       {registering && (
