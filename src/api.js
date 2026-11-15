@@ -1,4 +1,4 @@
-import { createApiClient, ApiError } from "../../shared/api-client.js";
+import { createApiClient, ApiError } from "../shared/api-client.js";
 export { ApiError };
 const API = (import.meta.env.VITE_API_URL || (import.meta.env.DEV ? "http://localhost:3000" : "")).replace(/\/+$/, "");
 if (!API || !/^https?:\/\//i.test(API) || (import.meta.env.PROD && !API.startsWith("https://"))) throw new Error("VITE_API_URL deve apontar para uma API válida via HTTPS em produção.");

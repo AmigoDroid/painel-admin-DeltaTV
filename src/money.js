@@ -1,1 +1,1 @@
-export {toCents,moneyInput,formatBRL} from "../../shared/ui/src/money.js";
+export {toCents,moneyInput,formatBRL} from "../shared/ui/src/money.js";

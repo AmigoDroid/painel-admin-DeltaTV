@@ -1,6 +1,6 @@
-import {Breadcrumb,PlatformBrand} from "../../shared/PanelExperience.jsx";
+import {Breadcrumb,PlatformBrand} from "../shared/PanelExperience.jsx";
 import Superadmin from "./pages/Superadmin.jsx";
-import { panelAllows, adminPageAllowed } from "../../shared/permissions.js";
+import { panelAllows, adminPageAllowed } from "../shared/permissions.js";
 import TaskFinder from "@deltatv/ui/TaskFinder";
 import { TASKS } from "./task-directory.js";
 import { connectRealtime } from "./realtime.js";

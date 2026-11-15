@@ -17,7 +17,7 @@ import {
   spDateToIso,
 } from "../ui.jsx";
 import PartnerPicker from "../PartnerPicker.jsx";
-import DataTable from "../../../shared/DataTable.jsx";
+import DataTable from "../../shared/DataTable.jsx";
 import TvMessages from "../TvMessages.jsx";
 import "./superadmin.css";
 const BASE = "/admin/control";

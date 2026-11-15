@@ -1,0 +1,38 @@
+{
+  "name": "@deltatv/ui",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.js",
+    "./TaskFinder": "./src/TaskFinder.jsx",
+    "./EasyStart": "./src/EasyStart.jsx",
+    "./useSimpleMode": "./src/useSimpleMode.js",
+    "./money": "./src/money.js",
+    "./appearance": "./src/appearance-screen-settings.js",
+    "./task-intent": "./src/task-intent.js",
+    "./ProfilePage": "./src/ProfilePage.jsx",
+    "./Dialog": "./src/Dialog.jsx",
+    "./WizardProgress": "./src/WizardProgress.jsx",
+    "./HelpExperience": "./src/HelpExperience.jsx",
+    "./WhiteLabelApps": "./src/WhiteLabelApps.jsx",
+    "./ConnectionAudit": "./src/ConnectionAudit.jsx",
+    "./ContentSourcesWorkspace": "./src/ContentSourcesWorkspace.jsx",
+    "./server-health": "./src/server-health.js",
+    "./ServerMonitorView": "./src/ServerMonitorView.jsx",
+    "./commerce-workspace.css": "./src/commerce-workspace.css",
+    "./RokuSimulator": "./src/RokuSimulator.jsx",
+    "./studio-workspace.css": "./src/studio-workspace.css",
+    "./operation-center.css": "./src/operation-center.css",
+    "./support-center.css": "./src/support-center.css",
+    "./PasswordResetView": "./src/PasswordResetView.jsx",
+    "./password-reset.css": "./src/password-reset.css",
+    "./LoginHistory": "./src/LoginHistory.jsx",
+    "./realtime": "./src/realtime.js",
+    "./StudioWorkspace": "./src/StudioWorkspace.jsx",
+    "./ConfigureForm": "./src/ConfigureForm.jsx"
+  },
+  "peerDependencies": {
+    "react": "^18.3.1"
+  }
+}
