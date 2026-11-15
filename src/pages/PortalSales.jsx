@@ -10,7 +10,7 @@ const Grid=({children})=><div style={{display:'grid',gridTemplateColumns:'repeat
 const Opt=({value,children})=><option value={value}>{children}</option>;
 const empty='';
 export default function PortalSales(){
- const [view,setView]=useState(null),[candidates,setCandidates]=useState([]),[search,setSearch]=useState('');
+ const [view,setView]=useState(null),[candidates,setCandidates]=useState([]),[invitations,setInvitations]=useState([]),[networkTree,setNetworkTree]=useState([]),[search,setSearch]=useState('');
  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[success,setSuccess]=useState('');
  const [plan,setPlan]=useState({code:'',name:'',wholesale:'',minimum:''});
  const [seller,setSeller]=useState({partnerId:'',parentPartnerId:''});
@@ -21,7 +21,7 @@ export default function PortalSales(){
  const [costs,setCosts]=useState(null);
  const [contractRequestId,setContractRequestId]=useState(()=>crypto.randomUUID());
  useEffect(()=>{if(view?.forecast?.settings&&!costs){const s=view.forecast.settings;setCosts({vps:String(Number(s.vps_monthly_cents)/100),domain:String(Number(s.domain_annual_cents)/100),other:String(Number(s.other_monthly_cents)/100),proxy:String(Number(s.proxy_cost_per_gb_cents)/100),gb:String(s.forecast_proxy_gb_per_partner),margin:String(s.target_margin_bp/100),tax:String(s.tax_bp/100),reserve:String(s.reserve_bp/100)});}},[view,costs]);
- const load=useCallback(async()=>{const [a,b]=await Promise.all([api('/admin/portal-sales'),api('/admin/portal-sales/candidates',{query:{q:search}})]);setView(a);setCandidates(b);},[search]);
+ const load=useCallback(async()=>{const [a,b,c,d]=await Promise.all([api('/admin/portal-sales'),api('/admin/portal-sales/candidates',{query:{q:search}}),api('/admin/portal-sales/invitations'),api('/admin/portal-sales/tree')]);setView(a);setCandidates(b);setInvitations(c.items||[]);setNetworkTree(d.items||[]);},[search]);
  useEffect(()=>{load().catch(e=>setError(e.message));},[load]);
  const submit=async(url,method,body)=>{
    setBusy(true);setError('');setSuccess('');
@@ -78,7 +78,7 @@ export default function PortalSales(){
      <button className="btn primary" disabled={busy}>Salvar plano</button>
     </form>
    </Section>
-   <Section title="3. Pedido de estoque pré-pago" description="Criar pedido não libera estoque. A liberação exige a liquidação na etapa 4.">
+   <Section title="3. Pedido de estoque pré-pago" description="Criar pedido não libera estoque. A liberação exige confirmação bancária pelo Superadmin (já implementada).">
     <form onSubmit={e=>{e.preventDefault();submit('/admin/portal-sales/orders','POST',{sellerPartnerId:order.sellerPartnerId,planCode:order.planCode,quantityMonths:Number(order.quantityMonths)});}} style={{display:'grid',gap:10}}>
      <FormField label="Master ou Submaster"><select required value={order.sellerPartnerId} onChange={e=>setOrder({...order,sellerPartnerId:e.target.value})}><Opt value={empty}>Selecionar</Opt>{sellers.filter(s=>s.active).map(s=><Opt key={s.partner_id} value={s.partner_id}>{s.name}</Opt>)}</select></FormField>
      <FormField label="Plano"><select required value={order.planCode} onChange={e=>setOrder({...order,planCode:e.target.value})}><Opt value={empty}>Selecionar</Opt>{plans.filter(p=>p.active).map(p=><Opt key={p.code} value={p.code}>{p.name} — {brl(p.wholesale_cents)}/mês</Opt>)}</select></FormField>
@@ -95,7 +95,7 @@ export default function PortalSales(){
     </form>
    </Section>
   </Grid>
-  <Section title="5. Ativar acesso de cliente existente" description="Primeiro vínculo exige você (Superadmin); renovações subsequentes ficam com o Master responsável.">
+  <Section title="5. Ativar acesso de cliente existente" description="Para contas legadas o primeiro vínculo exige Superadmin. Novos clientes podem ser cadastrados diretamente pelos Masters via convite com estoque reservado.">
    <form onSubmit={async e=>{e.preventDefault();const ok=await submit('/admin/portal-sales/contracts','POST',{sellerPartnerId:contract.sellerPartnerId,customerPartnerId:contract.customerPartnerId,planCode:contract.planCode,months:Number(contract.months),unitResaleCents:cents(contract.resale),monthlyFeeCents:cents(contract.monthly),requestId:contractRequestId});if(ok)setContractRequestId(crypto.randomUUID());}} style={{display:'grid',gap:12}}>
     <Grid>
      <FormField label="Vendedor"><select required value={contract.sellerPartnerId} onChange={e=>setContract({...contract,sellerPartnerId:e.target.value})}><Opt value={empty}>Selecionar</Opt>{sellers.filter(s=>s.active).map(s=><Opt key={s.partner_id} value={s.partner_id}>{s.name}</Opt>)}</select></FormField>
@@ -109,9 +109,25 @@ export default function PortalSales(){
     <button className="btn primary" disabled={busy||!contract.customerPartnerId}>Vincular contrato utilizando estoque</button>
    </form>
   </Section>
+  <Section title="Árvore comercial completa" description="Visão consolidada de Masters e Submasters. Cada vendedor só pode consultar os próprios descendentes.">
+   <div style={{overflowX:'auto'}}><table style={{width:'100%'}}><thead><tr><th>Distribuidor</th><th>Papel</th><th>Estoque</th><th>Clientes diretos</th></tr></thead><tbody>{networkTree.map(n=><tr key={n.partner_id}><td><span style={{paddingLeft:Math.min(n.depth,12)*12}}>{n.depth?'↳ ':''}{n.name}</span></td><td>{n.role}</td><td>{n.available_months}</td><td>{n.direct_customers}</td></tr>)}</tbody></table></div>
+  </Section>
   <Section title="Rede autorizada e estoque disponível">
    <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr><th>Parceiro</th><th>Papel</th><th>Meses em estoque</th><th>Pode vender</th><th>Ativo</th></tr></thead><tbody>{sellers.map(s=><tr key={s.partner_id}><td>{s.name}</td><td>{s.role==='master'?'Master':'Submaster'}</td><td>{s.stock_months}</td><td><input type="checkbox" checked={s.can_sell} disabled={busy} aria-label={`Permitir vendas de ${s.name}`} onChange={e=>submit(`/admin/portal-sales/sellers/${s.partner_id}`,'PATCH',{canSell:e.target.checked})}/></td><td><input type="checkbox" checked={s.active} disabled={busy} aria-label={`Ativar ${s.name}`} onChange={e=>submit(`/admin/portal-sales/sellers/${s.partner_id}`,'PATCH',{active:e.target.checked})}/></td></tr>)}</tbody></table></div>
    {!sellers.length&&<p className="muted">Cadastre o primeiro Master para começar.</p>}
+  </Section>
+  <Section title="Convites comerciais — toda a rede" description="Acompanhe reservas de meses, cadastros automáticos e convites pendentes. Você pode revogar convites de qualquer Master e devolver o estoque reservado.">
+   <Grid>
+    <div className="stat"><small>Pendentes</small><strong>{view?.invitationSummary?.pending??0}</strong></div>
+    <div className="stat"><small>Meses reservados</small><strong>{view?.invitationSummary?.reserved_months??0}</strong></div>
+    <div className="stat"><small>Cadastros concluídos</small><strong>{view?.invitationSummary?.accepted??0}</strong></div>
+   </Grid>
+   <div style={{overflowX:'auto'}}><table style={{width:'100%'}}><thead><tr><th>Master responsável</th><th>Convidado</th><th>Tipo</th><th>Meses</th><th>Estado</th><th>Criado</th><th>Ação</th></tr></thead><tbody>{invitations.map(i=><tr key={i.id}>
+    <td>{i.seller_name}</td><td>{i.invited_name}<br/><small>{i.invited_email}</small></td><td>{i.invite_type==='submaster'?'Submaster':'Parceiro'}</td><td>{i.months}</td>
+    <td>{({pending:'Reservado',accepted:'Aceito',revoked:'Revogado',expired:'Expirado'})[i.status]||i.status}</td><td>{monthDate(i.created_at)}</td>
+    <td>{i.status==='pending'&&<button disabled={busy} onClick={()=>{if(window.confirm('Revogar o convite e devolver o estoque ao Master?'))submit(`/admin/portal-sales/invitations/${i.id}/revoke`,'POST',{});}}>Revogar</button>}</td>
+   </tr>)}</tbody></table></div>
+   <small className="muted">Os registros são paginados por amostragem (últimos 200). Convites expirados são devolvidos ao estoque na próxima consulta comercial do vendedor.</small>
   </Section>
   <Section title="Contratos ativos da rede">
    <div style={{overflowX:'auto'}}><table style={{width:'100%'}}><thead><tr><th>Cliente</th><th>Vendedor</th><th>Plano</th><th>Vencimento</th><th>Meses pagos</th></tr></thead><tbody>{(view?.contracts||[]).map(c=><tr key={c.id}><td>{c.customer_name}</td><td>{c.seller_name}</td><td>{c.plan_code}</td><td>{monthDate(c.expires_at)}</td><td>{c.months_paid}</td></tr>)}</tbody></table></div>
