@@ -1,9 +1,9 @@
 /** Catálogo de ações e sinônimos. Rotas existentes, nunca cria autorizações. */
 export const TASKS = [
-  {label:"Enviar mensagem para TVs",route:"tvmessages",description:"Selecionar clientes, revisar comunicado e acompanhar leituras",keywords:["mensagem","comunicado","aviso","tv","clientes"]},
   {"label": "Cadastrar cliente", "actionId":"client.create", "route": "clients", "description": "Adicionar ou localizar um cliente e seus dispositivos", "keywords": ["novo", "cliente", "usuario", "cadastro", "cliente"]},
   {"label": "Cadastrar revenda", "route": "resellers", "description": "Cadastrar ou aprovar uma revenda", "keywords": ["nova", "revenda", "revendedor", "registro", "convite"]},
   {"label": "Cadastrar parceiro", "route": "partners", "description": "Gerenciar parceiros de conteúdo e pré-cadastros", "keywords": ["novo", "parceiro", "servidor"]},
+  {"label": "Ativar TV com licença", "route": "ativar-tv", "description": "MAC, licença do dispositivo e emissão direta pelo Superadmin", "keywords": ["ativar", "mac", "emitir", "licença", "tv"]},
   {"label": "Localizar dispositivo por MAC", "route": "devices", "description": "Buscar TVs e consultar detalhes", "keywords": ["mac", "aparelho", "tv", "localizar"]},
   {"label": "Ver TV sem configuração", "route": "unlinked", "description": "Localizar uma TV aguardando vínculo", "keywords": ["ativar", "configurar", "pendente"]},
   {"label": "Diagnosticar TV offline", "route": "support", "description": "Investigar falhas de conexão", "keywords": ["erro", "falha", "internet", "diagnostico", "suporte"]},

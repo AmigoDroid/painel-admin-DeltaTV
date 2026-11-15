@@ -1,4 +1,3 @@
-import TvMessages from "./TvMessages.jsx";
 import TaskFinder from "@deltatv/ui/TaskFinder";
 import { TASKS } from "./task-directory.js";
 import { connectRealtime } from "./realtime.js";
@@ -17,6 +16,7 @@ import Licenses from "./pages/Licenses.jsx";
 import Partners, { Resellers } from "./pages/Partners.jsx";
 import PartnerTrash from "./pages/PartnerTrash.jsx";
 import Devices from "./pages/Devices.jsx";
+import LicenseActivation from "./pages/LicenseActivation.jsx";
 import Unlinked from "./pages/Unlinked.jsx";
 import Sources from "./pages/Sources.jsx";
 import Billing from "./pages/Billing.jsx";
@@ -41,11 +41,10 @@ import HelpManagement from "./pages/HelpManagement.jsx";
 const WebAccess = () => <WebAccessPage admin />;
 
 const PAGES = {
-  tvmessages: ["Mensagens para TVs", TvMessages],
   pagamentos: ["Pagamentos", () => null], dispositivos: ["Dispositivos", () => null], licenciamento: ["Licenças", () => null], ativacao: ["Ativar aplicativo", () => null], conta: ["Minha conta", ProfilePage],
   dashboard: ["Visão geral", Dashboard], vpsmonitor: ["Servidor / VPS", VpsMonitor], vpsfiles: ["Arquivos da VPS", VpsFiles],
   webaccess: ["Player Web", WebAccess], whiteLabel: ["Aplicativos white-label", WhiteLabel],
-  licenses: ["Licenças das TVs", Licenses], devices: ["TVs e dispositivos", Devices], unlinked: ["TVs sem configuração", Unlinked],
+  "ativar-tv": ["Ativar TV", LicenseActivation], licenses: ["Licenças das TVs", Licenses], devices: ["TVs e dispositivos", Devices], unlinked: ["TVs sem configuração", Unlinked],
   partners: ["Parceiros", Partners], servermonitor: ["Qualidade dos servidores", ServerMonitor], sources: ["Fontes globais de conteúdo", Sources],
   resellers: ["Revendas", Resellers], network: ["Rede de distribuição", DistributionNetwork], support: ["Resolver problema da TV", () => <SupportCenter base="/admin" />], trash: ["Lixeira", PartnerTrash], clients: ["Clientes", Clients], credits: ["Créditos", Credits], downloads: ["Downloads e links", Downloads],
   billing: ["Financeiro", Billing], pix: ["Pix", Pix], pricing: ["Planos e valores", PlansAndPricing], commerce3: ["Planos SaaS e comissões", Commerce3],
@@ -55,7 +54,7 @@ const PAGES = {
 // Menu por área: quem é de conteúdo (Parceiros) fica separado de quem vende licença (Revendas e seus clientes).
 const GROUPS = [
   { label: null, items: ["dashboard"] },
-  { label: "Atendimento e operação", items: ["clients", "devices", "ativacao", "tvmessages", "support", "unlinked"] },
+  { label: "Atendimento e operação", items: ["ativar-tv", "clients", "devices", "support", "unlinked"] },
   { label: "Planos e licenças", items: ["commerce3", "licenses", "pricing", "credits"] },
   { label: "Financeiro", items: ["billing", "pix"] },
   { label: "Rede comercial", items: ["resellers", "partners", "network"] },
@@ -65,7 +64,6 @@ const GROUPS = [
 
 // Ícones do menu (traço simples, herdam a cor do texto).
 const ICONS = {
-  tvmessages: <><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4M7 8h10M7 12h6"/></>,
   pagamentos: <><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 11h18M8 16h3"/></>,
   dispositivos: <><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8M12 17v4"/></>,
   licenciamento: <><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9"/></>,
@@ -74,6 +72,7 @@ const ICONS = {
   dashboard: <><rect x="3" y="3" width="7.5" height="7.5" rx="2" /><rect x="13.5" y="3" width="7.5" height="7.5" rx="2" /><rect x="3" y="13.5" width="7.5" height="7.5" rx="2" /><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2" /></>,
   vpsmonitor: <><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h10M7 13h4m3 0h3M7 17h10"/></>,
   vpsfiles: <><path d="M3 6h6l2 2h10v12H3z"/><path d="M3 10h18"/></>,
+  "ativar-tv": <><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M8 12l3 3 5-6"/></>,
   licenses: <><circle cx="8" cy="15" r="4" /><path d="M11 12l9-9M16 7l3 3M14 9l2 2" /></>,
   partners: <><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5" /><path d="M16 4.8a3.5 3.5 0 010 6.4M18.5 14.8c1.7.7 2.8 2.3 3 5.2" /></>,
   servermonitor: <><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M6 14h3l2-5 3 8 2-4h2"/></>,
@@ -163,11 +162,11 @@ function UserMenu({ user, onAccount }) {
   );
 }
 
-const SIMPLE_ADMIN = new Set(["pagamentos", "dispositivos", "licenciamento", "ativacao", "conta", "dashboard", "support", "clients", "devices", "resellers", "network", "commerce3", "licenses", "billing", "servermonitor", "help"]);
+const SIMPLE_ADMIN = new Set(["pagamentos", "dispositivos", "licenciamento", "ativacao", "conta", "dashboard", "support", "ativar-tv", "clients", "devices", "resellers", "network", "commerce3", "licenses", "billing", "servermonitor", "help"]);
 function Shell({ user }) {
   const [simpleMode, setSimpleMode] = useSimpleMode("admin");
   // Itens do menu são conveniência: cada rota é protegida por permissão no backend.
-  const hidden = (k) => (k === "tvmessages" && user.role !== "superadmin") || ((k === "network") && user.role !== "superadmin") || ((k === "whiteLabel" || k === "help") && user.role !== "superadmin") || ((k === "vpsmonitor" || k === "vpsfiles" || k === "pricing" || k === "commerce3" || k === "trash") && user.role !== "superadmin") || (user.role === "support" && k === "audit") || ((k === "users" || k === "loginhistory" || k === "mail" || k === "notifications") && user.role !== "superadmin");
+  const hidden = (k) => ((k === "network" || k === "ativar-tv") && user.role !== "superadmin") || ((k === "whiteLabel" || k === "help") && user.role !== "superadmin") || ((k === "vpsmonitor" || k === "vpsfiles" || k === "pricing" || k === "commerce3" || k === "trash") && user.role !== "superadmin") || (user.role === "support" && k === "audit") || ((k === "users" || k === "loginhistory" || k === "mail" || k === "notifications") && user.role !== "superadmin");
   const menu = Object.entries(PAGES).filter(([k]) => !hidden(k));
   const allowed = (h) => menu.some(([k]) => k === h);
   const fromHash = () => (allowed(location.hash.slice(1)) ? location.hash.slice(1) : "dashboard");
@@ -229,10 +228,10 @@ function Shell({ user }) {
     <div className="layout">
       <aside className={`sidebar ${open ? "open" : ""}`} id="menu-principal">
         <div className="brand"><BrandMark size={32} /><div><strong>DeltaTV</strong><span>Administração</span></div><button type="button" className="sidebar-close" aria-label="Fechar menu" onClick={() => setOpen(false)}>×</button></div>
-        
+        <button type="button" className="easy-mode-button" aria-pressed={!simpleMode} onClick={() => setSimpleMode((s) => !s)}>{simpleMode ? "⚙ Ver todas as opções" : "✓ Voltar ao modo simples"}</button>
         <nav className="nav-scroll" aria-label="Menu principal">
           {GROUPS.map((g) => {
-            const items = g.items.filter((k) => allowed(k));
+            const items = g.items.filter((k) => allowed(k) && (!simpleMode || SIMPLE_ADMIN.has(k) || page === k));
             if (!items.length) return null;
             return (
               <div className="nav-group" key={g.label || "top"}>
@@ -256,7 +255,7 @@ function Shell({ user }) {
           </button>
           <strong className="topbar-title">{PAGES[page][0]}</strong>
           {badges.unlinked > 0 || badges.resellers > 0 ? <span className="count" aria-label="Itens aguardando">{(badges.unlinked || 0) + (badges.resellers || 0)}</span> : null}
-          
+          <button type="button" className="easy-mode-button" aria-pressed={!simpleMode} onClick={() => setSimpleMode((s) => !s)}>{simpleMode ? "Modo simples · mostrar tudo" : "Modo completo · simplificar"}</button>
           <UserMenu user={user} onAccount={() => go("conta")} />
         </div>
         <main className="content">
