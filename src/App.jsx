@@ -5,7 +5,8 @@ import { useEffect, useRef, useState } from "react";
 import { api, getAuth, login, logout } from "./api.js";
 import { UiProvider, Field, useAction, BrandMark } from "./ui.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
-import { OperationCenter, CENTER_CONFIG } from "./OperationCenter.jsx";
+import WorkArea from "./WorkArea.jsx";
+import { WORK_AREAS, LEGACY_CENTERS, findWorkArea } from "./work-areas.js";
 import { useSimpleMode } from "@deltatv/ui/useSimpleMode";
 import { EasyPageGuide } from "@deltatv/ui/EasyStart";
 import ServerMonitor from "./pages/ServerMonitor.jsx";
@@ -41,7 +42,8 @@ import HelpManagement from "./pages/HelpManagement.jsx";
 const WebAccess = () => <WebAccessPage admin />;
 
 const PAGES = {
-  pagamentos: ["Pagamentos", () => null], dispositivos: ["Dispositivos", () => null], licenciamento: ["Licenças", () => null], ativacao: ["Ativar aplicativo", () => null], conta: ["Minha conta", ProfilePage],
+  ...Object.fromEntries(Object.values(WORK_AREAS).map(a=>[a.id,[a.label,()=>null]])),
+  conta: ["Minha conta", ProfilePage],
   dashboard: ["Visão geral", Dashboard], vpsmonitor: ["Servidor / VPS", VpsMonitor], vpsfiles: ["Arquivos da VPS", VpsFiles],
   webaccess: ["Player Web", WebAccess], whiteLabel: ["Aplicativos white-label", WhiteLabel],
   "ativar-tv": ["Ativar TV", LicenseActivation], licenses: ["Licenças das TVs", Licenses], devices: ["TVs e dispositivos", Devices], unlinked: ["TVs sem configuração", Unlinked],
@@ -53,13 +55,10 @@ const PAGES = {
 
 // Menu por área: quem é de conteúdo (Parceiros) fica separado de quem vende licença (Revendas e seus clientes).
 const GROUPS = [
-  { label: null, items: ["dashboard"] },
-  { label: "Atendimento e operação", items: ["ativar-tv", "clients", "devices", "support", "unlinked"] },
-  { label: "Planos e licenças", items: ["commerce3", "licenses", "pricing", "credits"] },
-  { label: "Financeiro", items: ["billing", "pix"] },
-  { label: "Rede comercial", items: ["resellers", "partners", "network"] },
-  { label: "Aplicativos e servidores", items: ["whiteLabel", "webaccess", "downloads", "sources", "servermonitor"] },
-  { label: "Administração", items: ["vpsmonitor", "vpsfiles", "trash", "help", "users", "loginhistory", "notifications", "mail", "audit"] },
+ {label:null,items:['dashboard']},
+ {label:'Operações',items:['area/operacao','area/rede']},
+ {label:'Comercial e financeiro',items:['area/planos','area/financeiro']},
+ {label:'Plataforma',items:['area/aplicativos','area/infra','area/administracao']},
 ];
 
 // Ícones do menu (traço simples, herdam a cor do texto).
@@ -100,7 +99,7 @@ const ICONS = {
   audit: <><path d="M8 3h8v3H8z" /><path d="M6 5H5a1 1 0 00-1 1v14a1 1 0 001 1h14a1 1 0 001-1V6a1 1 0 00-1-1h-1M8 12h8M8 16h5" /></>,
 };
 const NavIcon = ({ k }) => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{ICONS[k]}</svg>
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{ICONS[k] || ICONS[WORK_AREAS[k]?.icon] || ICONS.dashboard}</svg>
 );
 
 function Login({ onDeviceAccess }) {
@@ -162,14 +161,22 @@ function UserMenu({ user, onAccount }) {
   );
 }
 
-const SIMPLE_ADMIN = new Set(["pagamentos", "dispositivos", "licenciamento", "ativacao", "conta", "dashboard", "support", "ativar-tv", "clients", "devices", "resellers", "network", "commerce3", "licenses", "billing", "servermonitor", "help"]);
+const SIMPLE_ADMIN = new Set(['dashboard','area/operacao','area/rede','area/planos','area/financeiro','area/aplicativos','area/infra','area/administracao']);
 function Shell({ user }) {
   const [simpleMode, setSimpleMode] = useSimpleMode("admin");
   // Itens do menu são conveniência: cada rota é protegida por permissão no backend.
   const hidden = (k) => ((k === "network" || k === "ativar-tv") && user.role !== "superadmin") || ((k === "whiteLabel" || k === "help") && user.role !== "superadmin") || ((k === "vpsmonitor" || k === "vpsfiles" || k === "pricing" || k === "commerce3" || k === "trash") && user.role !== "superadmin") || (user.role === "support" && k === "audit") || ((k === "users" || k === "loginhistory" || k === "mail" || k === "notifications") && user.role !== "superadmin");
-  const menu = Object.entries(PAGES).filter(([k]) => !hidden(k));
-  const allowed = (h) => menu.some(([k]) => k === h);
-  const fromHash = () => (allowed(location.hash.slice(1)) ? location.hash.slice(1) : "dashboard");
+  const canOpenPage = id => Boolean(PAGES[id]) && !hidden(id);
+  const allowed = id => {
+    const area = WORK_AREAS[id];
+    return area ? area.items.some(item => canOpenPage(item.page)) : canOpenPage(id);
+  };
+  const fromHash = () => {
+    const raw = location.hash.slice(1);
+    const id = LEGACY_CENTERS[raw] || raw;
+    const area = findWorkArea(id);
+    return (area ? area.items.some(item=>canOpenPage(item.page)) : allowed(id)) ? id : 'dashboard';
+  };
   const [page, setPage] = useState(fromHash);
   const [open, setOpen] = useState(false); // gaveta do menu em tela pequena
   useEffect(() => { if (location.hash.slice(1) !== page) location.hash = page; }, [page]);
@@ -201,8 +208,8 @@ function Shell({ user }) {
     observer.observe(document.body, { childList: true, subtree: true });
     return () => observer.disconnect();
   }, []);
-  const Current = PAGES[page][1];
-  const isCenter = page !== "conta" && Object.prototype.hasOwnProperty.call(CENTER_CONFIG, page);
+  const Current = PAGES[page]?.[1] || Dashboard;
+  const workArea = findWorkArea(page);
   const go = (k) => { setPage(k); setOpen(false); window.scrollTo(0, 0); };
   // Esc fecha a gaveta; ao voltar para tela grande ela não fica "aberta" escondida.
   useEffect(() => {
@@ -224,6 +231,13 @@ function Shell({ user }) {
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  if (workArea) return <WorkArea area={workArea} route={page} go={go} back={()=>go('dashboard')}
+    allowed={item=>canOpenPage(item.page)} renderIcon={item=><NavIcon k={item.icon || 'dashboard'}/>}
+    renderPage={item=>{
+      if(!canOpenPage(item.page)) return <p>Esta operação não está disponível para seu perfil.</p>;
+      const CurrentPage=PAGES[item.page][1];
+      return <CurrentPage key={item.id} onChanged={refreshCounts} activeTab={item.tab} hideTabs={item.page==='commerce3'}/>;
+    }} />;
   return (
     <div className="layout">
       <aside className={`sidebar ${open ? "open" : ""}`} id="menu-principal">
@@ -261,7 +275,7 @@ function Shell({ user }) {
         <main className="content">
           <TaskFinder tasks={TASKS.filter(task => allowed(task.route))} onNavigate={go} />
           {simpleMode && page !== "dashboard" && <EasyPageGuide role="admin" page={page} onBack={() => go("dashboard")} />}
-          {isCenter ? <OperationCenter section={page} onNavigate={go} allowed={allowed} /> : <Current onChanged={refreshCounts} />}
+          <Current onChanged={refreshCounts} />
         </main>
       </div>
     </div>
