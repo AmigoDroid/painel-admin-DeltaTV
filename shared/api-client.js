@@ -19,38 +19,76 @@ export function createApiClient({
   baseUrl,
   key,
   audience,
-  storage = globalThis.sessionStorage,
+  // Login normal: persiste entre abas e reinícios do navegador (até o refresh token vencer no servidor).
+  storage = globalThis.localStorage,
+  // Impersonação: vale só para a aba que a abriu e nunca é gravada no armazenamento persistente.
+  tabStorage = globalThis.sessionStorage,
   timeoutMs = 30000,
 }) {
   let auth = null,
     refreshing = null;
-  try {
-    auth = JSON.parse(storage?.getItem(key) || "null");
-  } catch {
-    /* unavailable/corrupted storage */
-  }
-  // Legacy sessions require a new login; never migrate a persistent refresh credential.
-  try {
-    globalThis.localStorage?.removeItem(key);
-  } catch {
-    /* storage can be disabled */
+  const read = (store) => {
+    try {
+      return JSON.parse(store?.getItem(key) || "null");
+    } catch {
+      return null; // storage unavailable/corrupted
+    }
+  };
+  const write = (store, value) => {
+    try {
+      if (!store) return false;
+      store.setItem(key, JSON.stringify(value));
+      return true;
+    } catch {
+      return false; // storage disabled or full: caller falls back
+    }
+  };
+  const remove = (store) => {
+    try {
+      store?.removeItem(key);
+    } catch {}
+  };
+  const clearTaskIntent = () => {
+    try {
+      tabStorage?.removeItem("deltatv.task-intent.v1");
+    } catch {}
+  };
+  const notify = () => globalThis.window?.dispatchEvent(new Event("auth-changed"));
+
+  {
+    const stored = read(storage),
+      tab = read(tabStorage);
+    if (tab?.impersonation) auth = tab;
+    else {
+      auth = stored || tab || null;
+      // Sessões criadas antes desta versão ficavam só na aba: promove para o armazenamento persistente.
+      if (tab && (stored || write(storage, tab))) remove(tabStorage);
+    }
   }
   const getAuth = () => auth;
   const save = (value) => {
+    const wasImpersonating = !!auth?.impersonation;
     auth = value;
-    try {
-      if (value) storage?.setItem(key, JSON.stringify(value));
-      else storage?.removeItem(key);
-    } catch {
-      /* memory-only fallback */
+    if (value?.impersonation) write(tabStorage, value);
+    else {
+      remove(tabStorage);
+      if (value) {
+        // Se o armazenamento persistente estiver bloqueado, mantém ao menos na aba.
+        if (!write(storage, value)) write(tabStorage, value);
+      } else if (!wasImpersonating) remove(storage);
     }
-    if (!value) {
-      try {
-        storage?.removeItem("deltatv.task-intent.v1");
-      } catch {}
-    }
-    globalThis.window?.dispatchEvent(new Event("auth-changed"));
+    if (!value) clearTaskIntent();
+    notify();
   };
+  // Outra aba entrou, renovou ou saiu: acompanha para não usar um refresh token já rotacionado.
+  globalThis.window?.addEventListener?.("storage", (event) => {
+    if (auth?.impersonation) return;
+    if (event.storageArea && event.storageArea !== storage) return;
+    if (event.key !== null && event.key !== key) return;
+    auth = read(storage);
+    if (!auth) clearTaskIntent();
+    notify();
+  });
   async function raw(
     path,
     { method = "GET", body, query, token, signal, timeout = timeoutMs } = {},
@@ -121,16 +159,42 @@ export function createApiClient({
         message: "Sessão encerrada. Entre novamente.",
       });
     }
-    try {
-      const data = await raw("/auth/refresh", {
-        method: "POST",
-        body: { refreshToken: current.refreshToken },
-      });
-      if (auth === current) save(data);
-    } catch (error) {
-      if (auth === current && error.status === 401) save(null);
-      throw error;
-    }
+    // O refresh token é de uso único. Se outra aba já renovou, adota a sessão dela em vez de
+    // reenviar um token queimado (o que derrubaria o login nas duas abas).
+    const adoptFromOtherTab = () => {
+      if (current.impersonation) return false;
+      const shared = read(storage);
+      if (
+        !shared?.refreshToken ||
+        shared.refreshToken === current.refreshToken ||
+        shared.user?.id !== current.user?.id
+      )
+        return false;
+      if (auth === current) {
+        auth = shared;
+        notify();
+      }
+      return true;
+    };
+    const run = async () => {
+      if (adoptFromOtherTab()) return;
+      try {
+        const data = await raw("/auth/refresh", {
+          method: "POST",
+          body: { refreshToken: current.refreshToken },
+        });
+        if (auth === current) save(data);
+      } catch (error) {
+        if (error.status === 401) {
+          if (adoptFromOtherTab()) return;
+          if (auth === current) save(null);
+        }
+        throw error;
+      }
+    };
+    // Web Locks serializa a renovação entre abas do mesmo navegador (quando disponível).
+    const locks = globalThis.navigator?.locks;
+    return locks?.request ? locks.request(`auth-refresh:${key}`, run) : run();
   }
   const refresh = () =>
     (refreshing ??= rotate().finally(() => {
@@ -198,12 +262,11 @@ export function createApiClient({
     save(result);
   }
   function restorePrevious() {
-    let previous = null;
-    try {
-      previous = JSON.parse(storage?.getItem(key + ":previous") || "null");
-      storage?.removeItem(key + ":previous");
-    } catch {}
-    save(previous);
+    // A impersonação vive só na aba; o login real continua no armazenamento persistente.
+    remove(tabStorage);
+    auth = read(storage);
+    if (!auth) clearTaskIntent();
+    notify();
   }
   async function endImpersonation() {
     const current = auth;
@@ -236,11 +299,6 @@ export function createApiClient({
   const acceptSession = (value) => {
     if (!value?.accessToken || !value?.user?.id)
       throw new TypeError("Sessão inválida.");
-    if (value.impersonation && auth && !auth.impersonation) {
-      try {
-        storage?.setItem(key + ":previous", JSON.stringify(auth));
-      } catch {}
-    }
     save(value);
   };
   return {
