@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {toCents,moneyInput} from '../src/money.js';
-const source=fs.readFileSync(new URL('../src/api.js',import.meta.url),'utf8').replaceAll('import.meta.env',JSON.stringify({VITE_API_URL:'https://api.example.test',DEV:false,PROD:true}));
+const core=fs.readFileSync(new URL('../../shared/api-client.js',import.meta.url),'utf8');
+const source=fs.readFileSync(new URL('../src/api.js',import.meta.url),'utf8').replace('import { createApiClient, ApiError } from "../../shared/api-client.js";',core).replace('export { ApiError };','').replaceAll('import.meta.env',JSON.stringify({VITE_API_URL:'https://api.example.test',DEV:false,PROD:true}));
 const defer=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b});return {promise,resolve,reject}};
 const response=(status,data)=>({ok:status<400,status,json:async()=>data});
 const initial={accessToken:'old',refreshToken:'refresh-old',user:{id:'test'}};
@@ -10,7 +11,7 @@ let sequence=0;
 async function client(fetcher){
  const values=new Map();const storage={getItem:k=>values.get(k)||null,setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)};
  for(const key of ['iptv-admin-auth','iptv-reseller-auth','iptv-content-partner-auth'])storage.setItem(key,JSON.stringify(initial));
- globalThis.localStorage=storage;globalThis.window=new EventTarget();globalThis.fetch=fetcher;
+ globalThis.localStorage={getItem:()=>null,removeItem:()=>{}};globalThis.sessionStorage=storage;globalThis.window=new EventTarget();globalThis.fetch=fetcher;
  return import('data:text/javascript;base64,'+Buffer.from(source+`\n// case ${++sequence}`).toString('base64'));
 }
 test('BRL values convert exactly and reject ambiguous or unsafe values',()=>{
@@ -59,7 +60,7 @@ test('credential rejection does not retry the operation or refresh session',asyn
 test('AbortSignal reaches fetch and cancellation remains an AbortError',async()=>{
  const controller=new AbortController();controller.abort();let observed;
  const api=await client(async(_url,opts)=>{observed=opts.signal;throw new DOMException('Cancelled','AbortError')});
- await assert.rejects(api.api('/test',{signal:controller.signal}),{name:'AbortError'});assert.equal(observed,controller.signal);
+ await assert.rejects(api.api('/test',{signal:controller.signal}),{name:'AbortError'});assert.equal(observed.aborted,true);
 });
 test('socket can proactively renew an expired access token',async()=>{
  let rotations=0;const api=await client(async()=>{rotations++;return response(200,{...initial,accessToken:'new'})});

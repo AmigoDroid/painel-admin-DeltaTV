@@ -1,5 +1,6 @@
 /** Catálogo de ações e sinônimos. Rotas existentes, nunca cria autorizações. */
 export const TASKS = [
+ {label:"Central do superadmin",route:"control",description:"Lotes, validade, sessões, permissões, relatórios e backup",keywords:["superadmin","impersonar","backup","papel","sessões","trial","teste"]},
   {"label": "Cadastrar cliente", "actionId":"client.create", "route": "clients", "description": "Adicionar ou localizar um cliente e seus dispositivos", "keywords": ["novo", "cliente", "usuario", "cadastro", "cliente"]},
   {"label": "Cadastrar revenda", "route": "resellers", "description": "Cadastrar ou aprovar uma revenda", "keywords": ["nova", "revenda", "revendedor", "registro", "convite"]},
   {"label": "Cadastrar parceiro", "route": "partners", "description": "Gerenciar parceiros de conteúdo e pré-cadastros", "keywords": ["novo", "parceiro", "servidor"]},

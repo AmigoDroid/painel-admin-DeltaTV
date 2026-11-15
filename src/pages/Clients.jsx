@@ -1,3 +1,4 @@
+import ValidatedInput from "../../../shared/ValidatedInput.jsx";
 import WizardProgress from "@deltatv/ui/WizardProgress";
 import { useTaskIntent } from "@deltatv/ui/task-intent";
 import PartnerPicker from "../PartnerPicker.jsx";
@@ -136,10 +137,10 @@ function ClientForm({ client, prefill, fixedPartnerId, defaultPartnerId, onClose
           <PartnerPicker value={f.partnerId} onChange={(v) => setF((f) => ({ ...f, partnerId: v }))} />
         </Field>
       )}
-      <div className="row"><Field label="Nome"><input value={f.name} onChange={set("name")} /></Field><Field label="MAC"><input value={f.mac} onChange={set("mac")} placeholder="AA:BB:CC:DD:EE:FF" /></Field></div>
+      <div className="row"><Field label="Nome"><input value={f.name} onChange={set("name")} /></Field><Field label="MAC"><ValidatedInput kind="mac" value={f.mac} onChange={set("mac")} placeholder="AA:BB:CC:DD:EE:FF" /></Field></div>
       </>}
       {(edit || step === 1) && <>
-      <div className="row"><Field label="Telefone"><input value={f.phone} onChange={set("phone")} /></Field><Field label="Valor mensal (R$)"><input value={f.price} onChange={set("price")} placeholder="35,00" /></Field></div>
+      <div className="row"><Field label="Telefone"><ValidatedInput kind="phone" value={f.phone} onChange={set("phone")} /></Field><Field label="Valor mensal (R$)"><input value={f.price} onChange={set("price")} placeholder="35,00" /></Field></div>
       <Field label="Endereço"><input value={f.address} onChange={set("address")} /></Field>
       <Field label="Vencimento"><input type="date" value={f.dueDate} onChange={set("dueDate")} /></Field>
       <Field label="Observações"><textarea rows={3} value={f.notes} onChange={set("notes")} /></Field>

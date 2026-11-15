@@ -53,11 +53,11 @@ export default function PartnerPicker({ value = "", onChange, kind, emptyLabel =
         <option value="">{emptyLabel}</option>
         {options.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
       </select>
-      <div style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 12 }}>
+      {(meta.totalPages > 1 || loading || error) && <div style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 12 }}>
         <button type="button" className="btn sm" disabled={disabled || page <= 1} onClick={() => setPage((v) => v - 1)}>Anterior</button>
         <span className="muted">{loading ? "Buscando…" : error || `Página ${page} de ${meta.totalPages || 1}`}</span>
         <button type="button" className="btn sm" disabled={disabled || page >= (meta.totalPages || 1)} onClick={() => setPage((v) => v + 1)}>Próxima</button>
-      </div>
+      </div>}
     </div>
   );
 }

@@ -1,3 +1,6 @@
+import {Breadcrumb,PlatformBrand} from "../../shared/PanelExperience.jsx";
+import Superadmin from "./pages/Superadmin.jsx";
+import { panelAllows, adminPageAllowed } from "../../shared/permissions.js";
 import TaskFinder from "@deltatv/ui/TaskFinder";
 import { TASKS } from "./task-directory.js";
 import { connectRealtime } from "./realtime.js";
@@ -44,6 +47,7 @@ const WebAccess = () => <WebAccessPage admin />;
 
 const PAGES = {
   ...Object.fromEntries(Object.values(WORK_AREAS).map(a=>[a.id,[a.label,()=>null]])),
+  control: ["Central do superadmin", Superadmin],
   conta: ["Minha conta", ProfilePage],
   dashboard: ["Visão geral", Dashboard], vpsmonitor: ["Servidor / VPS", VpsMonitor], vpsfiles: ["Arquivos da VPS", VpsFiles],
   webaccess: ["Player Web", WebAccess], whiteLabel: ["Aplicativos white-label", WhiteLabel],
@@ -59,7 +63,7 @@ const PAGES = {
 // Dashboards coexistem com as páginas originais. Nunca substituir
 // uma função existente por um cartão que apenas parece operacional.
 const GROUPS = [
- {label:null,items:['dashboard']},
+ {label:null,items:['dashboard','control']},
  {label:'Dashboards',items:['area/operacao','area/rede','area/planos','area/financeiro','area/aplicativos','area/infra','area/administracao']},
  {label:'Atendimento e operação',items:['ativar-tv','clients','devices','legados','support','unlinked'],legacy:true},
  {label:'Planos e licenças',items:['commerce3','licenses','pricing','credits'],legacy:true},
@@ -124,7 +128,7 @@ function Login({ onDeviceAccess }) {
   return (
     <div className="auth">
       <div className="login card">
-        <div className="auth-brand"><BrandMark size={44} /><div><strong>DeltaTV</strong><span>Painel de licenciamento</span></div></div>
+        <div className="auth-brand"><BrandMark size={44} /><div><strong><PlatformBrand/></strong><span>Painel de licenciamento</span></div></div>
         <h2>Entrar</h2>
         <p className="muted auth-sub">Use o e-mail e a senha da sua conta.</p>
         <form onSubmit={submit}>
@@ -173,7 +177,7 @@ const SIMPLE_ADMIN = new Set(['dashboard','area/operacao','area/rede','area/plan
 function Shell({ user }) {
   const [simpleMode, setSimpleMode] = useSimpleMode("admin");
   // Itens do menu são conveniência: cada rota é protegida por permissão no backend.
-  const hidden = (k) => ((k === "network" || k === "ativar-tv" || k === "legados") && user.role !== "superadmin") || ((k === "whiteLabel" || k === "help") && user.role !== "superadmin") || ((k === "vpsmonitor" || k === "vpsfiles" || k === "pricing" || k === "commerce3" || k === "trash") && user.role !== "superadmin") || (user.role === "support" && k === "audit") || ((k === "users" || k === "loginhistory" || k === "mail" || k === "notifications") && user.role !== "superadmin");
+  const hidden = (k) => !adminPageAllowed(k,user) || (k === "control" && user.role !== "superadmin") || ((k === "network" || k === "ativar-tv" || k === "legados") && user.role !== "superadmin") || ((k === "whiteLabel" || k === "help") && user.role !== "superadmin") || ((k === "vpsmonitor" || k === "vpsfiles" || k === "pricing" || k === "commerce3" || k === "trash") && user.role !== "superadmin") || (user.role === "support" && k === "audit") || ((k === "users" || k === "loginhistory" || k === "mail" || k === "notifications") && user.role !== "superadmin");
   const canOpenPage = id => Boolean(PAGES[id]) && !hidden(id);
   const allowed = id => {
     const area = WORK_AREAS[id];
@@ -183,7 +187,7 @@ function Shell({ user }) {
     const raw = location.hash.slice(1);
     const id = LEGACY_CENTERS[raw] || raw;
     const area = findWorkArea(id);
-    return (area ? area.items.some(item=>canOpenPage(item.page)) : allowed(id)) ? id : 'dashboard';
+    return (area ? area.items.some(item=>canOpenPage(item.page)) : allowed(id)) ? id : (canOpenPage('dashboard')?'dashboard':'conta');
   };
   const [page, setPage] = useState(fromHash);
   const [open, setOpen] = useState(false); // gaveta do menu em tela pequena
@@ -242,7 +246,7 @@ function Shell({ user }) {
   return (
     <div className="layout">
       <aside className={`sidebar ${open ? "open" : ""}`} id="menu-principal">
-        <div className="brand"><BrandMark size={32} /><div><strong>DeltaTV</strong><span>Administração</span></div><button type="button" className="sidebar-close" aria-label="Fechar menu" onClick={() => setOpen(false)}>×</button></div>
+        <div className="brand"><BrandMark size={32} /><div><strong><PlatformBrand/></strong><span>Administração</span></div><button type="button" className="sidebar-close" aria-label="Fechar menu" onClick={() => setOpen(false)}>×</button></div>
         <button type="button" className="easy-mode-button" aria-pressed={!simpleMode} onClick={() => setSimpleMode((s) => !s)}>{simpleMode ? "⚙ Ver todas as opções" : "✓ Voltar ao modo simples"}</button>
         <nav className="nav-scroll" aria-label="Menu principal">
           {GROUPS.filter(g => !g.legacy).map(renderMenuGroup)}
@@ -263,7 +267,7 @@ function Shell({ user }) {
           <button type="button" className="easy-mode-button" aria-pressed={!simpleMode} onClick={() => setSimpleMode((s) => !s)}>{simpleMode ? "Modo simples · mostrar tudo" : "Modo completo · simplificar"}</button>
           <UserMenu user={user} onAccount={() => go("conta")} />
         </div>
-        <main className="content">
+        <main className="content"><Breadcrumb panel="admin" current={PAGES[page][0]} onHome={()=>go("dashboard")}/>
           <TaskFinder tasks={TASKS.filter(task => allowed(task.route))} onNavigate={go} />
           {simpleMode && page !== "dashboard" && <EasyPageGuide role="admin" page={page} onBack={() => go("dashboard")} />}
           <Current onChanged={refreshCounts} />
@@ -286,7 +290,7 @@ export default function App() {
   const toDevice = (on) => { setDeviceMode(on); location.hash = on ? "dispositivo" : ""; };
   return (
     <UiProvider>
-      {auth?.user && auth.user.role !== "partner" ? <Shell user={auth.user} /> : deviceMode ? <DeviceAccess onBack={() => toDevice(false)} /> : <Login onDeviceAccess={() => toDevice(true)} />}
+      {panelAllows("admin", auth?.user) ? <Shell key={auth.user.id} user={auth.user} /> : deviceMode ? <DeviceAccess onBack={() => toDevice(false)} /> : <Login onDeviceAccess={() => toDevice(true)} />}
     </UiProvider>
   );
 }

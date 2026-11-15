@@ -282,6 +282,23 @@ function PartnerForm({ partner, scope, onClose, onSaved }) {
   );
 }
 
+/** Códigos excluídos (arquivados) da parceria: só o superadmin vê e restaura. */
+function DeletedCodes({ partnerId, run, confirm, onRestored }) {
+  const [rows, setRows] = useState(null);
+  const load = () => api(`/admin/partners/${partnerId}/codes/deleted`).then((r) => setRows(r.data || [])).catch(() => setRows([]));
+  useEffect(() => { load(); }, [partnerId]);
+  if (!rows?.length) return null;
+  const restore = async (c) => {
+    if (!(await confirm({ title: `Restaurar código ${c.code}`, message: "O código volta a aceitar novas ativações. Se o servidor dele foi excluído, ele volta sem servidor fixo. Créditos devolvidos na exclusão não são reservados de novo.", danger: false }))) return;
+    if (await run(() => api(`/admin/partners/${partnerId}/codes/${c.id}/restore`, { method: "POST" }), "Código restaurado.")) { load(); onRestored(); }
+  };
+  return <details style={{ marginTop: 16 }}><summary>Códigos excluídos ({rows.length})</summary>
+    <Table><thead><tr><th>Código</th><th>Rótulo</th><th>Excluído em</th><th /></tr></thead><tbody>
+      {rows.map((c) => <tr key={c.id}><td><strong>{c.code}</strong></td><td>{c.label || "—"}</td><td>{new Date(c.deletedAt).toLocaleString("pt-BR")}</td>
+        <td className="actions"><button className="btn" onClick={() => restore(c)}>Restaurar</button></td></tr>)}
+    </tbody></Table></details>;
+}
+
 function PartnerDetail({ id, onClose, onChanged }) {
   const { confirm, toast } = useUi();
   const run = useAction();
@@ -371,7 +388,8 @@ function PartnerDetail({ id, onClose, onChanged }) {
                 { label: "Excluir", hidden:role!=="superadmin",danger:true,onClick:()=>setDeleteItem({kind:"code",item:c,url:`/admin/partners/${id}/codes/${c.id}`}) },
               ]} />
             </td></tr>)}
-        </tbody></Table></>}
+        </tbody></Table>
+        {role === "superadmin" && <DeletedCodes partnerId={id} run={run} confirm={confirm} onRestored={() => { load(); onChanged(); }} />}</>}
       {cur === "providers" && <>
         <p className="muted">Servidores do provedor desta parceria. O cliente digita código, usuário e senha; o servidor monta a URL da playlist e a valida antes de ativar. Cada código aponta para um servidor (veja a coluna “Códigos”): quem usa o código é validado e atendido por ele. Só códigos antigos sem servidor testam todos, do menor para o maior número de prioridade. O modo de entrega vale para todos os dispositivos ligados ao servidor e muda em até alguns segundos.</p>
         <div className="actions left"><button className="btn primary" onClick={() => setProvForm({})}>Adicionar servidor</button></div>
