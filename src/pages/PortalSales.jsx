@@ -1,5 +1,6 @@
 import {useCallback,useEffect,useState} from 'react';
 import {api} from '../api.js';
+import PortalUsageAdmin from './PortalUsage.jsx';
 
 const brl=n=>Number(n||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 const cents=value=>{const n=Number(String(value).replace(',','.'));return Number.isFinite(n)&&n>=0?Math.round(n*100):NaN;};
@@ -11,27 +12,44 @@ const Opt=({value,children})=><option value={value}>{children}</option>;
 const empty='';
 export default function PortalSales(){
  const [view,setView]=useState(null),[candidates,setCandidates]=useState([]),[invitations,setInvitations]=useState([]),[networkTree,setNetworkTree]=useState([]),[search,setSearch]=useState('');
+ const [paymentSettings,setPaymentSettings]=useState(null),[candidateError,setCandidateError]=useState(''),[settingsError,setSettingsError]=useState('');
  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[success,setSuccess]=useState('');
  const [plan,setPlan]=useState({code:'',name:'',wholesale:'',minimum:''});
  const [seller,setSeller]=useState({partnerId:'',parentPartnerId:''});
  const [order,setOrder]=useState({sellerPartnerId:'',planCode:'',quantityMonths:'1'});
  const [settlement,setSettlement]=useState({orderId:'',settlementRef:'',method:'pix_manual_confirmed'});
+ const [infiniteVerify,setInfiniteVerify]=useState({orderId:'',transactionNsu:'',slug:''});
  const [contract,setContract]=useState({sellerPartnerId:'',customerPartnerId:'',planCode:'',months:'1',resale:'',monthly:'0'});
  const [exception,setException]=useState({sellerPartnerId:'',planCode:'',quantityMonths:'1',reason:''});
  const [costs,setCosts]=useState(null);
  const [contractRequestId,setContractRequestId]=useState(()=>crypto.randomUUID());
  useEffect(()=>{if(view?.forecast?.settings&&!costs){const s=view.forecast.settings;setCosts({vps:String(Number(s.vps_monthly_cents)/100),domain:String(Number(s.domain_annual_cents)/100),other:String(Number(s.other_monthly_cents)/100),proxy:String(Number(s.proxy_cost_per_gb_cents)/100),gb:String(s.forecast_proxy_gb_per_partner),margin:String(s.target_margin_bp/100),tax:String(s.tax_bp/100),reserve:String(s.reserve_bp/100)});}},[view,costs]);
- const load=useCallback(async()=>{const [a,b,c,d]=await Promise.all([api('/admin/portal-sales'),api('/admin/portal-sales/candidates',{query:{q:search}}),api('/admin/portal-sales/invitations'),api('/admin/portal-sales/tree')]);setView(a);setCandidates(b);setInvitations(c.items||[]);setNetworkTree(d.items||[]);},[search]);
+ // O endpoint /candidates pode falhar por migração pendente: NÃO derruba o restante do painel.
+ const load=useCallback(async()=>{
+   const [overview,invites,tree]=await Promise.all([
+    api('/admin/portal-sales'),api('/admin/portal-sales/invitations'),api('/admin/portal-sales/tree')
+   ]);
+   setView(overview);setInvitations(invites.items||[]);setNetworkTree(tree.items||[]);
+   try{const settings=await api('/admin/portal-sales/payment-settings');setPaymentSettings(settings);setSettingsError('');}
+   catch(e){setPaymentSettings(null);setSettingsError(e.message||'Erro nas configurações de pagamento.');}
+ },[]);
+ useEffect(()=>{const timer=setTimeout(()=>api('/admin/portal-sales/candidates',{query:{q:search}})
+   .then(setCandidates).then(()=>setCandidateError(''))
+   .catch(e=>{setCandidates([]);setCandidateError(e.message||'Falha na busca de parceiros.');}),250);
+  return()=>clearTimeout(timer);},[search]);
  useEffect(()=>{load().catch(e=>setError(e.message));},[load]);
+ useEffect(()=>{const timer=setInterval(()=>{if(document.visibilityState==='visible')load().catch(()=>{});},30000);
+  return()=>clearInterval(timer);},[load]);
  const submit=async(url,method,body)=>{
    setBusy(true);setError('');setSuccess('');
    try{await api(url,{method,body});setSuccess('Operação concluída e auditada.');await load();return true;}catch(e){setError(e.message);return false;}finally{setBusy(false)};
  };
- const sellers=view?.sellers||[],plans=view?.plans||[],pending=(view?.orders||[]).filter(o=>o.status==='pending');
+ const sellers=view?.sellers||[],plans=view?.plans||[],pending=(view?.orders||[]).filter(o=>o.status==='pending'&&(!o.payment_gateway||o.payment_gateway==='manual'));
  const available=candidates.filter(p=>p.status==='active');
  return <div style={{display:'grid',gap:16,maxWidth:1150}}>
   <header><h1>Venda do Painel do Parceiro</h1><p className="muted">Rede comercial independente das Revendas de TVs. Estoque = meses de acesso ao portal <strong>parceiro.deltatv.com.br</strong>.</p></header>
-  <div className="notice">Pagamento de pedidos confirmado MANUALMENTE pelo Superadmin após conferência do extrato bancário. Não é confirmação automática via Pix. Mensalidades de revenda ficam registradas, sem cobrança automática nesta etapa.</div>
+  <PortalUsageAdmin/>
+  <div className="notice">Acesso ao Painel do Parceiro: pedidos manuais exigem conferência do Superadmin. Pedidos InfinitePay/Mercado Pago só liberam meses após verificação da API. Mensalidades declaradas não são cobradas automaticamente.</div>
   {error&&<p role="alert" style={{color:'var(--bad,#d44)'}}>{error}</p>}{success&&<p role="status" style={{color:'var(--ok,#29875b)'}}>{success}</p>}
   <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(min(100%,180px),1fr))',gap:12}}>
    <div className="panel" style={{padding:16}}><small>Recebido pela plataforma neste mês</small><h2>{brl(view?.finance?.received_this_month_cents)}</h2><small className="muted">Pedidos de estoque liquidados</small></div>
@@ -57,8 +75,23 @@ export default function PortalSales(){
    </form>}
    <p className="muted">O custo mensal usa o total atual de contas de conteúdo ativas como rateio. O consumo de PlayerWeb proxy informado é projeção, não tráfego medido. Compare o preço recomendado com o preço-base antes de lançar um plano.</p>
   </Section>
+  <Section title="Meio de pagamento padrão — Venda do Painel do Parceiro" description="As credenciais são lidas exclusivamente do .env do backend. A escolha vale para novos pedidos de estoque; pedidos antigos conservam o meio original. Não altera cobranças de licenças de TV.">
+   {settingsError&&<p role="alert">{settingsError}. Confira se a migração do gateway foi aplicada.</p>}
+   {paymentSettings&&<form onSubmit={async e=>{e.preventDefault();const selected=e.currentTarget.elements.gateway.value;
+    if(!window.confirm(`Definir ${selected} como o gateway padrão para novos pedidos?`))return;
+    await submit('/admin/portal-sales/payment-settings','PUT',{defaultGateway:selected});}} style={{display:'grid',gap:10}}>
+     <FormField label="Gateway padrão"><select name="gateway" key={paymentSettings.defaultGateway} defaultValue={paymentSettings.defaultGateway}>
+      {paymentSettings.availableGateways.map(g=><option key={g.provider} value={g.provider} disabled={!g.enabled}>
+       {g.label}{g.enabled?'':' — configurar no .env'}
+      </option>)}
+     </select></FormField>
+     <small className="muted">InfinitePay: {paymentSettings.credentials.infinitepayHandlePresent?'handle ✓':'falta handle'} / {paymentSettings.credentials.infinitepayKeyPresent?'API Key ✓':'falta chave'}. Mercado Pago: {paymentSettings.credentials.mercadoPagoConfigured?'configurado ✓':'configurar token e webhook secret'}. Nenhum segredo é enviado ao navegador.</small>
+     <button className="btn primary" disabled={busy}>Salvar gateway padrão</button>
+   </form>}
+  </Section>
   <Section title="Localizar contas do Painel do Parceiro" description="Escolha contas existentes; o cadastro inicial de novos clientes continua pela tela Parceiros.">
    <FormField label="Pesquisar por nome ou código"><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Nome do parceiro"/></FormField>
+   {candidateError&&<p role="alert" style={{color:'var(--bad,#d44)'}}>Falha ao consultar parceiros: {candidateError}. As demais funções permanecem disponíveis.</p>}
    <p className="muted">{candidates.length} conta(s) encontradas. O cadastro não transforma uma conta de Revenda em parceiro.</p>
   </Section>
   <Grid>
@@ -78,13 +111,32 @@ export default function PortalSales(){
      <button className="btn primary" disabled={busy}>Salvar plano</button>
     </form>
    </Section>
-   <Section title="3. Pedido de estoque pré-pago" description="Criar pedido não libera estoque. A liberação exige confirmação bancária pelo Superadmin (já implementada).">
+   <Section title="3. Pedido de estoque pré-pago" description="Criar pedido não libera estoque. O gateway padrão é fixado na criação. A liberação exige confirmação bancária manual ou verificação automática na API.">
     <form onSubmit={e=>{e.preventDefault();submit('/admin/portal-sales/orders','POST',{sellerPartnerId:order.sellerPartnerId,planCode:order.planCode,quantityMonths:Number(order.quantityMonths)});}} style={{display:'grid',gap:10}}>
      <FormField label="Master ou Submaster"><select required value={order.sellerPartnerId} onChange={e=>setOrder({...order,sellerPartnerId:e.target.value})}><Opt value={empty}>Selecionar</Opt>{sellers.filter(s=>s.active).map(s=><Opt key={s.partner_id} value={s.partner_id}>{s.name}</Opt>)}</select></FormField>
      <FormField label="Plano"><select required value={order.planCode} onChange={e=>setOrder({...order,planCode:e.target.value})}><Opt value={empty}>Selecionar</Opt>{plans.filter(p=>p.active).map(p=><Opt key={p.code} value={p.code}>{p.name} — {brl(p.wholesale_cents)}/mês</Opt>)}</select></FormField>
      <FormField label="Quantidade de meses"><input type="number" required min="1" max="100000" value={order.quantityMonths} onChange={e=>setOrder({...order,quantityMonths:e.target.value})}/></FormField>
      <button className="btn primary" disabled={busy}>Gerar pedido pendente</button>
     </form>
+   </Section>
+   <Section title="Pedidos e links de cobrança" description="O gateway é fixado quando cada pedido nasce. Pix ou cartão pela InfinitePay, Pix pelo Mercado Pago e conferência manual conforme o meio escolhido.">
+    <div style={{overflowX:'auto'}}><table style={{width:'100%'}}><thead><tr><th>Master</th><th>Valor</th><th>Gateway</th><th>Status</th><th>Cobrança</th></tr></thead><tbody>{(view?.orders||[]).map(o=><tr key={o.id}>
+      <td>{o.seller_name}</td><td>{brl(o.total_cents)}</td><td>{o.payment_gateway||'manual'}</td><td>{o.status}</td>
+      <td style={{display:'grid',gap:6}}>{o.status==='pending'&&o.payment_gateway!=='manual'&&<button type="button" disabled={busy} onClick={()=>submit(`/admin/portal-sales/orders/${o.id}/checkout`,'POST',{})}>{o.checkout_url||o.pix_copy_paste?'Atualizar cobrança':'Gerar cobrança'}</button>}
+        {o.checkout_url&&<a href={o.checkout_url} target="_blank" rel="noreferrer">Abrir checkout</a>}
+        {o.checkout_url&&<button type="button" onClick={()=>navigator.clipboard?.writeText(o.checkout_url)}>Copiar link</button>}
+        {o.pix_copy_paste&&<details><summary>Pix copia e cola</summary><textarea readOnly value={o.pix_copy_paste} rows="3" onFocus={e=>e.target.select()}/></details>}
+        {o.status==='pending'&&o.payment_gateway==='mercadopago'&&<button type="button" disabled={busy} onClick={()=>submit(`/admin/portal-sales/orders/${o.id}/recheck`,'POST',{})}>Consultar pagamento</button>}
+      </td>
+    </tr>)}</tbody></table></div>
+    <details><summary>Conferir pagamento InfinitePay sem webhook (possui ID da transação e slug?)</summary>
+     <form style={{display:'grid',gap:8,marginTop:10}} onSubmit={e=>{e.preventDefault();submit(`/admin/portal-sales/orders/${infiniteVerify.orderId}/infinitepay/verify`,'POST',{transactionNsu:infiniteVerify.transactionNsu,slug:infiniteVerify.slug});}}>
+      <FormField label="Pedido InfinitePay"><select required value={infiniteVerify.orderId} onChange={e=>setInfiniteVerify({...infiniteVerify,orderId:e.target.value})}><Opt value="">Selecionar pedido</Opt>{(view?.orders||[]).filter(o=>o.status==='pending'&&o.payment_gateway==='infinitepay').map(o=><Opt key={o.id} value={o.id}>{o.seller_name} · {brl(o.total_cents)}</Opt>)}</select></FormField>
+      <FormField label="transaction_nsu"><input required minLength={8} maxLength={160} value={infiniteVerify.transactionNsu} onChange={e=>setInfiniteVerify({...infiniteVerify,transactionNsu:e.target.value})}/></FormField>
+      <FormField label="slug / invoice_slug"><input required minLength={2} maxLength={160} value={infiniteVerify.slug} onChange={e=>setInfiniteVerify({...infiniteVerify,slug:e.target.value})}/></FormField>
+      <button className="btn" disabled={busy}>Consultar API da InfinitePay e liberar somente se pago</button>
+     </form>
+    </details>
    </Section>
    <Section title="4. Confirmar recebimento" description="Somente depois de conferir o pagamento na conta bancária. Referência não pode ser reutilizada.">
     <form onSubmit={e=>{e.preventDefault();const found=pending.find(p=>p.id===settlement.orderId);if(!found)return;if(!window.confirm(`Você conferiu o recebimento de ${brl(found.total_cents)} no banco? Esta confirmação libera estoque.`))return;submit(`/admin/portal-sales/orders/${settlement.orderId}/settle`,'POST',{settlementRef:settlement.settlementRef,method:settlement.method});}} style={{display:'grid',gap:10}}>
