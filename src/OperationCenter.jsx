@@ -5,7 +5,7 @@ import { getAuth } from './api.js';
 /** Centralização de navegação, sem replicar operações nem contornar permissões. */
 export const CENTER_CONFIG = {
   pagamentos: { title: 'Pagamentos', intro: 'Consulte recebimentos, cobranças, Pix e planos no mesmo lugar.', entries: [
-    ['billing','Financeiro','Faturas, pagamentos e relatórios'],['pix','Pix','Cobranças e confirmações Pix'],['credits','Créditos','Saldos e movimentações'],['pricing','Planos e valores','Preços e políticas comerciais'],['network','Vendas da rede','Masters e revendas'] ] },
+    ['billing','Financeiro','Faturas, pagamentos e relatórios'],['gateways','Gateways de pagamento','Padrão, webhooks e cobranças Pix'],['credits','Créditos','Saldos e movimentações'],['pricing','Planos e valores','Preços e políticas comerciais'],['network','Vendas da rede','Masters e revendas'] ] },
   dispositivos: { title: 'Dispositivos', intro: 'Encontre a TV e acompanhe seu atendimento e configuração.', entries: [
     ['devices','Todas as TVs','Consulte, edite e acompanhe dispositivos'],['unlinked','Aguardando configuração','Dispositivos sem vínculo'],['clients','Clientes','Cadastros relacionados às TVs'],['support','Diagnóstico','Investigue falhas de conexão'] ] },
   licenciamento: { title: 'Licenças', intro: 'Gerencie estoque, licenças e distribuição em um ponto de entrada.', entries: [

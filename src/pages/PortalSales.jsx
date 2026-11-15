@@ -12,7 +12,7 @@ const Opt=({value,children})=><option value={value}>{children}</option>;
 const empty='';
 export default function PortalSales(){
  const [view,setView]=useState(null),[candidates,setCandidates]=useState([]),[invitations,setInvitations]=useState([]),[networkTree,setNetworkTree]=useState([]),[search,setSearch]=useState('');
- const [paymentSettings,setPaymentSettings]=useState(null),[candidateError,setCandidateError]=useState(''),[settingsError,setSettingsError]=useState('');
+ const [candidateError,setCandidateError]=useState('');
  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[success,setSuccess]=useState('');
  const [plan,setPlan]=useState({code:'',name:'',wholesale:'',minimum:''});
  const [seller,setSeller]=useState({partnerId:'',parentPartnerId:''});
@@ -30,8 +30,6 @@ export default function PortalSales(){
     api('/admin/portal-sales'),api('/admin/portal-sales/invitations'),api('/admin/portal-sales/tree')
    ]);
    setView(overview);setInvitations(invites.items||[]);setNetworkTree(tree.items||[]);
-   try{const settings=await api('/admin/portal-sales/payment-settings');setPaymentSettings(settings);setSettingsError('');}
-   catch(e){setPaymentSettings(null);setSettingsError(e.message||'Erro nas configurações de pagamento.');}
  },[]);
  useEffect(()=>{const timer=setTimeout(()=>api('/admin/portal-sales/candidates',{query:{q:search}})
    .then(setCandidates).then(()=>setCandidateError(''))
@@ -75,20 +73,7 @@ export default function PortalSales(){
    </form>}
    <p className="muted">O custo mensal usa o total atual de contas de conteúdo ativas como rateio. O consumo de PlayerWeb proxy informado é projeção, não tráfego medido. Compare o preço recomendado com o preço-base antes de lançar um plano.</p>
   </Section>
-  <Section title="Meio de pagamento padrão — Venda do Painel do Parceiro" description="As credenciais são lidas exclusivamente do .env do backend. A escolha vale para novos pedidos de estoque; pedidos antigos conservam o meio original. Não altera cobranças de licenças de TV.">
-   {settingsError&&<p role="alert">{settingsError}. Confira se a migração do gateway foi aplicada.</p>}
-   {paymentSettings&&<form onSubmit={async e=>{e.preventDefault();const selected=e.currentTarget.elements.gateway.value;
-    if(!window.confirm(`Definir ${selected} como o gateway padrão para novos pedidos?`))return;
-    await submit('/admin/portal-sales/payment-settings','PUT',{defaultGateway:selected});}} style={{display:'grid',gap:10}}>
-     <FormField label="Gateway padrão"><select name="gateway" key={paymentSettings.defaultGateway} defaultValue={paymentSettings.defaultGateway}>
-      {paymentSettings.availableGateways.map(g=><option key={g.provider} value={g.provider} disabled={!g.enabled}>
-       {g.label}{g.enabled?'':' — configurar no .env'}
-      </option>)}
-     </select></FormField>
-     <small className="muted">InfinitePay: {paymentSettings.credentials.infinitepayHandlePresent?'handle ✓':'falta handle'} / {paymentSettings.credentials.infinitepayKeyPresent?'API Key ✓':'falta chave'}. Mercado Pago: {paymentSettings.credentials.mercadoPagoConfigured?'configurado ✓':'configurar token e webhook secret'}. Nenhum segredo é enviado ao navegador.</small>
-     <button className="btn primary" disabled={busy}>Salvar gateway padrão</button>
-   </form>}
-  </Section>
+  <div className="notice">Os meios de pagamento e os webhooks agora são configurados em <a href="#gateways"><strong>Financeiro → Gateways de pagamento</strong></a>. O padrão vale apenas para pedidos novos de meses do Painel do Parceiro.</div>
   <Section title="Localizar contas do Painel do Parceiro" description="Escolha contas existentes; o cadastro inicial de novos clientes continua pela tela Parceiros.">
    <FormField label="Pesquisar por nome ou código"><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Nome do parceiro"/></FormField>
    {candidateError&&<p role="alert" style={{color:'var(--bad,#d44)'}}>Falha ao consultar parceiros: {candidateError}. As demais funções permanecem disponíveis.</p>}

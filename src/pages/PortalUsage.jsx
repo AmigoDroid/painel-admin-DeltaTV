@@ -8,15 +8,30 @@ const Card=({name,value,details})=><div className="stat"><small>{name}</small><s
 export default function PortalUsageAdmin(){
  const [month,setMonth]=useState(monthNow),[data,setData]=useState(null),[trend,setTrend]=useState([]),[devices,setDevices]=useState([]);
  const [settings,setSettings]=useState(null),[loading,setLoading]=useState(false),[error,setError]=useState(''),[note,setNote]=useState('');
- const load=useCallback(async()=>{setLoading(true);setError('');try{
-  const query={month};const [report,days,top]=await Promise.all([
+ const [diagnostic,setDiagnostic]=useState(null);
+ const load=useCallback(async()=>{setLoading(true);setError('');setDiagnostic(null);try{
+  const query={month};
+  // Um relatório com falha não deve apagar os outros ou esconder o erro de cada rota.
+  const [reportResult,dailyResult,deviceResult]=await Promise.allSettled([
    api('/admin/portal-sales/usage',{query}),api('/admin/portal-sales/usage/daily',{query}),api('/admin/portal-sales/usage/devices',{query})]);
-  setData(report);setTrend(days.items||[]);setDevices(top.items||[]);
-  setSettings(s=>s||report.settings&&{
+  const report=reportResult.status==='fulfilled'?reportResult.value:null;
+  setData(report);
+  setTrend(dailyResult.status==='fulfilled'?dailyResult.value.items||[]:[]);
+  setDevices(deviceResult.status==='fulfilled'?deviceResult.value.items||[]:[]);
+  if(report?.settings)setSettings(s=>s||{
    monthlyNodeGbBudget:report.settings.monthly_node_gb_budget,masterMonthlyNodeGbBudget:report.settings.master_monthly_node_gb_budget,
    cpuPercent:report.settings.cpu_percent,memoryPercent:report.settings.memory_percent,
    storagePercent:report.settings.storage_percent,retentionDays:report.settings.retention_days});
- }catch(ex){setError(ex.message)}finally{setLoading(false)}},[month]);
+  const failures=[['Resumo',reportResult],['Consumo diário',dailyResult],['Dispositivos',deviceResult]]
+   .filter(([,r])=>r.status==='rejected');
+  if(failures.length){
+   setError(failures.map(([name,r])=>`${name}: ${r.reason?.message||'Falha de comunicação'}${r.reason?.requestId?` (protocolo ${r.reason.requestId})`:''}`).join(' | '));
+   if(failures.some(([,r])=>r.reason?.status>=500)){
+    try{setDiagnostic(await api('/admin/portal-sales/usage/diagnostics'));}
+    catch{ /* diagnóstico indisponível em versões antigas do backend */ }
+   }
+  }
+ }catch(ex){setError(ex.message);setData(null);setTrend([]);setDevices([])}finally{setLoading(false)}},[month]);
  useEffect(()=>{void load()},[load]);
  const save=async e=>{e.preventDefault();setError('');setNote('');setLoading(true);try{
   await api('/admin/portal-sales/usage/settings',{method:'PUT',body:Object.fromEntries(Object.entries(settings).map(([key,value])=>[key,Number(value)]))});
@@ -31,6 +46,17 @@ export default function PortalUsageAdmin(){
    <small className="muted">Última consolidação: {data?.meter?.lastSuccess?new Date(data.meter.lastSuccess).toLocaleString('pt-BR'):'ainda não registrada'}</small>
   </div>
   {error&&<p role="alert" style={{color:'var(--bad,#c43d3d)'}}>{error}</p>}{note&&<p role="status" className="notice">{note}</p>}
+  {diagnostic&&!diagnostic.ready&&<div className="notice" role="alert" style={{display:'grid',gap:7}}>
+   <strong>Banco com pendências no monitoramento comercial</strong>
+   {!!diagnostic.missingTables?.length&&<span>Tabelas ausentes: {diagnostic.missingTables.join(', ')}</span>}
+   {!!diagnostic.missingColumns?.length&&<span>Colunas ausentes: {diagnostic.missingColumns.join(', ')}</span>}
+   {!!diagnostic.pendingMigrations?.length&&<span>Migrações pendentes: {diagnostic.pendingMigrations.join(', ')}</span>}
+   {!!diagnostic.missingSettings?.length&&<span>Configuração inicial ausente: {diagnostic.missingSettings.join(', ')}</span>}
+   <span>Após backup do PostgreSQL, execute <code>npm run db:migrate</code> e <code>npm run db:diagnose-portal-usage -- 2026-11</code> no backend. Não apague as tabelas existentes.</span>
+  </div>}
+  {diagnostic?.ready&&error&&<p className="notice" role="status">As tabelas e migrações verificadas estão presentes. Consulte os logs do backend pelo protocolo da solicitação e execute <code>npm run db:diagnose-portal-usage -- 2026-11</code> para identificar qual consulta falhou.</p>}
+  {!data&&trend.length>0&&<div className="notice"><strong>Dados diários disponíveis (resumo indisponível)</strong><p>{trend.map(d=>`${d.day}: ${g(d.nodeGb)}`).join(' · ')}</p></div>}
+  {!data&&devices.length>0&&<div className="notice"><strong>Dispositivos disponíveis (resumo indisponível)</strong><p>{devices.length} registros retornados. Recarregue o resumo depois de verificar o backend.</p></div>}
   {data&&<>
    <div className="notice"><strong>Atenção à precisão:</strong> bytes enviados pelo Nginx via X-Accel <strong>não são medidos</strong> por esta coleta Node. Redirects não são consumo de mídia na VPS. O custo em reais é uma estimativa pelo valor por GB configurado; o custo fixo por Master é rateado pelas contas vinculadas. Não representam a cobrança da hospedagem nem lucro líquido.</div>
    <div className="stats" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(155px,1fr))',gap:10}}>

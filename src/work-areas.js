@@ -22,7 +22,8 @@ export const WORK_AREAS = {
   ]},
   'area/financeiro': {id:'area/financeiro',label:'Financeiro',icon:'billing',description:'Um único local para cobranças, saldos, créditos e pagamentos Pix.',items:[
     {id:'billing',page:'billing',label:'Faturas e financeiro',description:'Cobranças, vencimentos e relatórios',icon:'billing'},
-    {id:'pix',page:'pix',label:'Pagamentos Pix',description:'Cobranças e confirmações Pix',icon:'pix'},
+    {id:'gateways',page:'gateways',label:'Gateways de pagamento',description:'Padrão, webhooks e cobranças Pix',icon:'pix'},
+    {id:'pix',page:'pix',label:'Pagamentos Pix (legado)',description:'Acesso preservado para rotas antigas',icon:'pix'},
     {id:'credits',page:'credits',label:'Créditos comerciais',description:'Saldos e movimentações de créditos',icon:'credits'},
   ]},
   'area/aplicativos': {id:'area/aplicativos',label:'Aplicativos',icon:'whiteLabel',description:'Player Web, aplicativos para TV, downloads e personalização comercial.',items:[
