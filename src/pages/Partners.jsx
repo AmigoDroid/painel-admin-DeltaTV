@@ -1,4 +1,5 @@
 import ServerHistoryModal from "../ServerHistoryModal.jsx";
+import DeletionDialog from "../DeletionDialog.jsx";
 import { useEffect, useRef, useState } from "react";
 import AdminDeleteModal from "./AdminDeleteModal.jsx";
 import PartnerPreRegistrations from "./PartnerPreRegistrations.jsx";
@@ -294,6 +295,7 @@ function PartnerDetail({ id, onClose, onChanged }) {
   const [historyServer, setHistoryServer] = useState(null);
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deleteItem,setDeleteItem] = useState(null);
   const [transferring, setTransferring] = useState(null);
   const role = getAuth()?.user?.role;
   const { data: p, error, reload: load, setData: setP } = useLoad(() => api(`/admin/partners/${id}`), [id]);
@@ -319,10 +321,7 @@ function PartnerDetail({ id, onClose, onChanged }) {
     const r = await run(() => api(`/admin/partners/${id}/${action}`, { method: "POST", body: { reason: c.reason } }), "Operação concluída.");
     if (r) { setP({ ...p, ...r }); load(); onChanged(); }
   };
-  const delProvider = async (pr) => {
-    if (!(await confirm({ title: "Excluir servidor", message: `${pr.name} (${pr.baseUrl})`, danger: true }))) return;
-    if (await run(() => api(`/admin/partners/${id}/providers/${pr.id}`, { method: "DELETE" }), "Servidor excluído.")) load();
-  };
+  const delProvider=(pr)=>setDeleteItem({kind:'provider',item:pr,url:`/admin/partners/${id}/providers/${pr.id}`});
   const revokeCode = async (c) => {
     if (!(await confirm({ title: "Revogar código", message: "Impede novas ativações com este código. Dispositivos já ativados continuam vinculados à parceria.", danger: true }))) return;
     if (await run(() => api(`/admin/partners/${id}/codes/${c.id}/revoke`, { method: "POST" }), "Código revogado.")) load();
@@ -357,6 +356,7 @@ function PartnerDetail({ id, onClose, onChanged }) {
         {(["suspended", "blocked"].includes(p.status) || (role === "superadmin" && p.status === "cancelled")) && <button className="btn primary" onClick={() => act("reactivate", isPending(p) ? { title: "Aprovar cadastro", message: "O revendedor poderá usar o portal imediatamente.", confirmLabel: "Aprovar" } : { title: `Reativar ${what}`, message: "Os dispositivos elegíveis recuperam o acesso." })}>{isPending(p) ? "Aprovar cadastro" : "Reativar"}</button>}
         {p.status !== "cancelled" && <button className="btn danger" onClick={() => act("cancel", { title: `Cancelar ${what}`, message: "Os dispositivos perdem o acesso. Só o superadmin pode reativar depois.", reason: "required", danger: true })}>Cancelar</button>}
       </div>
+      {deleteItem&&<DeletionDialog kind={deleteItem.kind} item={deleteItem.item} url={deleteItem.url} onClose={()=>setDeleteItem(null)} onDeleted={()=>{setDeleteItem(null);load();onChanged()}}/>}
       <div className="tabs">{tabList.map(([k, n]) => <button key={k} className={`tab ${cur === k ? "active" : ""}`} onClick={() => setTab(k)}>{n}</button>)}</div>
       {cur === "commercial" && <ContentContract partnerId={id} onSaved={() => { load(); onChanged(); }} />}
       {cur === "service-plan" && <ServicePlan partnerId={id} />}
@@ -368,6 +368,7 @@ function PartnerDetail({ id, onClose, onChanged }) {
               <RowMenu items={[
                 { label: "Configurar código", hidden: c.status !== "active" && role !== "superadmin", onClick: () => setEditCode(c) },
                 { label: "Revogar", hidden: c.status !== "active", danger: true, onClick: () => revokeCode(c) },
+                { label: "Excluir", hidden:role!=="superadmin",danger:true,onClick:()=>setDeleteItem({kind:"code",item:c,url:`/admin/partners/${id}/codes/${c.id}`}) },
               ]} />
             </td></tr>)}
         </tbody></Table></>}
@@ -380,7 +381,7 @@ function PartnerDetail({ id, onClose, onChanged }) {
               <RowMenu items={[
                 { label: "Editar", onClick: () => setProvForm(pr) },
                 { label: "Histórico detalhado", hidden: role !== "superadmin", onClick: () => setHistoryServer({ ...pr, partnerName: p.name }) },
-                { label: "Excluir", danger: true, onClick: () => delProvider(pr) },
+                { label: "Excluir", hidden: role !== "superadmin", danger: true, onClick: () => delProvider(pr) },
               ]} />
             </td></tr>)}
         </tbody></Table></>}
