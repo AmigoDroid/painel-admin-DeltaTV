@@ -46,4 +46,13 @@ export const WORK_AREAS = {
   ]},
 };
 export const LEGACY_CENTERS = {pagamentos:'area/financeiro',dispositivos:'area/operacao',licenciamento:'area/planos',ativacao:'area/operacao'};
-export function findWorkArea(route) {return Object.values(WORK_AREAS).find(a=>a.id===route || a.items.some(i=>i.id===route)) || null;}
+/** URLs novas dos dashboards. Rotas originais (ex.: #/clientes ou #clients)
+ * continuam abrindo exatamente as páginas legadas e não são interceptadas. */
+export function workAreaPath(area, item) {
+  return `${area.id}/secao/${encodeURIComponent(item.id)}`;
+}
+export function findWorkArea(route) {
+  return Object.values(WORK_AREAS).find(area =>
+    route === area.id || area.items.some(item => workAreaPath(area, item) === route || (item.id.startsWith('area/') && item.id === route))
+  ) || null;
+}

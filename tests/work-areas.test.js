@@ -1,14 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync,existsSync} from 'node:fs';
-import {WORK_AREAS,LEGACY_CENTERS,findWorkArea} from '../src/work-areas.js';
+import {WORK_AREAS,LEGACY_CENTERS,findWorkArea,workAreaPath} from '../src/work-areas.js';
 const source=file=>readFileSync(new URL(file,import.meta.url),'utf8');
 test('áreas do Admin possuem identificadores únicos e função de navegação íntegra',()=>{
   const areas=Object.values(WORK_AREAS);assert.ok(areas.length>=6);
   const ids=areas.flatMap(a=>a.items.map(i=>i.id));
   assert.equal(new Set(ids).size,ids.length);
   for(const a of areas){assert.ok(a.items.length>0);assert.equal(findWorkArea(a.id),a);
-    for(const item of a.items){assert.equal(findWorkArea(item.id),a);assert.ok(item.page);assert.ok(item.label&&item.description);}}
+    for(const item of a.items){assert.equal(findWorkArea(workAreaPath(a,item)),a);if(!item.id.startsWith('area/')) assert.equal(findWorkArea(item.id),null);assert.ok(item.page);assert.ok(item.label&&item.description);}}
 });
 test('operações administrativas importantes seguem disponíveis e não viram atalhos falsos',()=>{
   const pages=Object.values(WORK_AREAS).flatMap(a=>a.items.map(i=>i.page));

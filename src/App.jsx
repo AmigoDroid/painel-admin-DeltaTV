@@ -54,11 +54,17 @@ const PAGES = {
 };
 
 // Menu por área: quem é de conteúdo (Parceiros) fica separado de quem vende licença (Revendas e seus clientes).
+// Dashboards coexistem com as páginas originais. Nunca substituir
+// uma função existente por um cartão que apenas parece operacional.
 const GROUPS = [
  {label:null,items:['dashboard']},
- {label:'Operações',items:['area/operacao','area/rede']},
- {label:'Comercial e financeiro',items:['area/planos','area/financeiro']},
- {label:'Plataforma',items:['area/aplicativos','area/infra','area/administracao']},
+ {label:'Dashboards',items:['area/operacao','area/rede','area/planos','area/financeiro','area/aplicativos','area/infra','area/administracao']},
+ {label:'Atendimento e operação',items:['ativar-tv','clients','devices','support','unlinked'],legacy:true},
+ {label:'Planos e licenças',items:['commerce3','licenses','pricing','credits'],legacy:true},
+ {label:'Financeiro',items:['billing','pix'],legacy:true},
+ {label:'Rede comercial',items:['resellers','partners','network'],legacy:true},
+ {label:'Aplicativos e servidores',items:['whiteLabel','webaccess','downloads','sources','servermonitor'],legacy:true},
+ {label:'Administração',items:['vpsmonitor','vpsfiles','trash','help','users','loginhistory','notifications','mail','audit','conta'],legacy:true},
 ];
 
 // Ícones do menu (traço simples, herdam a cor do texto).
@@ -231,6 +237,20 @@ function Shell({ user }) {
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  const renderMenuGroup = g => {
+    const menuItems = g.items.filter(k => allowed(k) && (!simpleMode || SIMPLE_ADMIN.has(k) || page === k || g.legacy));
+    if (!menuItems.length) return null;
+    return <div className="nav-group" key={g.label || 'top'}>
+      {g.label && <div className="nav-heading">{g.label}</div>}
+      {menuItems.map(k => <button type="button" key={k}
+        className={`nav ${page === k ? 'active' : ''}`}
+        aria-current={page === k ? 'page' : undefined}
+        onClick={() => go(k)}>
+        <span className="nav__label"><NavIcon k={k}/>{PAGES[k][0]}</span>
+        {badges[k] > 0 && <span className="count">{badges[k] > 99 ? '99+' : badges[k]}</span>}
+      </button>)}
+    </div>;
+  };
   if (workArea) return <WorkArea area={workArea} route={page} go={go} back={()=>go('dashboard')}
     allowed={item=>canOpenPage(item.page)} renderIcon={item=><NavIcon k={item.icon || 'dashboard'}/>}
     renderPage={item=>{
@@ -244,21 +264,11 @@ function Shell({ user }) {
         <div className="brand"><BrandMark size={32} /><div><strong>DeltaTV</strong><span>Administração</span></div><button type="button" className="sidebar-close" aria-label="Fechar menu" onClick={() => setOpen(false)}>×</button></div>
         <button type="button" className="easy-mode-button" aria-pressed={!simpleMode} onClick={() => setSimpleMode((s) => !s)}>{simpleMode ? "⚙ Ver todas as opções" : "✓ Voltar ao modo simples"}</button>
         <nav className="nav-scroll" aria-label="Menu principal">
-          {GROUPS.map((g) => {
-            const items = g.items.filter((k) => allowed(k) && (!simpleMode || SIMPLE_ADMIN.has(k) || page === k));
-            if (!items.length) return null;
-            return (
-              <div className="nav-group" key={g.label || "top"}>
-                {g.label && <div className="nav-heading">{g.label}</div>}
-                {items.map((k) => (
-                  <button key={k} className={`nav ${page === k ? "active" : ""}`} onClick={() => go(k)}>
-                    <span className="nav__label"><NavIcon k={k} />{PAGES[k][0]}</span>
-                    {badges[k] > 0 && <span className="count" aria-label={`${badges[k]} aguardando`}>{badges[k] > 99 ? "99+" : badges[k]}</span>}
-                  </button>
-                ))}
-              </div>
-            );
-          })}
+          {GROUPS.filter(g => !g.legacy).map(renderMenuGroup)}
+          <details className="sidebar-all-functions" defaultOpen>
+            <summary>Todas as funções · acesso direto</summary>
+            {GROUPS.filter(g => g.legacy).map(renderMenuGroup)}
+          </details>
         </nav>
       </aside>
       {open && <div className="scrim" onClick={() => setOpen(false)} />}

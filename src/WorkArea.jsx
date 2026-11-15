@@ -1,17 +1,22 @@
 import { useEffect, useRef, useState } from "react";
 import "./workspace-dashboard.css";
+import { workAreaPath } from "./work-areas.js";
 
 /** Um ambiente de trabalho por domínio. Somente a navegação é compartilhada;
  * operações e autorização permanecem nos módulos e APIs originais. */
 export default function WorkArea({area,route,go,back,allowed,renderPage,renderIcon}) {
   const entries = area.items.filter(item => allowed(item.page));
-  const active = entries.find(item => item.id === route);
+  const active = entries.find(item => workAreaPath(area, item) === route || (item.id.startsWith('area/') && item.id === route));
   const [menuOpen,setMenuOpen] = useState(false);
   const menuButton = useRef(null);
   const sidebar = useRef(null);
   const main = useRef(null);
   const previous = useRef(route);
-  const select = id => {setMenuOpen(false);go(id);};
+  const select = id => {
+    const entry = entries.find(item => item.id === id);
+    setMenuOpen(false);
+    go(entry ? workAreaPath(area, entry) : id);
+  };
   useEffect(() => {
     setMenuOpen(false);
     if(previous.current !== route) {
@@ -59,7 +64,7 @@ export default function WorkArea({area,route,go,back,allowed,renderPage,renderIc
           <div className="dw-cards">{entries.map((item,i)=><button type="button" className="dw-card" key={item.id} onClick={()=>select(item.id)}><span className="dw-card-icon">{renderIcon?.(item)}</span><span className="dw-card-body"><strong>{item.label}</strong><small>{item.description}</small></span><span className="dw-card-arrow" aria-hidden="true">↗</span></button>)}</div>
           {!entries.length && <div className="dw-empty">Nenhuma função disponível para seu perfil nesta área.</div>}
         </> : <>
-          <header className="dw-page-head"><div><span className="dw-kicker">{area.label.toUpperCase()}</span><h1>{active.label}</h1><p>{active.description}</p></div><button type="button" className="dw-overview" onClick={()=>select(area.id)}>Todas as funções</button></header>
+          <header className="dw-page-head"><div><span className="dw-kicker">{area.label.toUpperCase()}</span><h1>{active.label}</h1><p>{active.description}</p></div><div className="dw-page-actions"><button type="button" className="dw-overview" onClick={()=>select(area.id)}>Menu desta área</button><button type="button" className="dw-overview dw-original" onClick={()=>go(active.page)}>Abrir tela original</button></div></header>
           <div className="dw-real-page">{renderPage(active)}</div>
         </>}
       </main>
