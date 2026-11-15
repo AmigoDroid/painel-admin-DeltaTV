@@ -56,3 +56,19 @@ export function findWorkArea(route) {
     route === area.id || area.items.some(item => workAreaPath(area, item) === route || (item.id.startsWith('area/') && item.id === route))
   ) || null;
 }
+
+/** Os verificadores de autorização de App/Shell recebem o objeto completo
+ * ({ id, page, label, tab }), nunca apenas uma string com o ID da página.
+ * A mesma função é usada no menu lateral, cards e testes de regressão. */
+export function visibleWorkAreaItems(area, allowed) {
+  if (!Array.isArray(area?.items) || typeof allowed !== 'function') return [];
+  return area.items.filter(item => allowed(item));
+}
+
+/** Retorna a seção somente se a conta tiver acesso à página real.
+ * A URL da visão geral não identifica uma seção. */
+export function visibleWorkAreaSection(area, route, allowed) {
+  return visibleWorkAreaItems(area, allowed).find(item =>
+    workAreaPath(area, item) === route || (item.id.startsWith('area/') && item.id === route)
+  ) || null;
+}

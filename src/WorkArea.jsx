@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import "./workspace-dashboard.css";
-import { workAreaPath } from "./work-areas.js";
+import { workAreaPath, visibleWorkAreaItems, visibleWorkAreaSection } from "./work-areas.js";
 
 /** Um ambiente de trabalho por domínio. Somente a navegação é compartilhada;
  * operações e autorização permanecem nos módulos e APIs originais. */
 export default function WorkArea({area,route,go,back,allowed,renderPage,renderIcon}) {
-  const entries = area.items.filter(item => allowed(item.page));
-  const active = entries.find(item => workAreaPath(area, item) === route || (item.id.startsWith('area/') && item.id === route));
+  const entries = visibleWorkAreaItems(area, allowed);
+  const active = visibleWorkAreaSection(area, route, allowed);
   const [menuOpen,setMenuOpen] = useState(false);
   const menuButton = useRef(null);
   const sidebar = useRef(null);
@@ -43,7 +43,7 @@ export default function WorkArea({area,route,go,back,allowed,renderPage,renderIc
     return () => {document.body.style.overflow=was;document.removeEventListener('keydown',handle);};
   },[menuOpen]);
   const heading = active?.label || 'Visão geral';
-  return <div className="dw-dashboard">
+  return <div className="dw-dashboard" data-deltatv-dashboard-release="NAV-FIX-20261114-01">
     {menuOpen && <button type="button" className="dw-scrim" aria-label="Fechar menu da área" onClick={()=>{setMenuOpen(false);menuButton.current?.focus();}} />}
     <aside ref={sidebar} className={'dw-sidebar'+(menuOpen?' dw-sidebar-open':'')} aria-label={'Menu de '+area.label} id="dw-menu">
       <div className="dw-brand"><span className="dw-brand-mark" aria-hidden="true">Δ</span><div><strong>DeltaTV</strong><small>{area.label}</small></div></div>
@@ -59,10 +59,10 @@ export default function WorkArea({area,route,go,back,allowed,renderPage,renderIc
       <header className="dw-topbar"><div className="dw-topbar-left"><button ref={menuButton} type="button" className="dw-menu-toggle" aria-label="Abrir menu da área" aria-controls="dw-menu" aria-expanded={menuOpen} onClick={()=>setMenuOpen(true)}>☰</button><div className="dw-crumb"><button type="button" onClick={back}>Painel</button><span aria-hidden="true">/</span><button type="button" onClick={()=>select(area.id)}>{area.label}</button><span aria-hidden="true">/</span><strong>{heading}</strong></div></div><button type="button" className="dw-top-exit" onClick={back}>Sair da área</button></header>
       <main ref={main} tabIndex={-1} className="dw-content" id="dw-content">
         {!active ? <>
-          <section className="dw-hero"><div><span className="dw-kicker">CENTRAL DE TRABALHO</span><h1>{area.label}</h1><p>{area.description}</p><button type="button" className="dw-primary" onClick={()=>select(entries[0]?.id||area.id)} disabled={!entries.length}>Começar agora <span aria-hidden="true">→</span></button></div><div className="dw-hero-symbol" aria-hidden="true">{renderIcon?.({icon:area.icon})}</div></section>
-          <div className="dw-group-heading"><div><span className="dw-kicker">FUNÇÕES DESTA ÁREA</span><h2>O que você deseja fazer?</h2><p>Escolha uma tarefa. Você continuará neste dashboard até voltar ao painel principal.</p></div><span className="dw-count">{entries.length} funções</span></div>
+          <section className="dw-hero dw-hero-compact"><div><span className="dw-kicker">ÁREA DE TRABALHO</span><h1>{area.label}</h1><p>{area.description}</p></div><div className="dw-hero-symbol" aria-hidden="true">{renderIcon?.({icon:area.icon})}</div></section>
+          <div className="dw-group-heading"><div><span className="dw-kicker">FUNÇÕES DESTA ÁREA</span><h2>Funções disponíveis</h2><p>Selecione uma função no menu lateral ou abaixo. A tela original abrirá nesta área.</p></div><span className="dw-count">{entries.length} funções</span></div>
           <div className="dw-cards">{entries.map((item,i)=><button type="button" className="dw-card" key={item.id} onClick={()=>select(item.id)}><span className="dw-card-icon">{renderIcon?.(item)}</span><span className="dw-card-body"><strong>{item.label}</strong><small>{item.description}</small></span><span className="dw-card-arrow" aria-hidden="true">↗</span></button>)}</div>
-          {!entries.length && <div className="dw-empty">Nenhuma função disponível para seu perfil nesta área.</div>}
+          {!entries.length && <div className="dw-empty" role="status">Esta área não possui operações autorizadas para a conta atual. Volte ao painel principal ou solicite ao administrador a revisão das permissões.</div>}
         </> : <>
           <header className="dw-page-head"><div><span className="dw-kicker">{area.label.toUpperCase()}</span><h1>{active.label}</h1><p>{active.description}</p></div><div className="dw-page-actions"><button type="button" className="dw-overview" onClick={()=>select(area.id)}>Menu desta área</button><button type="button" className="dw-overview dw-original" onClick={()=>go(active.page)}>Abrir tela original</button></div></header>
           <div className="dw-real-page">{renderPage(active)}</div>

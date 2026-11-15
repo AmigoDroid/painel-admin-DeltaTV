@@ -28,3 +28,11 @@
 .sidebar-all-functions>.nav-group{padding:0 6px 8px}
 .sidebar-all-functions .nav{min-height:37px}
 @media(max-width:530px){.dw-page-actions{width:100%}.dw-page-actions button{flex:1}}
+
+/* Visão geral compacta: as funções devem ser o destaque, não uma capa vazia. */
+.dw-hero.dw-hero-compact{min-height:0;padding:22px 27px;border-radius:15px}
+.dw-hero.dw-hero-compact h1{font-size:clamp(24px,2.6vw,31px);margin:7px 0 8px}
+.dw-hero.dw-hero-compact p{margin:0;max-width:88ch}
+.dw-hero.dw-hero-compact .dw-hero-symbol{width:64px;height:64px;border-radius:17px;transform:none}
+.dw-hero.dw-hero-compact .dw-hero-symbol svg{width:30px;height:30px;transform:none}
+@media(max-width:530px){.dw-hero.dw-hero-compact{padding:19px}.dw-group-heading{margin-top:22px}}

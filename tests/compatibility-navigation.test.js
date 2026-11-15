@@ -34,7 +34,7 @@ test('acesso direto a todas as funções foi restaurado no menu principal', () =
 test('dashboard consegue abrir a tela original sem prender o usuário', () => {
   const src = read('../src/WorkArea.jsx');
   assert.match(src, /go\(active\.page\)/);
-  assert.match(src, /workAreaPath\(area, item\)/);
+  assert.match(src, /workAreaPath\(area, entry\)/);
   assert.match(src, /Abrir tela original/);
 });
 
