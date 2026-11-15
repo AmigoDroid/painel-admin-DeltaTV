@@ -28,6 +28,7 @@ import Billing from "./pages/Billing.jsx";
 import Pix from "./pages/Pix.jsx";
 import Credits from "./pages/Credits.jsx";
 import DistributionNetwork from "./pages/DistributionNetwork.jsx";
+import PortalSales from "./pages/PortalSales.jsx";
 import Audit from "./pages/Audit.jsx";
 import DeviceAccess from "./pages/DeviceAccess.jsx";
 import Clients from "./pages/Clients.jsx";
@@ -53,7 +54,7 @@ const PAGES = {
   legados: ["Migração de legados", LegacyMigration],
   "ativar-tv": ["Ativar TV", LicenseActivation], licenses: ["Licenças das TVs", Licenses], devices: ["TVs e dispositivos", Devices], unlinked: ["TVs sem configuração", Unlinked],
   partners: ["Parceiros", Partners], servermonitor: ["Qualidade dos servidores", ServerMonitor], sources: ["Fontes globais de conteúdo", Sources],
-  resellers: ["Revendas", Resellers], network: ["Rede de distribuição", DistributionNetwork], support: ["Resolver problema da TV", () => <SupportCenter base="/admin" />], trash: ["Lixeira", PartnerTrash], clients: ["Clientes", Clients], credits: ["Créditos", Credits], downloads: ["Downloads e links", Downloads],
+  resellers: ["Revendas", Resellers], network: ["Rede de distribuição", DistributionNetwork], "portal-sales": ["Venda do Painel do Parceiro", PortalSales], support: ["Resolver problema da TV", () => <SupportCenter base="/admin" />], trash: ["Lixeira", PartnerTrash], clients: ["Clientes", Clients], credits: ["Créditos", Credits], downloads: ["Downloads e links", Downloads],
   billing: ["Financeiro", Billing], pix: ["Pix", Pix], pricing: ["Planos e valores", PlansAndPricing], commerce3: ["Planos SaaS e comissões", Commerce3],
   help: ["Central de Ajuda", HelpManagement], users: ["Usuários", Users], loginhistory: ["Histórico de login", LoginHistory], notifications: ["Notificações", Notifications], mail: ["E-mails", Mail], audit: ["Auditoria", Audit],
 };
@@ -65,7 +66,7 @@ const GROUPS = [
  {label:'Atendimento e operação',items:['ativar-tv','clients','devices','legados','support','unlinked']},
  {label:'Planos e licenças',items:['commerce3','licenses','pricing','credits']},
  {label:'Financeiro',items:['billing','pix']},
- {label:'Rede comercial',items:['resellers','partners','network']},
+ {label:'Rede comercial',items:['portal-sales','resellers','partners','network']},
  {label:'Aplicativos e servidores',items:['whiteLabel','webaccess','downloads','sources','servermonitor']},
  {label:'Administração',items:['vpsmonitor','vpsfiles','trash','help','users','loginhistory','notifications','mail','audit','conta']},
 ];
@@ -85,6 +86,7 @@ const ICONS = {
   partners: <><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5" /><path d="M16 4.8a3.5 3.5 0 010 6.4M18.5 14.8c1.7.7 2.8 2.3 3 5.2" /></>,
   servermonitor: <><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M6 14h3l2-5 3 8 2-4h2"/></>,
   commerce3: <><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 10h10M7 14h8"/></>,
+  "portal-sales": <><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M7 12h10M7 16h6"/></>,
   network: <><circle cx="12" cy="5" r="2"/><circle cx="5" cy="18" r="2"/><circle cx="19" cy="18" r="2"/><path d="M12 7v5M5 16l7-4 7 4"/></>,
   resellers: <><path d="M4 9l1.5-5h13L20 9" /><path d="M4 9a2.5 2.5 0 005 0 2.5 2.5 0 005 0 2.5 2.5 0 005 0" /><path d="M5 12v8h14v-8M10 20v-5h4v5" /></>,
   clients: <><circle cx="12" cy="8" r="4" /><path d="M4 21c.8-4 4-6 8-6s7.2 2 8 6" /></>,
@@ -173,7 +175,7 @@ function UserMenu({ user, onAccount }) {
 function Shell({ user }) {
   const [simpleMode, setSimpleMode] = useSimpleMode("admin");
   // Itens do menu são conveniência: cada rota é protegida por permissão no backend.
-  const hidden = (k) => !adminPageAllowed(k,user) || (k === "control" && user.role !== "superadmin") || ((k === "network" || k === "ativar-tv" || k === "legados") && user.role !== "superadmin") || ((k === "whiteLabel" || k === "help") && user.role !== "superadmin") || ((k === "vpsmonitor" || k === "vpsfiles" || k === "pricing" || k === "commerce3" || k === "trash") && user.role !== "superadmin") || (user.role === "support" && k === "audit") || ((k === "users" || k === "loginhistory" || k === "mail" || k === "notifications") && user.role !== "superadmin");
+  const hidden = (k) => !adminPageAllowed(k,user) || (k === "control" && user.role !== "superadmin") || ((k === "portal-sales" || k === "network" || k === "ativar-tv" || k === "legados") && user.role !== "superadmin") || ((k === "whiteLabel" || k === "help") && user.role !== "superadmin") || ((k === "vpsmonitor" || k === "vpsfiles" || k === "pricing" || k === "commerce3" || k === "trash") && user.role !== "superadmin") || (user.role === "support" && k === "audit") || ((k === "users" || k === "loginhistory" || k === "mail" || k === "notifications") && user.role !== "superadmin");
   const canOpenPage = id => Boolean(PAGES[id]) && !hidden(id);
   const allowed = id => canOpenPage(id);
   // Endereços antigos de sub-dashboards (#area/..., #pagamentos) abrem direto a função correspondente.
