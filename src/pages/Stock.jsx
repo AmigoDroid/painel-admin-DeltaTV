@@ -91,15 +91,15 @@ function GrantModal({ partnerId, onClose, onDone }) {
     const body = { months: Number(months), quantity: Number(quantity), unitPriceCents, note: note.trim() || undefined };
     if (await run(() => api(`/admin/partners/${partnerId}/stock/grant`, { method: "POST", body }), "Licenças lançadas no estoque.")) onDone();
   };
-  const ok = validMonths(months) && Number.isInteger(Number(quantity)) && Number(quantity) >= 1 && Number(quantity) <= 10000;
+  const ok = validMonths(months) && Number.isInteger(Number(quantity)) && Number(quantity) >= 1 && Number(quantity) <= 10000 && note.trim().length >= 10;
   return (
     <Modal title="Lançar licenças no estoque" onClose={onClose}>
       <MonthsField value={months} onChange={setMonths} />
       <div className="row">
         <Field label="Quantidade"><input type="number" min="1" max="10000" value={quantity} onChange={(e) => setQuantity(e.target.value)} /></Field>
-        <Field label="Valor por licença (R$)" hint="Opcional; fica só no extrato"><input value={price} onChange={(e) => setPrice(e.target.value)} placeholder="15,00" /></Field>
+        <Field label="Valor declarado por licença (R$)" hint="Opcional; não comprova recebimento de pagamento"><input value={price} onChange={(e) => setPrice(e.target.value)} placeholder="15,00" /></Field>
       </div>
-      <Field label="Observação" hint="Ex.: Pix recebido em 25/10"><input value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} /></Field>
+      <Field label="Motivo da exceção (obrigatório)" hint="Concessão manual de estoque sem comprovante financeiro automatizado. Mínimo 10 caracteres."><input value={note} onChange={(e) => setNote(e.target.value)} minLength={10} maxLength={500} required /></Field>
       <div className="actions"><button className="btn" onClick={onClose}>Cancelar</button><button className="btn primary" disabled={!ok} onClick={submit}>Lançar</button></div>
     </Modal>
   );

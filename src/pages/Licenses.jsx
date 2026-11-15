@@ -18,7 +18,7 @@ export default function Licenses() {
 
   return (
     <>
-      <div className="page-head"><h2>Licenças individuais</h2><div className="actions">{getAuth()?.user?.role === "superadmin" && <button className="btn" onClick={() => setTrialSettings(true)}>Teste gratuito</button>}<button className="btn primary" onClick={() => setCreating(true)}>Nova licença</button></div></div>
+      <div className="page-head"><h2>Licenças individuais</h2><div className="actions">{getAuth()?.user?.role === "superadmin" && <button className="btn" onClick={() => setTrialSettings(true)}>Teste gratuito</button>}{getAuth()?.user?.role === "superadmin" && <button className="btn primary" onClick={() => setCreating(true)}>Nova licença</button>}</div></div>
       <div className="toolbar">
         <input placeholder="Buscar por cliente, e-mail ou final do código" value={q} onChange={(e) => setQ(e.target.value)} />
         <select value={list.params.status} onChange={(e) => list.filter({ status: e.target.value })}>
