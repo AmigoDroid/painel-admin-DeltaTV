@@ -9,7 +9,7 @@ import { Badge, Empty, Field, Modal, PasswordInput, Pager, Table, fmtDateTime, u
  * (o backend impõe essa regra; aqui o formulário apenas não oferece o que seria recusado).
  * `partnerId` fixo = aba dentro do detalhe de uma revenda.
  */
-const ROLE = { superadmin: "Superadmin", admin: "Admin", support: "Suporte", partner: "Portal do parceiro" };
+const ROLE = { superadmin: "DeltaTV", admin: "Admin", support: "Suporte", partner: "Portal do parceiro" };
 
 export function UsersPanel({ partnerId: fixedPartnerId }) {
   const me = getAuth()?.user;

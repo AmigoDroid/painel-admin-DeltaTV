@@ -61,7 +61,7 @@ export default function AdminDeleteModal({ type, id, onClose, onDone }) {
           </p>
         </div>
         {type === "partner" ? <>
-          <p><strong>Enviar à Lixeira:</strong> os acessos ao portal e os códigos serão desativados. O cadastro será arquivado em <strong>Sistema → Lixeira</strong>, onde o superadmin poderá restaurar ou excluir definitivamente. O histórico financeiro permanece até uma eventual exclusão definitiva confirmada.</p>
+          <p><strong>Enviar à Lixeira:</strong> os acessos ao portal e os códigos serão desativados. O cadastro será arquivado em <strong>Sistema → Lixeira</strong>, onde a DeltaTV poderá restaurar ou excluir definitivamente. O histórico financeiro permanece até uma eventual exclusão definitiva confirmada.</p>
           <label style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "9px 0" }}>
             <input type="checkbox" checked={deleteClients} onChange={(e) => setDeleteClients(e.target.checked)} />
             <span><strong>Apagar também os clientes cadastrados</strong><div className="muted">{info.clients} fichas privadas de clientes desta revenda serão excluídas permanentemente; clientes globais, licenças e dados financeiros permanecem.</div></span>

@@ -1,182 +1,115 @@
 import {useCallback,useEffect,useState} from 'react';
 import {api} from '../api.js';
 import PortalUsageAdmin from './PortalUsage.jsx';
-
-const brl=n=>Number(n||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
-const cents=value=>{const n=Number(String(value).replace(',','.'));return Number.isFinite(n)&&n>=0?Math.round(n*100):NaN;};
-const monthDate=x=>x?new Date(x).toLocaleDateString('pt-BR'):'—';
-const Section=({title,description,children})=><section className="panel" style={{padding:18,display:'grid',gap:12,minWidth:0}}><div><h2>{title}</h2>{description&&<p className="muted">{description}</p>}</div>{children}</section>;
-const FormField=({label,children})=><label style={{display:'grid',gap:5,minWidth:0}}>{label}{children}</label>;
-const Grid=({children})=><div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(min(100%,185px),1fr))',gap:12}}>{children}</div>;
-const Opt=({value,children})=><option value={value}>{children}</option>;
-const empty='';
+const money=n=>Number(n||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const toCents=s=>Math.round(Number(String(s).replace(',','.'))*100);
+const date=s=>s?new Date(s).toLocaleDateString('pt-BR'):'—';
+const Panel=({title,sub,children})=><section className="panel" style={{padding:20,display:'grid',gap:14,minWidth:0}}><header><h2>{title}</h2>{sub&&<p className="muted">{sub}</p>}</header>{children}</section>;
+const Line=({label,children})=><label style={{display:'grid',gap:6,fontSize:14}}>{label}{children}</label>;
+const Layout=({children})=><div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(min(100%,240px),1fr))',gap:12}}>{children}</div>;
+const initialPackage={code:'',name:'',tier:'partner_professional',wholesale:'',minimum:'',dns:'4',dnsUnlimited:false,activations:'100',activationsUnlimited:false,failover:true,priority:false,alerts:true,history:false};
+const permissions=[['canSell','Vender acesso ao painel'],['canCreateSubmasters','Cadastrar Submasters'],['canTransferStock','Distribuir estoque'],['canViewFinance','Consultar financeiro'],['canManageGateways','Configurar gateways']];
 export default function PortalSales(){
- const [view,setView]=useState(null),[candidates,setCandidates]=useState([]),[invitations,setInvitations]=useState([]),[networkTree,setNetworkTree]=useState([]),[search,setSearch]=useState('');
- const [candidateError,setCandidateError]=useState('');
- const [busy,setBusy]=useState(false),[error,setError]=useState(''),[success,setSuccess]=useState('');
- const [plan,setPlan]=useState({code:'',name:'',wholesale:'',minimum:''});
- const [seller,setSeller]=useState({partnerId:'',parentPartnerId:''});
- const [order,setOrder]=useState({sellerPartnerId:'',planCode:'',quantityMonths:'1'});
- const [settlement,setSettlement]=useState({orderId:'',settlementRef:'',method:'pix_manual_confirmed'});
- const [infiniteVerify,setInfiniteVerify]=useState({orderId:'',transactionNsu:'',slug:''});
- const [contract,setContract]=useState({sellerPartnerId:'',customerPartnerId:'',planCode:'',months:'1',resale:'',monthly:'0'});
- const [exception,setException]=useState({sellerPartnerId:'',planCode:'',quantityMonths:'1',reason:''});
- const [costs,setCosts]=useState(null);
- const [contractRequestId,setContractRequestId]=useState(()=>crypto.randomUUID());
- useEffect(()=>{if(view?.forecast?.settings&&!costs){const s=view.forecast.settings;setCosts({vps:String(Number(s.vps_monthly_cents)/100),domain:String(Number(s.domain_annual_cents)/100),other:String(Number(s.other_monthly_cents)/100),proxy:String(Number(s.proxy_cost_per_gb_cents)/100),gb:String(s.forecast_proxy_gb_per_partner),margin:String(s.target_margin_bp/100),tax:String(s.tax_bp/100),reserve:String(s.reserve_bp/100)});}},[view,costs]);
- // O endpoint /candidates pode falhar por migração pendente: NÃO derruba o restante do painel.
- const load=useCallback(async()=>{
-   const [overview,invites,tree]=await Promise.all([
-    api('/admin/portal-sales'),api('/admin/portal-sales/invitations'),api('/admin/portal-sales/tree')
-   ]);
-   setView(overview);setInvitations(invites.items||[]);setNetworkTree(tree.items||[]);
+ const [tab,setTab]=useState('packages'),[overview,setOverview]=useState(null),[packages,setPackages]=useState([]),[candidates,setCandidates]=useState([]),[tree,setTree]=useState([]),[receivables,setReceivables]=useState([]),[prices,setPrices]=useState([]),[invites,setInvites]=useState([]),[tickets,setTickets]=useState([]),[detail,setDetail]=useState(null),[catalog,setCatalog]=useState([]);
+ const [form,setForm]=useState(initialPackage),[master,setMaster]=useState({partnerId:'',parentPartnerId:''}),[bill,setBill]=useState({sellerPartnerId:'',planCode:'',months:1}),[settle,setSettle]=useState({ref:'',method:'pix_manual_confirmed'}),[reply,setReply]=useState('');
+ const [newMaster,setNewMaster]=useState({partnerId:'',planCode:'',months:'10',price:'',monthlyFee:'0',paymentMode:'default'});
+ const [priceEdit,setPriceEdit]=useState({sellerId:'',planCode:'',unitPrice:'',reason:''});
+ const [loading,setLoading]=useState(false),[err,setErr]=useState(''),[notice,setNotice]=useState('');
+ const refresh=useCallback(async()=>{
+  const jobs=[['overview',api('/admin/portal-sales')],['packages',api('/admin/portal-sales/packages')],['candidates',api('/admin/portal-sales/candidates')],['tree',api('/admin/portal-sales/tree')],['receivables',api('/admin/portal-sales/receivables')],['prices',api('/admin/portal-sales/negotiated-prices')],['invites',api('/admin/portal-sales/invitations')],['catalog',api('/admin/service-plans')],['tickets',api('/admin/portal-sales/support/tickets')]];
+  const answers=await Promise.allSettled(jobs.map(x=>x[1]));
+  const failed=[];for(let i=0;i<jobs.length;i++){
+   const [key]=jobs[i],a=answers[i];if(a.status!=='fulfilled'){failed.push(key);continue;}
+   const result=a.value;
+   ({overview:setOverview,packages:x=>setPackages(x.items||[]),candidates:setCandidates,tree:x=>setTree(x.items||[]),receivables:x=>setReceivables(x.items||[]),prices:x=>setPrices(x.items||[]),invites:x=>setInvites(x.items||[]),catalog:x=>setCatalog(x.data||[]),tickets:x=>setTickets(x.items||[])})[key](result);
+  }if(failed.length)setErr(`Não foi possível carregar: ${failed.join(', ')}. Verifique as migrações e permissões.`);
  },[]);
- useEffect(()=>{const timer=setTimeout(()=>api('/admin/portal-sales/candidates',{query:{q:search}})
-   .then(setCandidates).then(()=>setCandidateError(''))
-   .catch(e=>{setCandidates([]);setCandidateError(e.message||'Falha na busca de parceiros.');}),250);
-  return()=>clearTimeout(timer);},[search]);
- useEffect(()=>{load().catch(e=>setError(e.message));},[load]);
- useEffect(()=>{const timer=setInterval(()=>{if(document.visibilityState==='visible')load().catch(()=>{});},30000);
-  return()=>clearInterval(timer);},[load]);
- const submit=async(url,method,body)=>{
-   setBusy(true);setError('');setSuccess('');
-   try{await api(url,{method,body});setSuccess('Operação concluída e auditada.');await load();return true;}catch(e){setError(e.message);return false;}finally{setBusy(false)};
- };
- const sellers=view?.sellers||[],plans=view?.plans||[],pending=(view?.orders||[]).filter(o=>o.status==='pending'&&(!o.payment_gateway||o.payment_gateway==='manual'));
- const available=candidates.filter(p=>p.status==='active');
- return <div style={{display:'grid',gap:16,maxWidth:1150}}>
-  <header><h1>Venda do Painel do Parceiro</h1><p className="muted">Rede comercial independente das Revendas de TVs. Estoque = meses de acesso ao portal <strong>parceiro.deltatv.com.br</strong>.</p></header>
-  <PortalUsageAdmin/>
-  <div className="notice">Acesso ao Painel do Parceiro: pedidos manuais exigem conferência do Superadmin. Pedidos InfinitePay/Mercado Pago só liberam meses após verificação da API. Mensalidades declaradas não são cobradas automaticamente.</div>
-  {error&&<p role="alert" style={{color:'var(--bad,#d44)'}}>{error}</p>}{success&&<p role="status" style={{color:'var(--ok,#29875b)'}}>{success}</p>}
-  <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(min(100%,180px),1fr))',gap:12}}>
-   <div className="panel" style={{padding:16}}><small>Recebido pela plataforma neste mês</small><h2>{brl(view?.finance?.received_this_month_cents)}</h2><small className="muted">Pedidos de estoque liquidados</small></div>
-   <div className="panel" style={{padding:16}}><small>Pedidos pendentes (não recebidos)</small><h2>{brl(view?.finance?.pending_cents)}</h2><small className="muted">Fora da receita</small></div>
-   <div className="panel" style={{padding:16}}><small>Recebimentos menos custos projetados</small><h2>{brl(view?.finance?.estimatedCashAfterForecastCostsCents)}</h2><small className="muted">Indicador de caixa, não lucro líquido</small></div>
-  </div>
-  <Section title="Simulador de custo e margem da plataforma" description="Cenário estimado para definir seu preço-base. Não é medição de banda ou lucro contábil; os custos reais deverão ser apurados pela telemetria.">
-   <Grid>
-    <div className="stat"><small>Custo fixo estimado por mês</small><strong>{brl(view?.forecast?.monthlyFixedCents)}</strong></div>
-    <div className="stat"><small>Parceiros ativos no rateio</small><strong>{view?.forecast?.activePartners??'—'}</strong></div>
-    <div className="stat"><small>Custo médio estimado por parceiro</small><strong>{brl(view?.forecast?.estimatedCostPerPartnerCents)}</strong></div>
-    <div className="stat"><small>Preço-base recomendado por mês</small><strong>{brl(view?.forecast?.suggestedWholesaleCents)}</strong></div>
-   </Grid>
-   {costs&&<form onSubmit={e=>{e.preventDefault();submit('/admin/portal-sales/costs','PUT',{vpsMonthlyCents:cents(costs.vps),domainAnnualCents:cents(costs.domain),otherMonthlyCents:cents(costs.other),proxyCostPerGbCents:cents(costs.proxy),forecastProxyGbPerPartner:Number(costs.gb),targetMarginBp:Math.round(Number(costs.margin)*100),taxBp:Math.round(Number(costs.tax)*100),reserveBp:Math.round(Number(costs.reserve)*100)});}} style={{display:'grid',gap:10}}>
-    <Grid>
-     {[
-       ['vps','VPS mensal (R$)'],['domain','Domínio anual (R$)'],['other','Outros custos mensais (R$)'],
-       ['proxy','Custo por GB de proxy (R$)'],['gb','Consumo mensal estimado (GB/parceiro)'],
-       ['margin','Margem desejada (%)'],['tax','Tributos/taxas (%)'],['reserve','Reserva de expansão (%)'],
-     ].map(([key,label])=><FormField key={key} label={label}><input required inputMode="decimal" value={costs[key]} onChange={e=>setCosts({...costs,[key]:e.target.value})}/></FormField>)}
-    </Grid>
-    <button className="btn primary" disabled={busy}>Salvar parâmetros de custo</button>
-   </form>}
-   <p className="muted">O custo mensal usa o total atual de contas de conteúdo ativas como rateio. O consumo de PlayerWeb proxy informado é projeção, não tráfego medido. Compare o preço recomendado com o preço-base antes de lançar um plano.</p>
-  </Section>
-  <div className="notice">Os meios de pagamento e os webhooks agora são configurados em <a href="#gateways"><strong>Financeiro → Gateways de pagamento</strong></a>. O padrão vale apenas para pedidos novos de meses do Painel do Parceiro.</div>
-  <Section title="Localizar contas do Painel do Parceiro" description="Escolha contas existentes; o cadastro inicial de novos clientes continua pela tela Parceiros.">
-   <FormField label="Pesquisar por nome ou código"><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Nome do parceiro"/></FormField>
-   {candidateError&&<p role="alert" style={{color:'var(--bad,#d44)'}}>Falha ao consultar parceiros: {candidateError}. As demais funções permanecem disponíveis.</p>}
-   <p className="muted">{candidates.length} conta(s) encontradas. O cadastro não transforma uma conta de Revenda em parceiro.</p>
-  </Section>
-  <Grid>
-   <Section title="1. Cadastrar Master ou Submaster" description="Sem limite de profundidade; um pai deve estar autorizado a vender.">
-    <form onSubmit={e=>{e.preventDefault();submit('/admin/portal-sales/sellers','POST',{partnerId:seller.partnerId,parentPartnerId:seller.parentPartnerId||null});}} style={{display:'grid',gap:10}}>
-     <FormField label="Conta de parceiro"><select required value={seller.partnerId} onChange={e=>setSeller({...seller,partnerId:e.target.value})}><Opt value={empty}>Selecionar parceiro</Opt>{available.filter(p=>!p.seller_role).map(p=><Opt key={p.id} value={p.id}>{p.name} · {p.slug}</Opt>)}</select></FormField>
-     <FormField label="Master pai (opcional)"><select value={seller.parentPartnerId} onChange={e=>setSeller({...seller,parentPartnerId:e.target.value})}><Opt value={empty}>Sem pai — Master principal</Opt>{sellers.filter(s=>s.active&&s.can_sell).map(s=><Opt key={s.partner_id} value={s.partner_id}>{s.name}</Opt>)}</select></FormField>
-     <button className="btn primary" disabled={busy||!seller.partnerId}>Cadastrar distribuidor</button>
+ useEffect(()=>{void refresh();},[refresh]);
+ const act=async(url,method,body)=>{setLoading(true);setErr('');setNotice('');try{const result=await api(url,{method,body});setNotice('Operação salva e auditada.');await refresh();return result;}catch(e){setErr(e.message||'Erro de operação.');return null;}finally{setLoading(false);}};
+ const roots=(overview?.sellers||[]).filter(s=>!s.parent_partner_id);
+ const pending=receivables.filter(x=>x.status==='pending');
+ const currentPlan=packages.find(p=>p.code===bill.planCode);
+ const tabs=[['packages','Pacotes de Serviço'],['masters','Masters e rede'],['receivables','Recebimentos de Masters'],['support','Central de Atendimento'],['usage','Infraestrutura']];
+ return <div style={{display:'grid',gap:16,maxWidth:1200}}>
+  <header><h1>Comercialização do Painel do Parceiro</h1><p className="muted">DeltaTV → Masters → Submasters → clientes. Um Pacote de Serviço controla os benefícios; pedidos antigos permanecem no histórico.</p></header>
+  <nav aria-label="Gestão comercial" style={{display:'flex',flexWrap:'wrap',gap:8}}>{tabs.map(([id,label])=><button key={id} type="button" className={tab===id?'btn primary':'btn'} onClick={()=>setTab(id)}>{label}</button>)}</nav>
+  {err&&<p className="alert" role="alert">{err}</p>}{notice&&<p className="notice" role="status">{notice}</p>}
+  {tab==='packages'&&<>
+   <Panel title="Pacotes de Serviço" sub="Um cadastro define DNS por código, ativações e recursos do painel. Pacotes vendidos preservam os benefícios contratados.">
+    <Layout>{packages.filter(x=>x.service_tier).map(p=><div className="stat" key={p.code} style={{display:'grid',gap:6}}><b>{p.name}</b><small>{p.max_dns===null?'DNS ilimitados':`${p.max_dns} DNS por código`} · {p.activation_limit===null?'Ativações ilimitadas':`${p.activation_limit} ativações`}</small><small>Aquisição-base: {money(p.wholesale_cents)} / mês</small><button type="button" className="outline" onClick={()=>setForm({code:p.code,name:p.name,tier:p.service_tier,wholesale:String(Number(p.wholesale_cents)/100),minimum:String(Number(p.min_resale_cents)/100),dns:p.max_dns===null?'':String(p.max_dns),dnsUnlimited:p.max_dns===null,activations:p.activation_limit===null?'':String(p.activation_limit),activationsUnlimited:p.activation_limit===null,failover:p.auto_failover,priority:p.auto_priority,alerts:p.email_alerts,history:p.detailed_history})}>Editar pacote</button></div>)}{!packages.some(x=>x.service_tier)&&<p className="muted">Crie o primeiro pacote para ativar a nova venda simplificada.</p>}</Layout>
+   </Panel>
+   <Panel title={packages.some(x=>x.code===form.code)?'Editar Pacote de Serviço':'Criar Pacote de Serviço'} sub="DNS é o nome mostrado no painel para os endereços de servidor. Limites continuam sendo aplicados pelo backend.">
+    <form onSubmit={e=>{e.preventDefault();void act('/admin/portal-sales/packages','PUT',{code:form.code,name:form.name,tier:form.tier,wholesaleCents:toCents(form.wholesale),minResaleCents:toCents(form.minimum),active:true,maxDns:form.dnsUnlimited?null:Number(form.dns),activationLimit:form.activationsUnlimited?null:Number(form.activations),autoFailover:form.failover,autoPriority:form.priority,emailAlerts:form.alerts,detailedHistory:form.history});}} style={{display:'grid',gap:14}}>
+     <Layout><Line label="Código único"><input required maxLength={32} pattern="[a-z][a-z0-9_-]{1,31}" disabled={packages.some(p=>p.code===form.code)} value={form.code} onChange={e=>setForm({...form,code:e.target.value})} placeholder="profissional_100"/></Line>
+      <Line label="Nome do pacote"><input required maxLength={120} value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/></Line>
+      <Line label="Base técnica"><select value={form.tier} onChange={e=>setForm({...form,tier:e.target.value})}>{catalog.filter(p=>p.active&&['content','both'].includes(p.audience)).map(p=><option key={p.key} value={p.key}>{p.name}</option>)}</select></Line>
+      <Line label="Preço de aquisição-base por mês (R$)"><input required type="number" step="0.01" min="0.01" value={form.wholesale} onChange={e=>setForm({...form,wholesale:e.target.value})}/></Line>
+      <Line label="Preço mínimo sugerido de revenda (R$)"><input required type="number" step="0.01" min="0.01" value={form.minimum} onChange={e=>setForm({...form,minimum:e.target.value})}/></Line>
+      <Line label="DNS permitidos por código"><input type="number" min="1" disabled={form.dnsUnlimited} required={!form.dnsUnlimited} value={form.dns} onChange={e=>setForm({...form,dns:e.target.value})}/><span><input type="checkbox" checked={form.dnsUnlimited} onChange={e=>setForm({...form,dnsUnlimited:e.target.checked})}/> Ilimitados</span></Line>
+      <Line label="Ativações permitidas"><input type="number" min="0" disabled={form.activationsUnlimited} required={!form.activationsUnlimited} value={form.activations} onChange={e=>setForm({...form,activations:e.target.value})}/><span><input type="checkbox" checked={form.activationsUnlimited} onChange={e=>setForm({...form,activationsUnlimited:e.target.checked})}/> Ilimitadas</span></Line></Layout>
+     <Layout>{[['failover','Failover automático'],['priority','Prioridade automática'],['alerts','Alertas por e-mail'],['history','Histórico detalhado']].map(([key,label])=><label key={key}><input type="checkbox" checked={form[key]} onChange={e=>setForm({...form,[key]:e.target.checked,...(key==='failover'&&!e.target.checked?{priority:false}:{})})}/> {label}</label>)}</Layout>
+     <div style={{display:'flex',gap:10}}><button className="btn primary" disabled={loading}>Salvar Pacote de Serviço</button><button className="btn" type="button" onClick={()=>setForm(initialPackage)}>Novo pacote</button></div>
     </form>
-   </Section>
-   <Section title="2. Planos de acesso" description="Preço-base e piso de revenda por mês de acesso; a duração é livre na compra.">
-    <form onSubmit={e=>{e.preventDefault();submit('/admin/portal-sales/plans','PUT',{code:plan.code,name:plan.name,wholesaleCents:cents(plan.wholesale),minResaleCents:cents(plan.minimum),active:true});}} style={{display:'grid',gap:10}}>
-     <FormField label="Identificador"><input required pattern="[a-z][a-z0-9_-]{1,31}" placeholder="painel_pro" value={plan.code} onChange={e=>setPlan({...plan,code:e.target.value})}/></FormField>
-     <FormField label="Nome"><input required value={plan.name} onChange={e=>setPlan({...plan,name:e.target.value})}/></FormField>
-     <FormField label="Preço-base por mês (R$)"><input required inputMode="decimal" value={plan.wholesale} onChange={e=>setPlan({...plan,wholesale:e.target.value})}/></FormField>
-     <FormField label="Piso de revenda (R$)"><input required inputMode="decimal" value={plan.minimum} onChange={e=>setPlan({...plan,minimum:e.target.value})}/></FormField>
-     <button className="btn primary" disabled={busy}>Salvar plano</button>
+   </Panel>
+   <p className="muted">Pacotes e contratos comerciais anteriores continuam disponíveis no banco, mas não precisam ser configurados separadamente para novas vendas.</p>
+  </>}
+  {tab==='masters'&&<>
+   <Panel title="Cadastrar Master principal" sub="Em uma única operação: conta existente do Painel do Parceiro + Pacote de Serviço + preço negociado + pedido de estoque. O pagamento é obrigatório antes de liberar estoque e benefícios.">
+    <form onSubmit={e=>{e.preventDefault();void act('/admin/portal-sales/masters/onboard','POST',{
+      partnerId:newMaster.partnerId,planCode:newMaster.planCode,quantityMonths:Number(newMaster.months),
+      agreedPriceCents:toCents(newMaster.price),monthlyFeeCents:toCents(newMaster.monthlyFee),paymentMode:newMaster.paymentMode});}} style={{display:'grid',gap:12}}>
+     <Layout>
+      <Line label="Conta do Parceiro"><select required value={newMaster.partnerId} onChange={e=>setNewMaster({...newMaster,partnerId:e.target.value})}><option value="">Selecionar conta</option>{candidates.filter(x=>!x.seller_role&&x.status==='active').map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></Line>
+      <Line label="Pacote de Serviço"><select required value={newMaster.planCode} onChange={e=>{const pkg=packages.find(p=>p.code===e.target.value);setNewMaster({...newMaster,planCode:e.target.value,price:pkg?String(Number(pkg.wholesale_cents)/100):newMaster.price})}}><option value="">Escolher pacote</option>{packages.filter(x=>x.active&&x.service_tier).map(x=><option key={x.code} value={x.code}>{x.name} — {x.max_dns===null?'DNS sem limite':`${x.max_dns} DNS por código`}</option>)}</select></Line>
+      <Line label="Meses de estoque pré-pago"><input required type="number" min="1" max="100000" value={newMaster.months} onChange={e=>setNewMaster({...newMaster,months:e.target.value})}/></Line>
+      <Line label="Preço negociado por mês (R$)"><input required type="number" min="0.01" step="0.01" value={newMaster.price} onChange={e=>setNewMaster({...newMaster,price:e.target.value})}/></Line>
+      <Line label="Mensalidade opcional (R$)"><input type="number" min="0" step="0.01" value={newMaster.monthlyFee} onChange={e=>setNewMaster({...newMaster,monthlyFee:e.target.value})}/></Line>
+      <Line label="Forma de pagamento do Master"><select value={newMaster.paymentMode} onChange={e=>setNewMaster({...newMaster,paymentMode:e.target.value})}><option value="default">Gateway padrão da DeltaTV</option><option value="manual">Pix externo — confirmação pela DeltaTV</option></select></Line>
+     </Layout>
+     <p className="muted">Valor do primeiro pedido: <strong>{money(toCents(newMaster.price)*Number(newMaster.months||0))}</strong>. O gateway padrão da DeltaTV ou o Pix externo define como esse pedido será pago. A mensalidade opcional será registrada, mas a recorrência automática ainda não está ativada.</p>
+     <button className="btn primary" disabled={loading||!newMaster.partnerId||!newMaster.planCode}>Cadastrar Master e gerar cobrança</button>
     </form>
-   </Section>
-   <Section title="3. Pedido de estoque pré-pago" description="Criar pedido não libera estoque. O gateway padrão é fixado na criação. A liberação exige confirmação bancária manual ou verificação automática na API.">
-    <form onSubmit={e=>{e.preventDefault();submit('/admin/portal-sales/orders','POST',{sellerPartnerId:order.sellerPartnerId,planCode:order.planCode,quantityMonths:Number(order.quantityMonths)});}} style={{display:'grid',gap:10}}>
-     <FormField label="Master ou Submaster"><select required value={order.sellerPartnerId} onChange={e=>setOrder({...order,sellerPartnerId:e.target.value})}><Opt value={empty}>Selecionar</Opt>{sellers.filter(s=>s.active).map(s=><Opt key={s.partner_id} value={s.partner_id}>{s.name}</Opt>)}</select></FormField>
-     <FormField label="Plano"><select required value={order.planCode} onChange={e=>setOrder({...order,planCode:e.target.value})}><Opt value={empty}>Selecionar</Opt>{plans.filter(p=>p.active).map(p=><Opt key={p.code} value={p.code}>{p.name} — {brl(p.wholesale_cents)}/mês</Opt>)}</select></FormField>
-     <FormField label="Quantidade de meses"><input type="number" required min="1" max="100000" value={order.quantityMonths} onChange={e=>setOrder({...order,quantityMonths:e.target.value})}/></FormField>
-     <button className="btn primary" disabled={busy}>Gerar pedido pendente</button>
+   </Panel>
+   <Panel title="Rede de Masters e Submasters" sub="A DeltaTV visualiza todos os níveis. Abra um integrante para alterar suas permissões individualmente.">
+    <div style={{overflowX:'auto'}}><table style={{width:'100%'}}><thead><tr><th>Integrante</th><th>Posição</th><th>Estoque</th><th>Clientes diretos</th><th>Permissões</th></tr></thead><tbody>{tree.map(s=><tr key={s.partner_id}><td><span style={{paddingLeft:Math.min(s.depth,12)*14}}>{s.depth?'↳ ':''}{s.name}</span></td><td>{s.role==='master'?'Master':'Submaster'}</td><td>{s.available_months}</td><td>{s.direct_customers}</td><td><button className="outline" type="button" onClick={async()=>{try{const result=await api('/admin/portal-sales');setOverview(result);setMaster(m=>({...m,partnerId:s.partner_id}));}catch(e){setErr(e.message)}}}>Ver rede</button></td></tr>)}</tbody></table></div>
+    <p className="muted">Gerenciar as permissões diretas:</p>
+    <Line label="Master / Submaster"><select value={master.partnerId} onChange={e=>setMaster({...master,partnerId:e.target.value})}><option value="">Selecionar</option>{(overview?.sellers||[]).map(s=><option key={s.partner_id} value={s.partner_id}>{s.name}{s.public_partner_number?` · ID ${s.public_partner_number}`:''}</option>)}</select></Line>
+    {overview?.sellers?.find(s=>s.partner_id===master.partnerId)&&<Layout>{permissions.map(([key,label])=>{const s=overview.sellers.find(s=>s.partner_id===master.partnerId);const column=({canSell:'can_sell',canCreateSubmasters:'can_create_submasters',canTransferStock:'can_transfer_stock',canViewFinance:'can_view_finance',canManageGateways:'can_manage_gateways'})[key];return <label key={key}><input type="checkbox" checked={Boolean(s[column])} disabled={loading} onChange={e=>{void act(`/admin/portal-sales/sellers/${master.partnerId}/permissions`,'PATCH',{[key]:e.target.checked});}}/> {label}</label>})}</Layout>}
+   </Panel>
+   <Panel title="Convites comerciais" sub="Reservas dos Masters; a DeltaTV pode cancelar convites ainda não aceitos.">
+    <div style={{overflowX:'auto'}}><table style={{width:'100%'}}><thead><tr><th>Master</th><th>Convidado</th><th>Pacote</th><th>Tipo</th><th>Estado</th><th></th></tr></thead><tbody>{invites.map(x=><tr key={x.id}><td>{x.seller_name}</td><td>{x.invited_email}</td><td>{x.plan_code}</td><td>{x.invite_type}</td><td>{x.status}</td><td>{x.status==='pending'&&<button disabled={loading} className="outline" onClick={()=>{if(window.confirm('Cancelar convite e devolver a reserva ao Master?'))void act(`/admin/portal-sales/invitations/${x.id}/revoke`,'POST',{});}}>Cancelar</button>}</td></tr>)}</tbody></table></div>
+   </Panel>
+  </>}
+  {tab==='receivables'&&<>
+   <Layout><div className="stat"><small>Recebimentos confirmados neste mês</small><strong>{money(overview?.finance?.received_this_month_cents)}</strong></div><div className="stat"><small>Pendente de recebimento</small><strong>{money(overview?.finance?.pending_cents)}</strong></div><div className="stat"><small>Masters de primeiro nível</small><strong>{roots.length}</strong></div></Layout>
+   <Panel title="Criar cobrança para Master" sub="Pedido de estoque pré-pago do Painel do Parceiro. Negociações especiais devem ser registradas antes da confirmação financeira.">
+    <form style={{display:'grid',gap:12}} onSubmit={e=>{e.preventDefault();void act('/admin/portal-sales/orders','POST',{sellerPartnerId:bill.sellerPartnerId,planCode:bill.planCode,quantityMonths:Number(bill.months)});}}>
+     <Layout><Line label="Master que paga diretamente à DeltaTV"><select required value={bill.sellerPartnerId} onChange={e=>setBill({...bill,sellerPartnerId:e.target.value})}><option value="">Selecionar</option>{roots.map(s=><option key={s.partner_id} value={s.partner_id}>{s.name}</option>)}</select></Line>
+      <Line label="Pacote de Serviço"><select required value={bill.planCode} onChange={e=>setBill({...bill,planCode:e.target.value})}><option value="">Selecionar</option>{packages.filter(x=>x.active&&x.service_tier).map(p=><option key={p.code} value={p.code}>{p.name} — {money(p.wholesale_cents)}/mês</option>)}</select></Line>
+      <Line label="Meses para estoque"><input type="number" min="1" max="100000" required value={bill.months} onChange={e=>setBill({...bill,months:e.target.value})}/></Line></Layout>
+     {currentPlan&&<p>Subtotal previsto: <b>{money(Number(currentPlan.wholesale_cents)*Number(bill.months))}</b></p>}
+     <button className="btn primary" disabled={loading}>Criar cobrança</button>
     </form>
-   </Section>
-   <Section title="Pedidos e links de cobrança" description="O gateway é fixado quando cada pedido nasce. Pix ou cartão pela InfinitePay, Pix pelo Mercado Pago e conferência manual conforme o meio escolhido.">
-    <div style={{overflowX:'auto'}}><table style={{width:'100%'}}><thead><tr><th>Master</th><th>Valor</th><th>Gateway</th><th>Status</th><th>Cobrança</th></tr></thead><tbody>{(view?.orders||[]).map(o=><tr key={o.id}>
-      <td>{o.seller_name}</td><td>{brl(o.total_cents)}</td><td>{o.payment_gateway||'manual'}</td><td>{o.status}</td>
-      <td style={{display:'grid',gap:6}}>{o.status==='pending'&&o.payment_gateway!=='manual'&&<button type="button" disabled={busy} onClick={()=>submit(`/admin/portal-sales/orders/${o.id}/checkout`,'POST',{})}>{o.checkout_url||o.pix_copy_paste?'Atualizar cobrança':'Gerar cobrança'}</button>}
-        {o.checkout_url&&<a href={o.checkout_url} target="_blank" rel="noreferrer">Abrir checkout</a>}
-        {o.checkout_url&&<button type="button" onClick={()=>navigator.clipboard?.writeText(o.checkout_url)}>Copiar link</button>}
-        {o.pix_copy_paste&&<details><summary>Pix copia e cola</summary><textarea readOnly value={o.pix_copy_paste} rows="3" onFocus={e=>e.target.select()}/></details>}
-        {o.status==='pending'&&o.payment_gateway==='mercadopago'&&<button type="button" disabled={busy} onClick={()=>submit(`/admin/portal-sales/orders/${o.id}/recheck`,'POST',{})}>Consultar pagamento</button>}
-      </td>
-    </tr>)}</tbody></table></div>
-    <details><summary>Conferir pagamento InfinitePay sem webhook (possui ID da transação e slug?)</summary>
-     <form style={{display:'grid',gap:8,marginTop:10}} onSubmit={e=>{e.preventDefault();submit(`/admin/portal-sales/orders/${infiniteVerify.orderId}/infinitepay/verify`,'POST',{transactionNsu:infiniteVerify.transactionNsu,slug:infiniteVerify.slug});}}>
-      <FormField label="Pedido InfinitePay"><select required value={infiniteVerify.orderId} onChange={e=>setInfiniteVerify({...infiniteVerify,orderId:e.target.value})}><Opt value="">Selecionar pedido</Opt>{(view?.orders||[]).filter(o=>o.status==='pending'&&o.payment_gateway==='infinitepay').map(o=><Opt key={o.id} value={o.id}>{o.seller_name} · {brl(o.total_cents)}</Opt>)}</select></FormField>
-      <FormField label="transaction_nsu"><input required minLength={8} maxLength={160} value={infiniteVerify.transactionNsu} onChange={e=>setInfiniteVerify({...infiniteVerify,transactionNsu:e.target.value})}/></FormField>
-      <FormField label="slug / invoice_slug"><input required minLength={2} maxLength={160} value={infiniteVerify.slug} onChange={e=>setInfiniteVerify({...infiniteVerify,slug:e.target.value})}/></FormField>
-      <button className="btn" disabled={busy}>Consultar API da InfinitePay e liberar somente se pago</button>
-     </form>
-    </details>
-   </Section>
-   <Section title="4. Confirmar recebimento" description="Somente depois de conferir o pagamento na conta bancária. Referência não pode ser reutilizada.">
-    <form onSubmit={e=>{e.preventDefault();const found=pending.find(p=>p.id===settlement.orderId);if(!found)return;if(!window.confirm(`Você conferiu o recebimento de ${brl(found.total_cents)} no banco? Esta confirmação libera estoque.`))return;submit(`/admin/portal-sales/orders/${settlement.orderId}/settle`,'POST',{settlementRef:settlement.settlementRef,method:settlement.method});}} style={{display:'grid',gap:10}}>
-     <FormField label="Pedido pendente"><select required value={settlement.orderId} onChange={e=>setSettlement({...settlement,orderId:e.target.value})}><Opt value={empty}>Selecionar</Opt>{pending.map(o=><Opt key={o.id} value={o.id}>{o.seller_name} — {brl(o.total_cents)} ({o.quantity_months} meses)</Opt>)}</select></FormField>
-     <FormField label="Referência do pagamento"><input required minLength="6" maxLength="120" value={settlement.settlementRef} onChange={e=>setSettlement({...settlement,settlementRef:e.target.value})} placeholder="ID da transação/extrato"/></FormField>
-     <FormField label="Forma de conferência"><select value={settlement.method} onChange={e=>setSettlement({...settlement,method:e.target.value})}><Opt value="pix_manual_confirmed">Pix conferido manualmente</Opt><Opt value="bank_manual_confirmed">Transferência bancária</Opt><Opt value="cash_manual_confirmed">Dinheiro recebido</Opt></select></FormField>
-     <button className="btn primary" disabled={busy||!pending.length}>Confirmar e liberar meses</button>
+   </Panel>
+   <Panel title="Preços negociados com Masters" sub="Cada Master de primeiro nível pode ter seu próprio preço de compra. A alteração valerá somente para pedidos futuros.">
+    <form style={{display:'grid',gap:12}} onSubmit={e=>{e.preventDefault();void act('/admin/portal-sales/negotiated-prices','PUT',{
+      sellerId:priceEdit.sellerId,planCode:priceEdit.planCode,unitPriceCents:toCents(priceEdit.unitPrice),reason:priceEdit.reason});}}>
+     <Layout><Line label="Master"><select required value={priceEdit.sellerId} onChange={e=>setPriceEdit({...priceEdit,sellerId:e.target.value})}><option value="">Selecionar</option>{roots.map(r=><option value={r.partner_id} key={r.partner_id}>{r.name}</option>)}</select></Line>
+      <Line label="Pacote de Serviço"><select required value={priceEdit.planCode} onChange={e=>setPriceEdit({...priceEdit,planCode:e.target.value})}><option value="">Selecionar</option>{packages.filter(p=>p.service_tier).map(p=><option key={p.code} value={p.code}>{p.name}</option>)}</select></Line>
+      <Line label="Preço acordado/mês (R$)"><input type="number" min="0.01" step="0.01" required value={priceEdit.unitPrice} onChange={e=>setPriceEdit({...priceEdit,unitPrice:e.target.value})}/></Line>
+      <Line label="Motivo da negociação"><input minLength={8} maxLength={500} required value={priceEdit.reason} onChange={e=>setPriceEdit({...priceEdit,reason:e.target.value})}/></Line></Layout>
+     <button className="btn primary" disabled={loading}>Salvar preço negociado</button>
     </form>
-   </Section>
-  </Grid>
-  <Section title="5. Ativar acesso de cliente existente" description="Para contas legadas o primeiro vínculo exige Superadmin. Novos clientes podem ser cadastrados diretamente pelos Masters via convite com estoque reservado.">
-   <form onSubmit={async e=>{e.preventDefault();const ok=await submit('/admin/portal-sales/contracts','POST',{sellerPartnerId:contract.sellerPartnerId,customerPartnerId:contract.customerPartnerId,planCode:contract.planCode,months:Number(contract.months),unitResaleCents:cents(contract.resale),monthlyFeeCents:cents(contract.monthly),requestId:contractRequestId});if(ok)setContractRequestId(crypto.randomUUID());}} style={{display:'grid',gap:12}}>
-    <Grid>
-     <FormField label="Vendedor"><select required value={contract.sellerPartnerId} onChange={e=>setContract({...contract,sellerPartnerId:e.target.value})}><Opt value={empty}>Selecionar</Opt>{sellers.filter(s=>s.active).map(s=><Opt key={s.partner_id} value={s.partner_id}>{s.name}</Opt>)}</select></FormField>
-     <FormField label="Cliente do Painel do Parceiro"><select required value={contract.customerPartnerId} onChange={e=>setContract({...contract,customerPartnerId:e.target.value})}><Opt value={empty}>Selecionar</Opt>{available.filter(p=>!p.contract_seller_id||p.contract_seller_id===contract.sellerPartnerId).map(p=><Opt key={p.id} value={p.id}>{p.name}</Opt>)}</select></FormField>
-     <FormField label="Plano"><select required value={contract.planCode} onChange={e=>setContract({...contract,planCode:e.target.value})}><Opt value={empty}>Selecionar</Opt>{plans.filter(p=>p.active).map(p=><Opt key={p.code} value={p.code}>{p.name}</Opt>)}</select></FormField>
-     <FormField label="Meses de acesso"><input type="number" required min="1" max="120" value={contract.months} onChange={e=>setContract({...contract,months:e.target.value})}/></FormField>
-     <FormField label="Preço declarado de revenda (R$/mês)"><input required inputMode="decimal" value={contract.resale} onChange={e=>setContract({...contract,resale:e.target.value})}/></FormField>
-     <FormField label="Mensalidade adicional declarada (R$)"><input inputMode="decimal" value={contract.monthly} onChange={e=>setContract({...contract,monthly:e.target.value})}/></FormField>
-    </Grid>
-    <p className="muted">O valor comercial informado não comprova que o Master recebeu dinheiro do cliente. Mensalidade adicional não é cobrada automaticamente. Prazo antigo de parceiro legado não é reduzido.</p>
-    <button className="btn primary" disabled={busy||!contract.customerPartnerId}>Vincular contrato utilizando estoque</button>
-   </form>
-  </Section>
-  <Section title="Árvore comercial completa" description="Visão consolidada de Masters e Submasters. Cada vendedor só pode consultar os próprios descendentes.">
-   <div style={{overflowX:'auto'}}><table style={{width:'100%'}}><thead><tr><th>Distribuidor</th><th>Papel</th><th>Estoque</th><th>Clientes diretos</th></tr></thead><tbody>{networkTree.map(n=><tr key={n.partner_id}><td><span style={{paddingLeft:Math.min(n.depth,12)*12}}>{n.depth?'↳ ':''}{n.name}</span></td><td>{n.role}</td><td>{n.available_months}</td><td>{n.direct_customers}</td></tr>)}</tbody></table></div>
-  </Section>
-  <Section title="Rede autorizada e estoque disponível">
-   <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr><th>Parceiro</th><th>Papel</th><th>Meses em estoque</th><th>Pode vender</th><th>Ativo</th></tr></thead><tbody>{sellers.map(s=><tr key={s.partner_id}><td>{s.name}</td><td>{s.role==='master'?'Master':'Submaster'}</td><td>{s.stock_months}</td><td><input type="checkbox" checked={s.can_sell} disabled={busy} aria-label={`Permitir vendas de ${s.name}`} onChange={e=>submit(`/admin/portal-sales/sellers/${s.partner_id}`,'PATCH',{canSell:e.target.checked})}/></td><td><input type="checkbox" checked={s.active} disabled={busy} aria-label={`Ativar ${s.name}`} onChange={e=>submit(`/admin/portal-sales/sellers/${s.partner_id}`,'PATCH',{active:e.target.checked})}/></td></tr>)}</tbody></table></div>
-   {!sellers.length&&<p className="muted">Cadastre o primeiro Master para começar.</p>}
-  </Section>
-  <Section title="Convites comerciais — toda a rede" description="Acompanhe reservas de meses, cadastros automáticos e convites pendentes. Você pode revogar convites de qualquer Master e devolver o estoque reservado.">
-   <Grid>
-    <div className="stat"><small>Pendentes</small><strong>{view?.invitationSummary?.pending??0}</strong></div>
-    <div className="stat"><small>Meses reservados</small><strong>{view?.invitationSummary?.reserved_months??0}</strong></div>
-    <div className="stat"><small>Cadastros concluídos</small><strong>{view?.invitationSummary?.accepted??0}</strong></div>
-   </Grid>
-   <div style={{overflowX:'auto'}}><table style={{width:'100%'}}><thead><tr><th>Master responsável</th><th>Convidado</th><th>Tipo</th><th>Meses</th><th>Estado</th><th>Criado</th><th>Ação</th></tr></thead><tbody>{invitations.map(i=><tr key={i.id}>
-    <td>{i.seller_name}</td><td>{i.invited_name}<br/><small>{i.invited_email}</small></td><td>{i.invite_type==='submaster'?'Submaster':'Parceiro'}</td><td>{i.months}</td>
-    <td>{({pending:'Reservado',accepted:'Aceito',revoked:'Revogado',expired:'Expirado'})[i.status]||i.status}</td><td>{monthDate(i.created_at)}</td>
-    <td>{i.status==='pending'&&<button disabled={busy} onClick={()=>{if(window.confirm('Revogar o convite e devolver o estoque ao Master?'))submit(`/admin/portal-sales/invitations/${i.id}/revoke`,'POST',{});}}>Revogar</button>}</td>
-   </tr>)}</tbody></table></div>
-   <small className="muted">Os registros são paginados por amostragem (últimos 200). Convites expirados são devolvidos ao estoque na próxima consulta comercial do vendedor.</small>
-  </Section>
-  <Section title="Contratos ativos da rede">
-   <div style={{overflowX:'auto'}}><table style={{width:'100%'}}><thead><tr><th>Cliente</th><th>Vendedor</th><th>Plano</th><th>Vencimento</th><th>Meses pagos</th></tr></thead><tbody>{(view?.contracts||[]).map(c=><tr key={c.id}><td>{c.customer_name}</td><td>{c.seller_name}</td><td>{c.plan_code}</td><td>{monthDate(c.expires_at)}</td><td>{c.months_paid}</td></tr>)}</tbody></table></div>
-  </Section>
-  <details className="panel" style={{padding:18}}><summary>Exceção financeira — concessão exclusiva do Superadmin</summary><p className="muted">Cria meses de acesso SEM recebimento. Use apenas quando necessário e justifique. Fica registrado permanentemente na auditoria.</p>
-   <form style={{display:'grid',gap:10,marginTop:14}} onSubmit={e=>{e.preventDefault();if(!window.confirm('Conceder estoque SEM PAGAMENTO? Operação será auditada como exceção do Superadmin.'))return;submit('/admin/portal-sales/exceptions','POST',{sellerPartnerId:exception.sellerPartnerId,planCode:exception.planCode,quantityMonths:Number(exception.quantityMonths),reason:exception.reason});}}>
-    <FormField label="Distribuidor"><select required value={exception.sellerPartnerId} onChange={e=>setException({...exception,sellerPartnerId:e.target.value})}><Opt value="">Selecionar</Opt>{sellers.map(s=><Opt key={s.partner_id} value={s.partner_id}>{s.name}</Opt>)}</select></FormField>
-    <FormField label="Plano"><select required value={exception.planCode} onChange={e=>setException({...exception,planCode:e.target.value})}><Opt value="">Selecionar</Opt>{plans.map(p=><Opt key={p.code} value={p.code}>{p.name}</Opt>)}</select></FormField>
-    <FormField label="Meses"><input type="number" min="1" max="100000" value={exception.quantityMonths} onChange={e=>setException({...exception,quantityMonths:e.target.value})}/></FormField>
-    <FormField label="Justificativa"><textarea required minLength="10" maxLength="500" value={exception.reason} onChange={e=>setException({...exception,reason:e.target.value})}/></FormField>
-    <button className="btn" disabled={busy}>Registrar exceção e liberar</button>
-   </form>
-  </details>
+    <div style={{overflowX:'auto'}}><table style={{width:'100%'}}><thead><tr><th>Master</th><th>Pacote</th><th>Preço de compra</th></tr></thead><tbody>{prices.map(p=><tr key={`${p.seller_partner_id}-${p.plan_code}`}><td>{p.master_name}</td><td>{p.package_name}</td><td>{money(p.unit_price_cents)}</td></tr>)}</tbody></table></div>
+   </Panel>
+   <Panel title="Recebimentos de Masters" sub="Pagamento pelo painel (InfinitePay/Mercado Pago) ou Pix externo verificado. Comprovante sozinho não aprova o pedido.">
+    <div style={{overflowX:'auto'}}><table style={{width:'100%'}}><thead><tr><th>Master</th><th>Pacote</th><th>Meses</th><th>Valor</th><th>Pagamento</th><th>Estado</th><th>Ação</th></tr></thead><tbody>{receivables.map(o=><tr key={o.id}><td>{o.master_name}</td><td>{o.package_name}</td><td>{o.quantity_months}</td><td>{money(o.total_cents)}</td><td>{o.payment_gateway||'manual'}</td><td>{o.status==='paid'?'Confirmado':o.status==='pending'?'Pendente':o.status}</td><td>{o.status==='pending'&&<>{o.payment_gateway!=='manual'&&<button disabled={loading} className="outline" onClick={()=>void act(`/admin/portal-sales/orders/${o.id}/checkout`,'POST',{})}>Gerar checkout</button>}{o.payment_gateway==='manual'&&<button type="button" className="outline" onClick={()=>{const ref=window.prompt('Referência bancária da transação (mín. 6 caracteres):');if(ref?.length>=6&&window.confirm(`Você conferiu ${money(o.total_cents)} na sua conta?`))void act(`/admin/portal-sales/orders/${o.id}/settle`,'POST',{settlementRef:ref,method:'pix_manual_confirmed'});}}>Confirmar Pix externo</button>}</>}{o.checkout_url&&<a target="_blank" rel="noreferrer" href={o.checkout_url}>Pagar</a>}</td></tr>)}</tbody></table></div>{!receivables.length&&<p className="muted">Nenhuma cobrança criada.</p>}
+   </Panel>
+  </>}
+  {tab==='support'&&<Panel title="DeltaTV — Central de Atendimento" sub="Visualização de todos os chamados recebidos, inclusive aqueles tratados por Masters.">
+   <div style={{overflowX:'auto'}}><table style={{width:'100%'}}><thead><tr><th>Protocolo</th><th>Cliente</th><th>Assunto</th><th>Atendente</th><th>Situação</th></tr></thead><tbody>{tickets.map(t=><tr key={t.id} onClick={async()=>{try{setDetail(await api(`/admin/portal-sales/support/tickets/${t.id}`));}catch(e){setErr(e.message)}}} style={{cursor:'pointer'}}><td>#{t.protocol}</td><td>{t.creator_name}</td><td>{t.subject}</td><td>{t.assigned_name||'DeltaTV'}</td><td>{t.status}</td></tr>)}</tbody></table></div>
+   {detail&&<div style={{display:'grid',gap:8}}><h3>Chamado #{detail.ticket.protocol}</h3>{detail.messages.map(m=><div className="notice" key={m.id}>{m.internal&&<b>Nota interna · </b>}{m.body}</div>)}<textarea rows="3" value={reply} onChange={e=>setReply(e.target.value)} placeholder="Resposta ao chamado"/><button className="btn primary" disabled={!reply.trim()||loading} onClick={async()=>{const ok=await act(`/admin/portal-sales/support/tickets/${detail.ticket.id}/reply`,'POST',{body:reply,internal:false,status:'in_progress'});if(ok){setReply('');setDetail(await api(`/admin/portal-sales/support/tickets/${detail.ticket.id}`));}}}>Responder</button></div>}
+  </Panel>}
+  {tab==='usage'&&<PortalUsageAdmin/>}
  </div>;
 }

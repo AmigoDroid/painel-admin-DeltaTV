@@ -65,7 +65,7 @@ export default function PaymentGateways(){
       </section>
       <section className="card" style={{padding:18}}>
         <h2>Recebimento dos Masters de Revenda de TV</h2>
-        <p className="muted">O Mercado Pago, a InfinitePay e o Pix manual de cada vendedor são configurados individualmente no módulo de rede das TVs. As credenciais de cada vendedor não podem ser substituídas por uma configuração única do Superadmin.</p>
+        <p className="muted">O Mercado Pago, a InfinitePay e o Pix manual de cada vendedor são configurados individualmente no módulo de rede das TVs. As credenciais de cada vendedor não podem ser substituídas por uma configuração única da DeltaTV.</p>
       </section>
     </>}
     {tab==='webhooks'&&<>

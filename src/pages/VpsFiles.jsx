@@ -65,7 +65,7 @@ export default function VpsFiles() {
   const refresh = () => setRevision((n) => n + 1);
   return <div className="vfm-page">
     <header className="vfm-intro">
-      <div><h2>Arquivos e armazenamento da VPS</h2><p className="muted">Consulte o espaço ocupado por cada pasta. Explorador somente leitura, exclusivo do Superadmin.</p></div>
+      <div><h2>Arquivos e armazenamento da VPS</h2><p className="muted">Consulte o espaço ocupado por cada pasta. Explorador somente leitura, exclusivo da DeltaTV.</p></div>
       <button className="btn" onClick={refresh} disabled={loading || !activeRoot}>Atualizar</button>
     </header>
     <div className="vfm-root-picker" role="group" aria-label="Pastas disponíveis">

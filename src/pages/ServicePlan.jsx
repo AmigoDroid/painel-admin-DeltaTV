@@ -39,7 +39,7 @@ export default function ServicePlan({partnerId}){
  <option value="default">Padrão do plano</option><option value="true">Permitir</option><option value="false">Desativar</option>
  </select></label>)}
  <div className="panel" style={{padding:14}}><strong>Recursos efetivos atuais</strong><p className="muted">{plan?.features.maxServers == null ? "URLs ilimitadas" : `${plan.features.maxServers} URLs`} por código · Failover {plan?.features.autoFailover?"ativo":"desligado"} · Prioridade {plan?.features.autoPriority?"automática":"manual"} · Alertas {plan?.features.emailAlerts?"ativos":"desligados"}</p></div>
- {allowed?<button className="btn primary" disabled={busy}>{busy?"Salvando…":"Salvar plano e exceções"}</button>:<p className="muted">Apenas o Superadmin pode modificar planos de serviço.</p>}
+ {allowed?<button className="btn primary" disabled={busy}>{busy?"Salvando…":"Salvar plano e exceções"}</button>:<p className="muted">Apenas a DeltaTV pode modificar planos de serviço.</p>}
  </form>{done&&<p style={{color:"var(--ok,#29a980)"}} role="status">{done}</p>}
  </>}</section>;
 }

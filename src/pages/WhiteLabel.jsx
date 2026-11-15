@@ -102,12 +102,12 @@ export default function WhiteLabel() {
         {chosen.appearanceEnabled ? 'Desativar Estúdio Visual' : 'Habilitar Estúdio Visual'}</button>
       <button className="btn primary" onClick={() => setPayment({ months: 1, amount: inputAmount(chosen.monthlyFeeCents), reference: "", notes: "" })}>Registrar mensalidade</button>
       <button className="btn sm" onClick={() => setChosen(null)}>Fechar</button></div></div>
-      <p><b>Personalização Roku:</b> {chosen.appearanceEnabled ? "Liberada para este cliente" : "Bloqueada pelo Superadmin"} · <b>Situação:</b> {statuses[chosen.effectiveStatus] || chosen.effectiveStatus} · <b>Válido até:</b> {chosen.paidThrough || "Pendente"} · <b>Aparelhos:</b> {chosen.activeActivations}{chosen.planType === "limited" ? ` / ${chosen.activationLimit}` : " (ilimitados)"}</p>
+      <p><b>Personalização Roku:</b> {chosen.appearanceEnabled ? "Liberada para este cliente" : "Bloqueada pela DeltaTV"} · <b>Situação:</b> {statuses[chosen.effectiveStatus] || chosen.effectiveStatus} · <b>Válido até:</b> {chosen.paidThrough || "Pendente"} · <b>Aparelhos:</b> {chosen.activeActivations}{chosen.planType === "limited" ? ` / ${chosen.activationLimit}` : " (ilimitados)"}</p>
       <div className="adm-wl-cols"><div><header className="page-head"><h3>URLs do cliente</h3><button className="btn sm" onClick={() => setServerForm({ name: "", baseUrl: "", priority: 0, status: "active" })}>+ Servidor</button></header>
         {servers.map(s => <div className="adm-wl-entry" key={s.id}><div><b>{s.name}</b><small>{s.baseUrl} · {s.status}</small></div><div className="adm-wl-actions"><button className="btn sm" onClick={() => setServerForm(s)}>Editar</button>
           <button className="btn sm danger" onClick={() => { if (window.confirm(`Remover URL ${s.name}?`)) void task(() => api(`${ROOT}/${chosen.id}/servers/${s.id}`, { method: "DELETE" }), "URL removida."); }}>Excluir</button></div></div>)}
         {!servers.length && <p className="muted">O cliente ainda não cadastrou servidores.</p>}</div>
-      <div><h3>Pagamentos registrados</h3><p className="muted">Registro manual do superadmin, não confirmação automática do Pix.</p>
+      <div><h3>Pagamentos registrados</h3><p className="muted">Registro manual da DeltaTV, não confirmação automática do Pix.</p>
         {payments.map(p => <div className="adm-wl-entry" key={p.id}><b>{fmtMoney(p.amountCents)}</b><small>{p.reference} · {p.months} mês(es) · até {p.paidThrough}</small></div>)}
         {!payments.length && <p className="muted">Ainda sem pagamentos.</p>}</div></div>
       <RokuBuildManager appId={chosen.id} appName={chosen.name} appearanceEnabled={chosen.appearanceEnabled}/>

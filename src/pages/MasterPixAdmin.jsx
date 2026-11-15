@@ -26,11 +26,11 @@ export default function MasterPixAdmin({id}){
     {error&&<p className="error" role="alert">{error}</p>}{message&&<p role="status">{message}</p>}
     <p>{settings?.configured?`Conta recebedora ${settings.merchantId} · ${settings.enabled?'ativa':'pausada'}`:'Mercado Pago ainda não configurado.'}</p>
     {settings?.pendingPayments>0&&<p className="error">{settings.pendingPayments} cobranças precisam ser concluídas antes de trocar as credenciais.</p>}
-    <details><summary>Configurar a conta de recebimento (Superadmin)</summary>
+    <details><summary>Configurar a conta de recebimento (DeltaTV)</summary>
       <p className="muted">As credenciais são cifradas. Nenhuma chave é exibida após o cadastro.</p>
       <div style={{display:'grid',gap:8}}><label>Access Token<input type="password" autoComplete="off" value={token} onChange={e=>setToken(e.target.value)}/></label>
       <label>Chave do Webhook<input type="password" autoComplete="off" value={secret} onChange={e=>setSecret(e.target.value)}/></label>
-      <label>Confirme sua senha do Superadmin<input type="password" autoComplete="current-password" value={currentPassword} onChange={e=>setCurrentPassword(e.target.value)}/></label>
+      <label>Confirme sua senha da DeltaTV<input type="password" autoComplete="current-password" value={currentPassword} onChange={e=>setCurrentPassword(e.target.value)}/></label>
       <button className="btn primary" disabled={busy||token.length<30||secret.length<16||currentPassword.length<8} onClick={()=>act(()=>api(`/admin/network/master-pix/accounts/${id}/settings`,{method:'PUT',body:{accessToken:token,webhookSecret:secret,currentPassword,active:true}}),'Conta de recebimento salva.')}>Validar e salvar</button></div>
     </details>
     {settings?.webhookUrl&&<label>URL do Webhook<input readOnly value={settings.webhookUrl} onFocus={e=>e.target.select()}/></label>}

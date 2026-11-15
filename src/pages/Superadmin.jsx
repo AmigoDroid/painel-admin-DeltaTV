@@ -1097,7 +1097,7 @@ function Sessions() {
         loading={!grants.data && !grants.error}
         error={grants.error}
         columns={[
-          { key: "actorId", label: "Superadmin" },
+          { key: "actorId", label: "DeltaTV" },
           { key: "targetId", label: "Conta acessada" },
           {
             key: "expiresAt",
@@ -1150,7 +1150,7 @@ function Roles() {
     <section>
       <p>
         Crie papéis a partir de uma função existente. As permissões podem ser
-        restringidas por área e ação. O superadmin mantém acesso integral.
+        restringidas por área e ação. A DeltaTV mantém acesso integral.
       </p>
       <button
         className="btn primary"
@@ -1687,7 +1687,7 @@ function Backup() {
 export default function Superadmin() {
   const [tab, setTab] = useState("overview");
   if (getAuth()?.user?.role !== "superadmin")
-    return <p role="alert">Acesso exclusivo do superadmin.</p>;
+    return <p role="alert">Acesso exclusivo da DeltaTV.</p>;
   const Current = {
     overview: Overview,
     licenses: Licenses,
@@ -1702,12 +1702,12 @@ export default function Superadmin() {
       <div className="control-hero">
         <div>
           <small>ADMINISTRAÇÃO DA PLATAFORMA</small>
-          <h2>Central do superadmin</h2>
+          <h2>Central DeltaTV</h2>
           <p>Operação global, controle de acesso e histórico das alterações.</p>
         </div>
         <span className="badge info">Acesso integral · ações auditadas</span>
       </div>
-      <nav className="control-tabs" aria-label="Áreas do superadmin">
+      <nav className="control-tabs" aria-label="Áreas da DeltaTV">
         {TABS.map(([id, label]) => (
           <button
             type="button"

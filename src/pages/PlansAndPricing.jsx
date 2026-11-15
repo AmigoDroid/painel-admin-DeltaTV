@@ -258,7 +258,7 @@ function LicensePrices() {
 
 export default function PlansAndPricing() {
   const [tab, setTab] = useState("contracts");
-  if (getAuth()?.user?.role !== "superadmin") return <p className="error">Esta área é exclusiva do Superadmin.</p>;
+  if (getAuth()?.user?.role !== "superadmin") return <p className="error">Esta área é exclusiva da DeltaTV.</p>;
   return <div className="pricing-page">
     <div className="page-head"><div><h2>Planos e valores</h2><p className="muted page-sub">Uma visão central dos recursos, contratos de parceiros e preços das licenças.</p></div></div>
     <div className="tabs pricing-tabs" role="tablist" aria-label="Planos e valores">

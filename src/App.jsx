@@ -48,7 +48,7 @@ import HelpManagement from "./pages/HelpManagement.jsx";
 const WebAccess = () => <WebAccessPage admin />;
 
 const PAGES = {
-  control: ["Central do superadmin", Superadmin],
+  control: ["Central DeltaTV", Superadmin],
   conta: ["Minha conta", ProfilePage],
   dashboard: ["Visão geral", Dashboard], vpsmonitor: ["Servidor / VPS", VpsMonitor], vpsfiles: ["Arquivos da VPS", VpsFiles],
   webaccess: ["Player Web", WebAccess], whiteLabel: ["Aplicativos white-label", WhiteLabel],
