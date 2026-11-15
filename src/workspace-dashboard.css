@@ -36,3 +36,12 @@
 .dw-hero.dw-hero-compact .dw-hero-symbol{width:64px;height:64px;border-radius:17px;transform:none}
 .dw-hero.dw-hero-compact .dw-hero-symbol svg{width:30px;height:30px;transform:none}
 @media(max-width:530px){.dw-hero.dw-hero-compact{padding:19px}.dw-group-heading{margin-top:22px}}
+
+/* Todas as funções direto no painel inicial (sem sub-dashboards). */
+.af-group{margin:16px 0 8px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#a7b8d2}
+.af-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,210px),1fr));gap:8px}
+.af-tile{display:flex;align-items:center;gap:10px;min-height:48px;padding:10px 12px;background:#162238;border:1px solid #354868;border-radius:11px;color:#eef4ff;font-size:13px;font-weight:600;text-align:left;cursor:pointer}
+.af-tile:hover,.af-tile:focus-visible{border-color:#7da5e7;background:#203456;outline:none}
+.af-tile-icon{display:grid;place-items:center;flex:0 0 auto;width:30px;height:30px;border-radius:9px;background:#22385b;color:#9fc0fb}
+.af-tile-label{flex:1;min-width:0}
+.af-tile .af-badge{flex:0 0 auto;min-width:20px;padding:1px 6px;border-radius:999px;background:#e5484d;color:#fff;font-size:11px;text-align:center}

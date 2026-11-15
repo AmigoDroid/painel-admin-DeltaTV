@@ -26,9 +26,10 @@ test('nenhuma seção dos dashboards aponta para outra área por acidente', () =
 
 test('acesso direto a todas as funções foi restaurado no menu principal', () => {
   const shell = read('../src/App.jsx');
-  assert.match(shell, /Todas as funções · acesso direto/);
-  assert.match(shell, /GROUPS\.filter\(g => g\.legacy\)\.map\(renderMenuGroup\)/);
-  assert.match(shell, /GROUPS\.filter\(g => !g\.legacy\)\.map\(renderMenuGroup\)/);
+  // Menu único, como no painel do parceiro: sem grupo "Dashboards" e sem lista recolhível.
+  assert.match(shell, /GROUPS\.map\(renderMenuGroup\)/);
+  assert.doesNotMatch(shell, /label:'Dashboards'/);
+  assert.doesNotMatch(shell, /<details className="sidebar-all-functions"/);
 });
 
 test('dashboard consegue abrir a tela original sem prender o usuário', () => {

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync,existsSync} from 'node:fs';
-import {WORK_AREAS,LEGACY_CENTERS,findWorkArea,workAreaPath} from '../src/work-areas.js';
+import {WORK_AREAS,LEGACY_CENTERS,findWorkArea,workAreaPath,resolveLegacyRoute} from '../src/work-areas.js';
 const source=file=>readFileSync(new URL(file,import.meta.url),'utf8');
 test('áreas do Admin possuem identificadores únicos e função de navegação íntegra',()=>{
   const areas=Object.values(WORK_AREAS);assert.ok(areas.length>=6);
@@ -14,16 +14,21 @@ test('operações administrativas importantes seguem disponíveis e não viram a
   const pages=Object.values(WORK_AREAS).flatMap(a=>a.items.map(i=>i.page));
   for(const p of ['clients','devices','ativar-tv','resellers','network','commerce3','licenses','pix','billing','servermonitor','audit'])assert.ok(pages.includes(p),p);
   const shell=source('../src/App.jsx');
-  assert.match(shell,/if \(workArea\) return <WorkArea/);
-  assert.match(shell,/canOpenPage\(item\.page\)/);
-  assert.match(shell,/findWorkArea\(page\)/);
-  for(const id of Object.keys(WORK_AREAS)) assert.ok(shell.includes('WORK_AREAS'));
+  assert.doesNotMatch(shell,/return <WorkArea/);
+  assert.match(shell,/const allowed = id => canOpenPage\(id\)/);
+  assert.match(shell,/resolveLegacyRoute/);
   assert.ok(existsSync(new URL('../src/workspace-dashboard.css',import.meta.url)));
 });
 test('atalhos antigos são enviados aos novos dashboards',()=>{
   assert.equal(LEGACY_CENTERS.pagamentos,'area/financeiro');
   assert.equal(LEGACY_CENTERS.dispositivos,'area/operacao');
-  assert.ok(source('../src/App.jsx').includes('LEGACY_CENTERS[raw]'));
+  // Os endereços antigos agora abrem direto a página real, sem sub-dashboard.
+  assert.equal(resolveLegacyRoute('pagamentos'),'billing');
+  assert.equal(resolveLegacyRoute('dispositivos'),'devices');
+  assert.equal(resolveLegacyRoute('area/financeiro'),'dashboard');
+  assert.equal(resolveLegacyRoute(workAreaPath(WORK_AREAS['area/operacao'],WORK_AREAS['area/operacao'].items[0])),'clients');
+  assert.equal(resolveLegacyRoute('clients'),'clients');
+  assert.ok(source('../src/App.jsx').includes('resolveLegacyRoute'));
 });
 test('planos, contratos e comissões possuem seções distintas sem duplicar os serviços',()=>{
   const plan=WORK_AREAS['area/planos'];

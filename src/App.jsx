@@ -8,8 +8,8 @@ import { useEffect, useRef, useState } from "react";
 import { api, getAuth, login, logout } from "./api.js";
 import { UiProvider, Field, useAction, BrandMark } from "./ui.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
-import WorkArea from "./WorkArea.jsx";
-import { WORK_AREAS, LEGACY_CENTERS, findWorkArea } from "./work-areas.js";
+import AllFunctions from "./AllFunctions.jsx";
+import { resolveLegacyRoute } from "./work-areas.js";
 import { useSimpleMode } from "@deltatv/ui/useSimpleMode";
 import { EasyPageGuide } from "@deltatv/ui/EasyStart";
 import ServerMonitor from "./pages/ServerMonitor.jsx";
@@ -46,7 +46,6 @@ import HelpManagement from "./pages/HelpManagement.jsx";
 const WebAccess = () => <WebAccessPage admin />;
 
 const PAGES = {
-  ...Object.fromEntries(Object.values(WORK_AREAS).map(a=>[a.id,[a.label,()=>null]])),
   control: ["Central do superadmin", Superadmin],
   conta: ["Minha conta", ProfilePage],
   dashboard: ["Visão geral", Dashboard], vpsmonitor: ["Servidor / VPS", VpsMonitor], vpsfiles: ["Arquivos da VPS", VpsFiles],
@@ -59,18 +58,16 @@ const PAGES = {
   help: ["Central de Ajuda", HelpManagement], users: ["Usuários", Users], loginhistory: ["Histórico de login", LoginHistory], notifications: ["Notificações", Notifications], mail: ["E-mails", Mail], audit: ["Auditoria", Audit],
 };
 
-// Menu por área: quem é de conteúdo (Parceiros) fica separado de quem vende licença (Revendas e seus clientes).
-// Dashboards coexistem com as páginas originais. Nunca substituir
-// uma função existente por um cartão que apenas parece operacional.
+// Menu único e direto (como no painel do parceiro): cada função abre a própria página,
+// sem passar por sub-dashboards. A mesma lista alimenta o menu lateral e a tela inicial.
 const GROUPS = [
  {label:null,items:['dashboard','control']},
- {label:'Dashboards',items:['area/operacao','area/rede','area/planos','area/financeiro','area/aplicativos','area/infra','area/administracao']},
- {label:'Atendimento e operação',items:['ativar-tv','clients','devices','legados','support','unlinked'],legacy:true},
- {label:'Planos e licenças',items:['commerce3','licenses','pricing','credits'],legacy:true},
- {label:'Financeiro',items:['billing','pix'],legacy:true},
- {label:'Rede comercial',items:['resellers','partners','network'],legacy:true},
- {label:'Aplicativos e servidores',items:['whiteLabel','webaccess','downloads','sources','servermonitor'],legacy:true},
- {label:'Administração',items:['vpsmonitor','vpsfiles','trash','help','users','loginhistory','notifications','mail','audit','conta'],legacy:true},
+ {label:'Atendimento e operação',items:['ativar-tv','clients','devices','legados','support','unlinked']},
+ {label:'Planos e licenças',items:['commerce3','licenses','pricing','credits']},
+ {label:'Financeiro',items:['billing','pix']},
+ {label:'Rede comercial',items:['resellers','partners','network']},
+ {label:'Aplicativos e servidores',items:['whiteLabel','webaccess','downloads','sources','servermonitor']},
+ {label:'Administração',items:['vpsmonitor','vpsfiles','trash','help','users','loginhistory','notifications','mail','audit','conta']},
 ];
 
 // Ícones do menu (traço simples, herdam a cor do texto).
@@ -111,7 +108,7 @@ const ICONS = {
   audit: <><path d="M8 3h8v3H8z" /><path d="M6 5H5a1 1 0 00-1 1v14a1 1 0 001 1h14a1 1 0 001-1V6a1 1 0 00-1-1h-1M8 12h8M8 16h5" /></>,
 };
 const NavIcon = ({ k }) => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{ICONS[k] || ICONS[WORK_AREAS[k]?.icon] || ICONS.dashboard}</svg>
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{ICONS[k] || ICONS.dashboard}</svg>
 );
 
 function Login({ onDeviceAccess }) {
@@ -173,21 +170,16 @@ function UserMenu({ user, onAccount }) {
   );
 }
 
-const SIMPLE_ADMIN = new Set(['dashboard','area/operacao','area/rede','area/planos','area/financeiro','area/aplicativos','area/infra','area/administracao']);
 function Shell({ user }) {
   const [simpleMode, setSimpleMode] = useSimpleMode("admin");
   // Itens do menu são conveniência: cada rota é protegida por permissão no backend.
   const hidden = (k) => !adminPageAllowed(k,user) || (k === "control" && user.role !== "superadmin") || ((k === "network" || k === "ativar-tv" || k === "legados") && user.role !== "superadmin") || ((k === "whiteLabel" || k === "help") && user.role !== "superadmin") || ((k === "vpsmonitor" || k === "vpsfiles" || k === "pricing" || k === "commerce3" || k === "trash") && user.role !== "superadmin") || (user.role === "support" && k === "audit") || ((k === "users" || k === "loginhistory" || k === "mail" || k === "notifications") && user.role !== "superadmin");
   const canOpenPage = id => Boolean(PAGES[id]) && !hidden(id);
-  const allowed = id => {
-    const area = WORK_AREAS[id];
-    return area ? area.items.some(item => canOpenPage(item.page)) : canOpenPage(id);
-  };
+  const allowed = id => canOpenPage(id);
+  // Endereços antigos de sub-dashboards (#area/..., #pagamentos) abrem direto a função correspondente.
   const fromHash = () => {
-    const raw = location.hash.slice(1);
-    const id = LEGACY_CENTERS[raw] || raw;
-    const area = findWorkArea(id);
-    return (area ? area.items.some(item=>canOpenPage(item.page)) : allowed(id)) ? id : (canOpenPage('dashboard')?'dashboard':'conta');
+    const id = resolveLegacyRoute(location.hash.slice(1));
+    return allowed(id) ? id : (canOpenPage('dashboard') ? 'dashboard' : 'conta');
   };
   const [page, setPage] = useState(fromHash);
   const [open, setOpen] = useState(false); // gaveta do menu em tela pequena
@@ -200,7 +192,6 @@ function Shell({ user }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user.role]);
   const Current = PAGES[page]?.[1] || Dashboard;
-  const workArea = findWorkArea(page);
   const go = (k) => { setPage(k); setOpen(false); window.scrollTo(0, 0); };
   // Esc fecha a gaveta; ao voltar para tela grande ela não fica "aberta" escondida.
   useEffect(() => {
@@ -223,7 +214,7 @@ function Shell({ user }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const renderMenuGroup = g => {
-    const menuItems = g.items.filter(k => allowed(k) && (!simpleMode || SIMPLE_ADMIN.has(k) || page === k || g.legacy));
+    const menuItems = g.items.filter(allowed);
     if (!menuItems.length) return null;
     return <div className="nav-group" key={g.label || 'top'}>
       {g.label && <div className="nav-heading">{g.label}</div>}
@@ -236,24 +227,17 @@ function Shell({ user }) {
       </button>)}
     </div>;
   };
-  if (workArea) return <WorkArea area={workArea} route={page} go={go} back={()=>go('dashboard')}
-    allowed={item=>canOpenPage(item.page)} renderIcon={item=><NavIcon k={item.icon || 'dashboard'}/>}
-    renderPage={item=>{
-      if(!canOpenPage(item.page)) return <p>Esta operação não está disponível para seu perfil.</p>;
-      const CurrentPage=PAGES[item.page][1];
-      return <CurrentPage key={item.id} onChanged={refreshCounts} activeTab={item.tab} hideTabs={item.page==='commerce3'}/>;
-    }} />;
+  // Mesmas funções do menu lateral, em cartões na tela inicial (o painel inicial já é a primeira entrada).
+  const homeGroups = GROUPS.map(g => ({
+    label: g.label || "Geral",
+    items: g.items.filter(k => k !== "dashboard" && allowed(k)).map(k => ({ id: k, label: PAGES[k][0], icon: <NavIcon k={k} />, badge: badges[k] })),
+  }));
   return (
     <div className="layout">
       <aside className={`sidebar ${open ? "open" : ""}`} id="menu-principal">
         <div className="brand"><BrandMark size={32} /><div><strong><PlatformBrand/></strong><span>Administração</span></div><button type="button" className="sidebar-close" aria-label="Fechar menu" onClick={() => setOpen(false)}>×</button></div>
-        <button type="button" className="easy-mode-button" aria-pressed={!simpleMode} onClick={() => setSimpleMode((s) => !s)}>{simpleMode ? "⚙ Ver todas as opções" : "✓ Voltar ao modo simples"}</button>
         <nav className="nav-scroll" aria-label="Menu principal">
-          {GROUPS.filter(g => !g.legacy).map(renderMenuGroup)}
-          <details className="sidebar-all-functions" defaultOpen>
-            <summary>Todas as funções · acesso direto</summary>
-            {GROUPS.filter(g => g.legacy).map(renderMenuGroup)}
-          </details>
+          {GROUPS.map(renderMenuGroup)}
         </nav>
       </aside>
       {open && <div className="scrim" onClick={() => setOpen(false)} />}
@@ -264,13 +248,13 @@ function Shell({ user }) {
           </button>
           <strong className="topbar-title">{PAGES[page][0]}</strong>
           {badges.unlinked > 0 || badges.resellers > 0 ? <span className="count" aria-label="Itens aguardando">{(badges.unlinked || 0) + (badges.resellers || 0)}</span> : null}
-          <button type="button" className="easy-mode-button" aria-pressed={!simpleMode} onClick={() => setSimpleMode((s) => !s)}>{simpleMode ? "Modo simples · mostrar tudo" : "Modo completo · simplificar"}</button>
+          <button type="button" className="easy-mode-button" aria-pressed={!simpleMode} onClick={() => setSimpleMode((s) => !s)}>{simpleMode ? "Guia das telas: ligado" : "Guia das telas: desligado"}</button>
           <UserMenu user={user} onAccount={() => go("conta")} />
         </div>
         <main className="content"><Breadcrumb panel="admin" current={PAGES[page][0]} onHome={()=>go("dashboard")}/>
           <TaskFinder tasks={TASKS.filter(task => allowed(task.route))} onNavigate={go} />
           {simpleMode && page !== "dashboard" && <EasyPageGuide role="admin" page={page} onBack={() => go("dashboard")} />}
-          <Current onChanged={refreshCounts} />
+          <Current onChanged={refreshCounts} menu={homeGroups} onNavigate={go} />
         </main>
       </div>
     </div>

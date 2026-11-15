@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, getAuth } from "../api.js";
 import EasyStart from "@deltatv/ui/EasyStart";
+import AllFunctions from "../AllFunctions.jsx";
 import { Badge, Table, fmtDate, fmtDateTime, fmtMoney } from "../ui.jsx";
 
 /* Ícones de traço simples, no mesmo estilo do menu. */
@@ -61,7 +62,7 @@ const Group = ({ title, tone, items, render }) => (
   </div>
 );
 
-export default function Dashboard() {
+export default function Dashboard({ menu, onNavigate }) {
   const [d, setD] = useState(null);
   const [error, setError] = useState("");
   const [presence, setPresence] = useState(null);
@@ -155,20 +156,7 @@ export default function Dashboard() {
         <div><h2>{first ? `Olá, ${first}` : "Visão geral"}</h2><p className="muted page-sub dash-date">{today}</p></div>
       </div>
 
-      <section className="dw-home-hubs" aria-labelledby="admin-areas-heading">
-        <div className="dw-group-heading"><div><span className="dw-kicker">GESTÃO DO DELTATV</span><h2 id="admin-areas-heading">Áreas de trabalho</h2><p>Abra um ambiente especializado com menu próprio, sem perder as funções administrativas.</p></div></div>
-        <div className="dw-home-hub-grid">
-          {[
-            ['area/operacao','Atendimento e TVs','Clientes, ativações e diagnóstico'],
-            ['area/rede','Rede comercial','Masters, parceiros, revendas e comissões'],
-            ['area/planos','Planos e licenças','Assinaturas, contratos e licenciamento'],
-            ['area/financeiro','Financeiro','Faturas, Pix e créditos'],
-            ['area/aplicativos','Aplicativos','White Label, Player Web e downloads'],
-            ['area/infra','Servidores e infraestrutura','Fontes, monitoramento e VPS'],
-            ['area/administracao','Administração','Auditoria, permissões e histórico'],
-          ].map(([id,label,desc])=><a href={'#'+id} className="dw-home-hub" key={id}><span className="dw-card-icon" aria-hidden="true">▦</span><span><strong>{label}</strong><small>{desc}</small></span><span aria-hidden="true">↗</span></a>)}
-        </div>
-      </section>
+      <AllFunctions groups={menu} onNavigate={onNavigate} />
       <EasyStart role="admin" onNavigate={(id) => { window.location.hash = id; }} />
       <div className={`attn ${attention.length ? "" : "ok"}`}>
         {attention.length

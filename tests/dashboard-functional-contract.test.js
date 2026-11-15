@@ -75,6 +75,7 @@ test('Admin: todas as páginas cadastradas nos dashboards existem em PAGES', () 
   const registered = new Set([...declaration.matchAll(/(?:^|[,\s])(?:"([^"]+)"|([A-Za-z_$][\w$-]*))\s*:\s*\[/gm)]
     .map(match => match[1] || match[2]));
   for (const item of items) assert.ok(registered.has(item.page), `Falta a página ${item.page} no Admin`);
-  assert.match(source, /allowed=\{item=>canOpenPage\(item\.page\)\}/);
-  assert.match(source, /if \(workArea\) return <WorkArea/);
+  assert.match(source, /resolveLegacyRoute\(location\.hash\.slice\(1\)\)/);
+  assert.doesNotMatch(source, /return <WorkArea/, 'sub-dashboards não fazem mais parte da navegação');
+  assert.match(source, /<Current onChanged=\{refreshCounts\} menu=\{homeGroups\} onNavigate=\{go\} \/>/);
 });
