@@ -7,6 +7,21 @@ const optionalNumber=value=>value===""?null:Number(value);
 const inviteDescription=(i)=>`${i.uses}/${i.maxUses==null?"sem limite":i.maxUses} cadastros · ${i.expiresAt?`vence ${new Date(i.expiresAt).toLocaleDateString("pt-BR")}`:"sem vencimento"}`;
 const shareWhatsapp=(url,name)=>`https://wa.me/?text=${encodeURIComponent(`Olá! Cadastre sua revenda DeltaTV na rede de ${name}: ${url}`)}`;
 const names={servers:"Servidores IPTV",codes:"Códigos de ativação",devices:"Gerenciamento de TVs",clients:"Clientes",stock:"Estoque de licenças",credits:"Créditos e compras",web:"Player Web",white_label:"Aplicativos personalizados",remote:"Controle remoto"};
+function MasterLicenseDeliveries({partnerId}) {
+  const [rows,setRows]=useState([]),[error,setError]=useState('');
+  useEffect(()=>{let active=true;setRows([]);setError('');
+    api(`/admin/network/accounts/${partnerId}/license-deliveries`).then(r=>{if(active)setRows(r.data||[]);})
+      .catch(e=>{if(active)setError(e.message);});return()=>{active=false;};
+  },[partnerId]);
+  return <section style={{marginTop:14}}><h4>Entregas diretas de licenças</h4>
+    <p className="muted">Movimentos de estoque declarados pelo Master. Pagamentos externos não são confirmados pelo DeltaTV.</p>
+    {error&&<p className="error" role="alert">{error}</p>}
+    {rows.length>0?<div className="table-wrap"><table><thead><tr><th>Quando</th><th>Revenda</th><th>Licenças</th><th>Tipo</th></tr></thead>
+      <tbody>{rows.map(r=><tr key={r.id}><td>{new Date(r.createdAt).toLocaleString('pt-BR')}</td><td>{r.buyerName}</td>
+        <td>{r.quantity} × {r.months} mês(es)</td><td>{r.purpose==='external_payment'?'Pagamento externo declarado':'Sem cobrança'}</td></tr>)}</tbody>
+    </table></div>:!error&&<p className="muted">Sem entregas diretas registradas.</p>}
+  </section>;
+}
 export default function DistributionNetwork(){
   const [inviteUrl,setInviteUrl]=useState(""),[inviteUses,setInviteUses]=useState(""),[inviteDays,setInviteDays]=useState(""),[invites,setInvites]=useState([]);
   const [issuancePermission,setIssuancePermission]=useState(null);
@@ -98,12 +113,13 @@ export default function DistributionNetwork(){
         <div className="row" style={{gap:8,flexWrap:"wrap"}}><button className="btn primary" disabled={busy} onClick={()=>enable(true)}>{detail.account.distributionRole==="master"?"Salvar permissões":"Transformar em Master"}</button>{detail.account.distributionRole==="master"&&<button className="btn" disabled={busy||(detail.childrenTotal??detail.children.length)>0} onClick={()=>window.confirm("Desativar a função Master dessa revenda?")&&enable(false)}>Remover função Master</button>}</div>
         {detail.account.distributionRole==="master"&&!detail.account.parentPartnerId&&<div className="card" style={{padding:16,margin:"16px 0",border:"1px solid var(--line, #334155)"}}>
           <h4 style={{marginTop:0}}>Emissão própria de licenças · Master principal</h4>
-          <p className="muted">Permite que este Master crie licenças no seu próprio estoque, sem precisar comprá-las do Superadmin. A emissão é registrada no extrato e na auditoria.</p>
+          <p className="muted">Permite que este Master crie licenças no seu próprio estoque, sem comprá-las do Superadmin. Para ele vender essas licenças à rede, também habilite “Definir preços e vender licenças” nas permissões acima. São autorizações independentes.</p>
           <label style={{display:"flex",gap:10,alignItems:"center",marginBottom:8}}>
             <input type="checkbox" disabled={busy||!issuancePermission} checked={!!issuancePermission?.authorized}
               onChange={e=>{const enabled=e.target.checked;act(()=>api(`/admin/network/accounts/${selected}/self-issuance`,{method:"PUT",body:{enabled}}),enabled?"Master autorizado a emitir licenças.":"Permissão de emissão revogada.");}}/>
             <strong>Permitir que este Master emita licenças sem comprar</strong>
           </label>
+          {!detail.policy.canSell&&<p className="error">Atenção: este Master poderá emitir, mas NÃO vender licenças até que “Definir preços e vender licenças” seja habilitado e salvo acima.</p>}
           <p className="muted" style={{fontSize:12}}>Exclusivo de Master sem superior. Submasters e revendas nunca herdam esta autorização, mesmo quando podem vender ou promover outros revendedores.</p>
         </div>}
         <hr/><h4>Vincular a um Master existente</h4><p className="muted">A conta deve estar independente e não possuir uma sub-rede. Use apenas para vincular contas existentes.</p><div className="row" style={{alignItems:"end",gap:8,flexWrap:"wrap"}}><label>Master superior<select value={parentId} onChange={e=>setParentId(e.target.value)}><option value="">Selecione…</option>{tree.filter(p=>p.distributionRole==="master"&&p.id!==selected).map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label><button className="btn" disabled={busy||!parentId||!!detail.account.parentPartnerId} onClick={attach}>Vincular</button>{detail.account.parentPartnerId&&<button className="btn" disabled={busy||(detail.childrenTotal??detail.children.length)>0} onClick={()=>window.confirm("Desvincular a revenda e deixá-la independente? Verifique suas compras e contratos primeiro.")&&detach()}>Desvincular</button>}</div>
@@ -127,6 +143,7 @@ export default function DistributionNetwork(){
         </li>)}</ul></details>}
         </>}
         <hr/><h4>Preços do Master</h4><p className="muted">O Superadmin pode definir os preços de qualquer Master. Valores em créditos; não configura repasse bancário.</p><div className="row" style={{gap:10,alignItems:"end",flexWrap:"wrap"}}><label>Meses<input type="number" min="1" max="120" value={newPrice.months} onChange={e=>setNewPrice(v=>({...v,months:e.target.value}))}/></label><label>Créditos por licença<input type="number" min="1" value={newPrice.priceCredits} onChange={e=>setNewPrice(v=>({...v,priceCredits:e.target.value}))}/></label><button className="btn primary" disabled={busy} onClick={()=>act(()=>api(`/admin/network/accounts/${selected}/prices`,{method:"PUT",body:{months:Number(newPrice.months),priceCredits:Number(newPrice.priceCredits),active:true}}),"Preço salvo.")}>Salvar preço</button></div><div style={{marginTop:8}}>{offers.map(p=><span key={p.months} style={{display:"inline-block",padding:8}}>{p.months} mês(es): {p.priceCredits} créditos · {p.active?"Ativo":"Pausado"}</span>)}</div><h4>Vendas recentes</h4>{sales.length?<ul>{sales.slice(0,12).map(v=><li key={v.id}>{v.counterpartyName}: {v.quantity} × {v.months} meses — {v.totalCredits} créditos</li>)}</ul>:<p className="muted">Sem vendas registradas.</p>}</>}
+        {detail.account.distributionRole==="master"&&<MasterLicenseDeliveries partnerId={selected}/>}
         {detail.account.distributionRole==="master"&&<MasterPixAdmin key={selected} id={selected}/>}
         <hr/><h4>Recursos disponíveis para a conta</h4><p className="muted">O Superadmin controla o que cada revenda pode acessar. Restrições do Master superior também são respeitadas.</p>
         {resources&&Object.entries(names).map(([key,label])=><div key={key} className="distribution-resource"><span>{label}{resources.effective[key]?.enabled===false&&<small> (indisponível na rede)</small>}</span><div className="row" style={{gap:8,alignItems:"center"}}>{key==="servers"&&<label>Limite<input type="number" min="0" aria-label="Limite de servidores" defaultValue={resources.direct[key]?.limit??""} onBlur={e=>{const limit=e.target.value===""?null:Number(e.target.value);if(limit!==resources.direct[key]?.limit)act(()=>api(`/admin/network/accounts/${selected}/resources`,{method:"PUT",body:{resource:key,enabled:resources.direct[key]?.enabled!==false,limit}}),"Limite atualizado.");}} style={{width:80}}/></label>}<input aria-label={`${label} habilitado`} type="checkbox" checked={resources.direct[key]?.enabled!==false} disabled={busy} onChange={e=>act(()=>api(`/admin/network/accounts/${selected}/resources`,{method:"PUT",body:{resource:key,enabled:e.target.checked,limit:resources.direct[key]?.limit??null}}),"Recurso atualizado.")}/></div></div>)}
