@@ -1,9 +1,10 @@
 import {useCallback,useEffect,useState} from 'react';
 import {api} from '../api.js';
+import {formatBRL} from '@deltatv/ui/money';
 
 const empty=()=>({code:'',name:'',wholesaleCents:100,minResaleCents:100,active:true,
  maxDns:1,activationLimit:100,autoFailover:true,autoPriority:false,emailAlerts:true,detailedHistory:false});
-const money=c=>Number(c||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const money=formatBRL;
 const codeFor=name=>name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'').replace(/^([0-9])/,'p_$1').slice(0,30);
 const toForm=p=>({code:p.code,name:p.name,wholesaleCents:Number(p.wholesale_cents),minResaleCents:Number(p.min_resale_cents),active:p.active,
  maxDns:p.max_dns===null?null:Number(p.max_dns),activationLimit:p.activation_limit===null?null:Number(p.activation_limit),

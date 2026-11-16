@@ -1,7 +1,8 @@
 import {useCallback,useEffect,useState} from 'react';
 import {api} from '../api.js';
+import {formatBRL} from '@deltatv/ui/money';
 import PortalUsageAdmin from './PortalUsage.jsx';
-const money=n=>Number(n||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const money=formatBRL;
 const toCents=s=>Math.round(Number(String(s).replace(',','.'))*100);
 const date=s=>s?new Date(s).toLocaleDateString('pt-BR'):'—';
 const Panel=({title,sub,children})=><section className="panel" style={{padding:20,display:'grid',gap:14,minWidth:0}}><header><h2>{title}</h2>{sub&&<p className="muted">{sub}</p>}</header>{children}</section>;

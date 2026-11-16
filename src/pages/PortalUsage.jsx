@@ -1,6 +1,7 @@
 import {useCallback,useEffect,useState} from 'react';
 import {api} from '../api.js';
-const brl=v=>v==null?'Não configurado':Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+import {formatBRL} from '@deltatv/ui/money';
+const brl=v=>v==null?'Não configurado':formatBRL(v);
 const g=v=>Number(v||0).toLocaleString('pt-BR',{maximumFractionDigits:3})+' GB';
 const monthNow=()=>new Date().toISOString().slice(0,7);
 const label=({live:'TV ao vivo',hls:'Segmentos HLS',movie:'Filmes',series:'Séries',api:'Catálogo/API',epg:'Guia/EPG'});
