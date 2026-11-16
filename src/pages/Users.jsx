@@ -88,17 +88,32 @@ function UserForm({ user, me, full, fixedPartnerId, onClose, onSaved }) {
     partnerId: user?.partnerId || fixedPartnerId || "", status: user?.status || "active", password: "",
     delegatedPermissions: user?.delegatedPermissions || [], networkLimits: user?.networkLimits || {},
   });
+  const [linkCandidates,setLinkCandidates]=useState(null);
+  const [linkError,setLinkError]=useState('');
+  const recoverLinkedAccount=async()=>{
+    if(!edit)return;
+    setLinkError('');
+    try {
+      const response=await api(`/admin/users/${user.id}/portal-link-options`);
+      const suggestions=response.data||[];
+      setLinkCandidates(suggestions);
+      if(suggestions.length===1)setF(prev=>({...prev,partnerId:suggestions[0].id}));
+    } catch(e){setLinkError(e.message||'Não foi possível consultar os vínculos.');}
+  };
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   const isPartner = f.role === "partner";
+  const isAdmin = f.role === "admin";
   const roleLocked = !full || !!fixedPartnerId || self;
   const submit = async () => {
-    const body = { name: f.name, email: f.email, role: f.role, partnerId: isPartner ? f.partnerId : null, status: f.status };
+    const body = { name: f.name, email: f.email, role: f.role,
+      partnerId: (isPartner || isAdmin) ? (f.partnerId || null) : null, status: f.status };
     if (f.role === "admin" && full) {
       body.delegatedPermissions = f.delegatedPermissions;
       body.networkLimits = f.networkLimits;
     }
     if (f.password) body.password = f.password;
-    if (!edit) { body.password = f.password; if (!isPartner) delete body.partnerId; if (isPartner && !body.partnerId) return; delete body.status; }
+    if (!edit) { body.password = f.password; if (!(isPartner || isAdmin)) delete body.partnerId;
+      if (isPartner && !body.partnerId) return; delete body.status; }
     const r = await run(() => api(edit ? `/admin/users/${user.id}` : "/admin/users", { method: edit ? "PATCH" : "POST", body }), "Usuário salvo.");
     if (r) onSaved();
   };
@@ -109,12 +124,33 @@ function UserForm({ user, me, full, fixedPartnerId, onClose, onSaved }) {
         <Field label="Função" hint={self ? "Você não pode alterar a própria função." : undefined}>
           <select value={f.role} onChange={set("role")} disabled={roleLocked}>{Object.entries(ROLE).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
         </Field>
-        {isPartner && !fixedPartnerId && (
-          <Field label="Revenda / parceiro"><PartnerPicker value={f.partnerId} onChange={(v) => setF((f) => ({ ...f, partnerId: v }))} /></Field>
+        {(isPartner || isAdmin) && !fixedPartnerId && (
+          <Field label={isAdmin ? "Conta operacional vinculada (opcional)" : "Revenda / parceiro"}>
+            <PartnerPicker value={f.partnerId} onChange={(v) => setF(prev => ({ ...prev, partnerId: v }))}
+              emptyLabel={isAdmin ? "Sem conta operacional vinculada" : "Selecione a conta"}/>
+          </Field>
         )}
       </div>
       {full && f.role === "admin" && <section className="card" style={{padding:16,display:"grid",gap:12}}>
         <h3>Permissões deste Admin</h3>
+        <div className="actions" style={{flexWrap:"wrap"}}>
+          <button type="button" className="btn sm" onClick={()=>setF(v=>({...v,delegatedPermissions:ADMIN_RIGHTS.map(([key])=>key)}))}>Liberar toda a própria rede</button>
+          <button type="button" className="btn sm" onClick={()=>setF(v=>({...v,delegatedPermissions:[]}))}>Remover permissões</button>
+          <span className="muted">{f.delegatedPermissions.length} de {ADMIN_RIGHTS.length} autorizações</span>
+        </div>
+        {!f.delegatedPermissions.length && <div className="notice" role="status">Sem permissões selecionadas, o Admin verá somente uma página informativa. Marque as funções que ele poderá utilizar.</div>}
+        {isAdmin && edit && !user.partnerId && <div className="card" style={{padding:10,display:"grid",gap:8}}>
+          <strong>Era Parceiro ou Revenda antes de virar Admin?</strong>
+          <p className="muted">A versão anterior removia o vínculo quando você trocava a função. Procure a conta original no histórico e confirme o vínculo abaixo.</p>
+          <button type="button" className="btn sm" onClick={recoverLinkedAccount}>Localizar conta operacional anterior</button>
+          {linkError&&<div className="notice error" role="alert">{linkError}</div>}
+          {linkCandidates&&(!linkCandidates.length?<p className="muted">Nenhum vínculo histórico identificado. Use a busca de parceiros acima.</p>:
+            <Field label="Contas identificadas no histórico"><select value={f.partnerId||''} onChange={set('partnerId')}>
+              <option value="">Selecione a conta correta</option>
+              {linkCandidates.map(item=><option key={item.id} value={item.id}>{item.name} — {item.kind}</option>)}
+            </select></Field>)}
+        </div>}
+        {isAdmin && f.partnerId && <div className="notice" role="status">O Admin poderá entrar também nos portais operacionais da conta vinculada, com o mesmo e-mail e senha. Ao salvar, a DeltaTV transfere a gestão desta conta para a rede dele, sem transferir outros parceiros, planos ou recursos globais.</div>}
         <p className="muted">A DeltaTV controla cada função. Recursos não autorizados ficam ocultos e suas APIs retornam 403. Gestão da VPS e configurações globais são sempre exclusivas da DeltaTV.</p>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(225px,1fr))",gap:10}}>
           {ADMIN_RIGHTS.map(([permission,label])=><label key={permission} style={{display:"flex",alignItems:"center",gap:8}}>

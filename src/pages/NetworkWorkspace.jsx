@@ -16,10 +16,10 @@ const LABELS={
 const currency=cents=>new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format((Number(cents)||0)/100);
 const toCents=value=>Math.round(Number(String(value).replace(",","."))*100);
 const nextMonth=()=>addMonthsClamped();
-const blankPlan=()=>({name:"",description:"",audience:"content",monthlyPrice:"0,00",maxServers:"5",noDnsLimit:false,
+const blankPlan=()=>({name:"",description:"",audience:"content",monthlyPrice:"0.00",maxServers:"5",noDnsLimit:false,activationLimit:"100",noActivationLimit:false,validityDays:"30",
   autoFailover:true,autoPriority:false,emailAlerts:false,detailedHistory:false});
-const blankAccount=kind=>({name:"",slug:"",kind,planKey:"",monthlyFee:"0,00",activationLimit:"100",noActivationLimit:false,
-  dnsLimit:"5",noDnsLimit:false,endsAt:nextMonth(),contactName:"",contactEmail:"",contactPhone:"",portalName:"",portalEmail:"",portalPassword:""});
+const blankAccount=kind=>({name:'',email:'',password:'',kind,planKey:''});
+const blankInvite=()=>({email:'',planKey:'',sendEmail:false});
 const permsOf=user=>new Set(user?.permissions||[]);
 const field=(name,child)=><label className="field" style={{display:"grid",gap:5}}><span>{name}</span>{child}</label>;
 function ErrorMessage({message}){return message?<div className="notice error" role="alert">{message}</div>:null;}
@@ -33,11 +33,16 @@ export default function NetworkWorkspace(){
  const permits=key=>central||permissions.has(key);
  const [admins,setAdmins]=useState([]);
  const [adminId,setAdminId]=useState(()=>central?sessionStorage.getItem("deltatv-selected-admin")||"":"");
- const [tab,setTab]=useState("partners");
+ const [tab,setTab]=useState(()=>central || permissions.has('network:partners:read') ? 'partners' :
+   permissions.has('network:resellers:read') ? 'resellers' :
+   permissions.has('network:plans:read') ? 'plans' : 'partners');
  const [overview,setOverview]=useState(null),[plans,setPlans]=useState([]),[partners,setPartners]=useState([]);
  const [selected,setSelected]=useState(null);
  const [planForm,setPlanForm]=useState(null),[accountForm,setAccountForm]=useState(null),[editingAccount,setEditingAccount]=useState(null);
  const [newUser,setNewUser]=useState(null);
+ const [paymentReference,setPaymentReference]=useState(''),[confirmingPayment,setConfirmingPayment]=useState(false);
+ const [inviteForm,setInviteForm]=useState(null),[inviteResult,setInviteResult]=useState(null),
+  [invitations,setInvitations]=useState([]);
  const [q,setQ]=useState(""),[search,setSearch]=useState(""),[page,setPage]=useState(1),[pageMeta,setPageMeta]=useState(null),
    [busy,setBusy]=useState(false),[error,setError]=useState(""),[success,setSuccess]=useState("");
  const requestGeneration=useRef(0);
@@ -55,6 +60,7 @@ export default function NetworkWorkspace(){
    const jobs=[];
    if(permits("network:dashboard:read"))jobs.push(request("summary").then(v=>{if(requestGeneration.current===generation)setOverview(v);}));
    if(permits("network:plans:read"))jobs.push(request("plans").then(v=>{if(requestGeneration.current===generation)setPlans(v.data||[]);}));
+   if(permits('network:partners:write'))jobs.push(request('invitations').then(v=>{if(requestGeneration.current===generation)setInvitations(v.data||[]);}));
    if(permits("network:partners:read")||permits("network:resellers:read"))
      jobs.push(request("partners",{query:{pageSize:20,page,q:search,kind:tab==="plans"?undefined:tab==="resellers"?"reseller":"content"}})
        .then(v=>{if(requestGeneration.current===generation){setPartners(v.data||[]);setPageMeta(v.meta||null);}}));
@@ -76,66 +82,72 @@ export default function NetworkWorkspace(){
    catch(e){if(requestGeneration.current===generation)setError(e.message);}
  };
  const editPartner=()=>{
-   if(!selected)return;
-   const p=selected.partner,t=selected.contract,s=selected.plan;
-   setEditingAccount({id:p.id,kind:p.kind,name:p.name,planKey:s?.tier||"",monthlyFee:(p.monthlyFeeCents/100).toFixed(2),
-    activationLimit:String(t?.activationLimit??p.deviceLimit??100),noActivationLimit:(t?.activationLimit??p.deviceLimit)===null,
-    dnsLimit:String(s?.maxServersOverride??5),noDnsLimit:s?.maxServersOverride===0,
-    endsAt:new Date(p.endsAt).toISOString().slice(0,10),contactName:p.contactName||"",
-    contactEmail:p.contactEmail||"",contactPhone:p.contactPhone||""});
+  if(!selected)return;
+  const p=selected.partner;
+  setEditingAccount({id:p.id,name:p.name,kind:p.kind,planKey:selected.plan?.tier||''});
+ };
+ const issueInvite=async()=>{
+   if(!inviteForm?.email||!inviteForm.planKey)return setError('Informe o e-mail e o plano do convite.');
+   setBusy(true);setError('');setSuccess('');setInviteResult(null);
+   try{
+    const result=await request('invitations',{method:'POST',body:inviteForm});
+    setInviteResult(result);setInviteForm(null);
+    setSuccess(result.warning||'Convite criado. Copie o link e compartilhe com o cliente.');
+    await reload();
+   }catch(e){setError(e.message||'Falha ao emitir convite.');}
+   finally{setBusy(false);}
  };
  const savePlan=async()=>{
    const f=planForm;const parsed=toCents(f.monthlyPrice);
    if(!Number.isInteger(parsed)||parsed<0)return setError("Informe um preço válido.");
    const body={name:f.name,description:f.description,audience:f.audience,monthlyPriceCents:parsed,
-    maxServers:f.noDnsLimit?null:Number(f.maxServers),autoFailover:f.autoFailover,autoPriority:f.autoPriority,
+    maxServers:f.noDnsLimit?null:Number(f.maxServers),
+    activationLimit:f.noActivationLimit?null:Number(f.activationLimit),
+    validityDays:Number(f.validityDays),autoFailover:f.autoFailover,autoPriority:f.autoPriority,
     emailAlerts:f.emailAlerts,detailedHistory:f.detailedHistory};
    const ok=await act(()=>request(f.key?`plans/${f.key}`:"plans",{method:f.key?"PUT":"POST",body}),"Plano salvo para esta rede.");
    if(ok)setPlanForm(null);
  };
  const savePartner=async()=>{
-   const f=editingAccount||accountForm, edit=Boolean(editingAccount);
-   const paid=toCents(f.monthlyFee);
-   if(!Number.isInteger(paid)||paid<0)return setError("Informe uma mensalidade válida.");
-   const common={name:f.name,planKey:f.planKey,monthlyFeeCents:paid,
-     activationLimit:f.noActivationLimit?null:Number(f.activationLimit),dnsLimit:f.noDnsLimit?0:Number(f.dnsLimit),
-     endsAt:`${f.endsAt}T23:59:59.000Z`,contactName:f.contactName||"",contactEmail:f.contactEmail||undefined,
-     contactPhone:f.contactPhone||""};
-   const body=edit?common:{...common,slug:f.slug,kind:f.kind,
-     portalUser:{name:f.portalName,email:f.portalEmail,password:f.portalPassword}};
-   if(!edit&&!between(0,100000000)(paid))return setError("Preço inválido.");
-   const ok=await act(()=>request(edit?`partners/${f.id}`:"partners",{method:edit?"PATCH":"POST",body}),
-     edit?"Contrato e conta atualizados.":"Conta criada na sua rede, com acesso próprio ao portal.");
+   const f=editingAccount||accountForm,edit=Boolean(editingAccount);
+   if(!f.planKey)return setError('Escolha o plano para aplicar os benefícios e o preço automaticamente.');
+   const body=edit?{name:f.name,planKey:f.planKey}:{name:f.name,email:f.email,password:f.password,
+     kind:f.kind,planKey:f.planKey};
+   const ok=await act(()=>request(edit?`partners/${f.id}`:'partners',{method:edit?'PATCH':'POST',body}),
+     edit?'Conta atualizada conforme o plano.':'Conta criada nesta rede, com os recursos definidos pelo plano.');
    if(ok){setAccountForm(null);setEditingAccount(null);setSelected(null);}
  };
- const renderAccountForm=(f,set,edit=false)=><div className="card" style={{display:"grid",gap:12,padding:20}}>
-   <h3>{edit?"Editar parceiro e contrato":f.kind==="reseller"?"Nova revenda":"Novo parceiro"}</h3>
-   <div className="row">{field("Empresa",<input value={f.name} onChange={e=>set({...f,name:e.target.value})}/>)}
-     {!edit&&field("Identificador",<input placeholder="empresa-exemplo" value={f.slug} onChange={e=>set({...f,slug:e.target.value.toLowerCase().replace(/[^a-z0-9-]/g,"")})}/>)}</div>
-   <div className="row">
-    {field("Plano da sua rede",<select value={f.planKey} onChange={e=>{const p=plans.find(x=>x.key===e.target.value);set({...f,planKey:e.target.value,
-      monthlyFee:p? (p.monthlyPriceCents/100).toFixed(2):f.monthlyFee,dnsLimit:p?.maxServers!=null?String(p.maxServers):f.dnsLimit,noDnsLimit:p?.maxServers==null});}}><option value="">Selecione um plano</option>{plans.filter(p=>p.active && (p.audience===f.kind||p.audience==="both")).map(p=><option key={p.key} value={p.key}>{p.name}</option>)}</select>)}
-    {field("Mensalidade (R$)",<input type="number" min="0" step="0.01" value={f.monthlyFee} onChange={e=>set({...f,monthlyFee:e.target.value})}/>)}
-   </div>
-   <div className="row">
-     {field("Ativações",<><input type="number" min="0" disabled={f.noActivationLimit} value={f.activationLimit} onChange={e=>set({...f,activationLimit:e.target.value})}/><label><input type="checkbox" checked={f.noActivationLimit} onChange={e=>set({...f,noActivationLimit:e.target.checked})}/> Sem limite</label></>)}
-     {field("DNS por código",<><input type="number" min="1" disabled={f.noDnsLimit} value={f.dnsLimit} onChange={e=>set({...f,dnsLimit:e.target.value})}/><label><input type="checkbox" checked={f.noDnsLimit} onChange={e=>set({...f,noDnsLimit:e.target.checked})}/> Sem limite</label></>)}
-     {field("Vencimento",<input type="date" value={f.endsAt} onChange={e=>set({...f,endsAt:e.target.value})}/>)}
-   </div>
-   <div className="row">{field("Responsável",<input value={f.contactName} onChange={e=>set({...f,contactName:e.target.value})}/>)}
-      {field("E-mail de contato",<input type="email" value={f.contactEmail} onChange={e=>set({...f,contactEmail:e.target.value})}/>)}
-      {field("Telefone",<input value={f.contactPhone} onChange={e=>set({...f,contactPhone:e.target.value})}/>)}</div>
-   {!edit&&<><h4>Login do painel {f.kind==="reseller"?"da Revenda":"do Parceiro"}</h4><div className="row">
-      {field("Nome do usuário",<input value={f.portalName} onChange={e=>set({...f,portalName:e.target.value})}/>)}
-      {field("E-mail de acesso",<input type="email" value={f.portalEmail} onChange={e=>set({...f,portalEmail:e.target.value})}/>)}
-      {field("Senha inicial (mín. 12 caracteres)",<input type="password" value={f.portalPassword} onChange={e=>set({...f,portalPassword:e.target.value})}/>)}
-   </div></>}
-   <div className="actions"><button className="btn" onClick={()=>{setAccountForm(null);setEditingAccount(null)}}>Cancelar</button>
-     <button className="btn primary" disabled={busy||!f.name||!f.planKey||(!edit&&(!f.slug||!f.portalEmail||f.portalPassword.length<12))} onClick={savePartner}>{busy?"Salvando...":"Salvar"}</button></div>
- </div>;
+ const planOptions=kind=>plans.filter(p=>p.active&&(p.audience===kind||p.audience==='both'));
+ const formatLimit=value=>value==null?'Sem limite':String(value);
+ const renderAccountForm=(f,set,edit=false)=>{
+   const plan=plans.find(p=>p.key===f.planKey);
+   return <section className="card" style={{display:'grid',gap:14,padding:20,maxWidth:680}}>
+    <div><h3>{edit?'Editar conta':'Novo '+(f.kind==='reseller'?'revendedor':'parceiro')}</h3>
+    <p className="muted">Basta identificar a conta e escolher o plano. Sem cadastro duplicado nem campos de limites repetidos.</p></div>
+    {field('Nome',<input autoComplete="name" value={f.name} onChange={e=>set({...f,name:e.target.value})}/>)}
+    {!edit&&field('E-mail',<input type="email" autoComplete="email" value={f.email} onChange={e=>set({...f,email:e.target.value})}/>)}
+    {!edit&&field('Senha (mínimo de 12 caracteres)',<input type="password" autoComplete="new-password" value={f.password} onChange={e=>set({...f,password:e.target.value})}/>)}
+    {field('Plano da conta',<select value={f.planKey} onChange={e=>set({...f,planKey:e.target.value})}>
+      <option value="">Escolha o plano</option>{edit&&f.planKey&&!plans.some(p=>p.key===f.planKey)&&<option value={f.planKey}>Plano atual (legado)</option>}
+      {planOptions(f.kind).map(p=><option key={p.key} value={p.key}>{p.name} · {currency(p.monthlyPriceCents)}</option>)}
+    </select>)}
+    {plan&&<div className="card" style={{padding:14,background:'var(--surface-muted,var(--surface,transparent))'}}>
+      <strong>{plan.name}</strong><p style={{margin:'8px 0'}}>{currency(plan.monthlyPriceCents)} / mês · {plan.validityDays??30} dias iniciais</p>
+      <p className="muted">DNS: {formatLimit(plan.maxServers)} · Ativações: {formatLimit(plan.activationLimit)} · {plan.autoFailover?'Failover incluso':'Sem failover'} · {plan.emailAlerts?'Alertas por e-mail':'Sem alertas'}</p>
+    </div>}
+    <div className="actions"><button className="btn" type="button" onClick={()=>{setAccountForm(null);setEditingAccount(null)}}>Cancelar</button>
+     <button className="btn primary" type="button" disabled={busy||!f.name.trim()||!f.planKey||(!edit&&(!f.email.includes('@')||f.password.length<12))}
+       onClick={savePartner}>{busy?'Salvando...':edit?'Aplicar plano':'Criar conta'}</button></div>
+   </section>;
+ };
  return <div className="workspace-admin-page" style={{display:"grid",gap:18}}>
   <div className="page-head"><h2>{central?"Administração das redes":"Minha rede"}</h2><p className="muted">Parceiros, revendas, planos e usuários da sua rede. Os dados de outras administrações não ficam disponíveis.</p></div>
-  {central&&<div className="card" style={{padding:16}}>{field("Admin responsável pela rede",<select value={adminId} onChange={e=>{requestGeneration.current++;setAdminId(e.target.value);setPage(1);setQ("");setPartners([]);setPlans([]);setPageMeta(null);setOverview(null);setSelected(null);}}><option value="">Selecione um Admin</option>{admins.map(a=><option key={a.id} value={a.id}>{a.name} — {a.email}</option>)}</select>)}</div>}
+  {central&&<div className="card" style={{padding:16}}>{field("Admin responsável pela rede",<select value={adminId} onChange={e=>{requestGeneration.current++;setAdminId(e.target.value);setPage(1);setQ("");setPartners([]);setPlans([]);setPageMeta(null);setOverview(null);setSelected(null);}}><option value="">Selecione uma rede</option><option value="deltatv">DeltaTV — rede principal</option>{admins.map(a=><option key={a.id} value={a.id}>{a.name} — {a.email}</option>)}</select>)}</div>}
+  {!central && permissions.size === 0 && <div className="card" role="status" style={{padding:20,display:"grid",gap:8}}>
+    <h3>Permissões de administração ainda não configuradas</h3>
+    <p>Seu usuário é Admin, mas a DeltaTV ainda não liberou funções para sua rede. Solicite que a DeltaTV acesse Usuários, edite sua conta e selecione as permissões necessárias.</p>
+    <p className="muted">A sua conta operacional de Parceiro/Revenda pode continuar ativa separadamente. Nenhum dado foi excluído por esta mensagem.</p>
+  </div>}
   {!available?<p className="muted">Selecione um Admin para abrir os cadastros de sua rede.</p>:<>
    {overview&&<div className="grid cards" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10}}>
      {[{label:"Parceiros",value:overview.partners},{label:"Revendas",value:overview.resellers},{label:"Planos",value:overview.plans}].map(x=><div className="card" key={x.label} style={{padding:16}}><small>{x.label}</small><h2>{x.value}</h2></div>)}
@@ -155,15 +167,40 @@ export default function NetworkWorkspace(){
        {field("Mensalidade (R$)",<input type="number" min="0" step="0.01" value={planForm.monthlyPrice} onChange={e=>setPlanForm({...planForm,monthlyPrice:e.target.value})}/>)}</div>
        {field("Descrição",<input value={planForm.description} onChange={e=>setPlanForm({...planForm,description:e.target.value})}/>)}
        <div className="row">{field("DNS por código",<><input type="number" min="1" disabled={planForm.noDnsLimit} value={planForm.maxServers} onChange={e=>setPlanForm({...planForm,maxServers:e.target.value})}/><label><input type="checkbox" checked={planForm.noDnsLimit} onChange={e=>setPlanForm({...planForm,noDnsLimit:e.target.checked})}/> Sem limite</label></>)}</div>
+       <div className="row">{field('Ativações',<><input type="number" min="0" disabled={planForm.noActivationLimit} value={planForm.activationLimit} onChange={e=>setPlanForm({...planForm,activationLimit:e.target.value})}/><label><input type="checkbox" checked={planForm.noActivationLimit} onChange={e=>setPlanForm({...planForm,noActivationLimit:e.target.checked})}/> Sem limite</label></>)}
+         {field('Validade inicial do acesso (dias)',<input type="number" min="1" max="3660" value={planForm.validityDays} onChange={e=>setPlanForm({...planForm,validityDays:e.target.value})}/>)}</div>
        <div className="row">{[["autoFailover","Failover automático"],["autoPriority","Prioridade automática"],["emailAlerts","Alertas por e-mail"],["detailedHistory","Histórico detalhado"]].map(([key,label])=><label key={key}><input type="checkbox" checked={planForm[key]} onChange={e=>setPlanForm({...planForm,[key]:e.target.checked})}/> {label}</label>)}</div>
        <div className="actions"><button className="btn" onClick={()=>setPlanForm(null)}>Cancelar</button><button className="btn primary" disabled={busy||!planForm.name} onClick={savePlan}>Salvar plano</button></div>
      </div>}
      <div className="card" style={{padding:16}}><h3>Planos desta rede</h3>
-       {plans.length?<table className="table"><thead><tr><th>Plano</th><th>Tipo</th><th>Preço mensal</th><th>DNS</th><th>Gerenciar</th></tr></thead><tbody>{plans.map(p=><tr key={p.key}><td>{p.name}</td><td>{p.audience}</td><td>{currency(p.monthlyPriceCents)}</td><td>{p.maxServers??"Sem limite"}</td><td>{permits("network:plans:write")&&<button className="btn sm" onClick={()=>setPlanForm({key:p.key,name:p.name,description:p.description,audience:p.audience,monthlyPrice:(p.monthlyPriceCents/100).toFixed(2),maxServers:String(p.maxServers??""),noDnsLimit:p.maxServers==null,autoFailover:p.autoFailover,autoPriority:p.autoPriority,emailAlerts:p.emailAlerts,detailedHistory:p.detailedHistory})}>Editar</button>}</td></tr>)}</tbody></table>:<p className="muted">Nenhum plano criado nesta rede.</p>}
+       {plans.length?<table className="table"><thead><tr><th>Plano</th><th>Tipo</th><th>Preço mensal</th><th>DNS</th><th>Ativações</th><th>Validade</th><th>Gerenciar</th></tr></thead><tbody>{plans.map(p=><tr key={p.key}><td>{p.name}</td><td>{p.audience}</td><td>{currency(p.monthlyPriceCents)}</td><td>{p.maxServers??"Sem limite"}</td><td>{p.activationLimit??"Sem limite"}</td><td>{p.validityDays??30} dias</td><td>{permits("network:plans:write")&&<button className="btn sm" onClick={()=>setPlanForm({key:p.key,name:p.name,description:p.description,audience:p.audience,monthlyPrice:(p.monthlyPriceCents/100).toFixed(2),maxServers:String(p.maxServers??""),noDnsLimit:p.maxServers==null,activationLimit:String(p.activationLimit??''),noActivationLimit:p.activationLimit==null,validityDays:String(p.validityDays??30),autoFailover:p.autoFailover,autoPriority:p.autoPriority,emailAlerts:p.emailAlerts,detailedHistory:p.detailedHistory})}>Editar</button>}</td></tr>)}</tbody></table>:<p className="muted">Nenhum plano criado nesta rede.</p>}
      </div>
    </>}
    {tab!=="plans"&&permits(initialTab)&&<>
-     {!editingAccount&&!accountForm&&permits(tab==="resellers"?"network:resellers:write":"network:partners:write")&&<div><button className="btn primary" onClick={()=>{setAccountForm(blankAccount(tab==="resellers"?"reseller":"content"));setSelected(null);}}>Novo {tab==="resellers"?"revendedor":"parceiro"}</button></div>}
+     {!editingAccount&&!accountForm&&permits(tab==="resellers"?"network:resellers:write":"network:partners:write")&&<div className="actions">
+       <button className="btn primary" onClick={()=>{setAccountForm(blankAccount(tab==="resellers"?"reseller":"content"));setInviteForm(null);setSelected(null);}}>Novo {tab==="resellers"?"revendedor":"parceiro"}</button>
+       {tab==='partners'&&<button className="btn" onClick={()=>{setInviteForm(blankInvite());setAccountForm(null);setEditingAccount(null);setInviteResult(null);}}>Enviar convite</button>}
+     </div>}
+     {tab==='partners'&&inviteForm&&<div className="card" style={{padding:20,maxWidth:640,display:'grid',gap:12}}>
+       <h3>Convidar parceiro</h3><p className="muted">Escolha o plano e informe o e-mail. O convidado cria a conta e entra automaticamente na sua rede, com os recursos do plano.</p>
+       {field('E-mail do destinatário',<input type="email" value={inviteForm.email} onChange={e=>setInviteForm({...inviteForm,email:e.target.value})}/>)}
+       {field('Plano do convite',<select value={inviteForm.planKey} onChange={e=>setInviteForm({...inviteForm,planKey:e.target.value})}>
+        <option value="">Escolha o plano</option>{planOptions('content').map(p=><option key={p.key} value={p.key}>{p.name} · {currency(p.monthlyPriceCents)}</option>)}</select>)}
+       {inviteForm.planKey&&<p className="muted">O convite aplica o preço, DNS, ativações e a validade do plano. Um plano gratuito custa R$ 0,00.</p>}
+       <label><input type="checkbox" checked={inviteForm.sendEmail} onChange={e=>setInviteForm({...inviteForm,sendEmail:e.target.checked})}/> Enviar por e-mail (requer SMTP configurado)</label>
+       <div className="actions"><button className="btn" onClick={()=>setInviteForm(null)}>Cancelar</button><button className="btn primary" disabled={busy||!inviteForm.planKey||!inviteForm.email.includes('@')} onClick={issueInvite}>Gerar convite</button></div>
+     </div>}
+     {tab==='partners'&&inviteResult?.url&&<div className="card" role="status" style={{padding:16,maxWidth:640}}>
+       <strong>Convite criado</strong>{inviteResult.warning&&<p className="muted">{inviteResult.warning}</p>}
+       <label className="field">Link de cadastro<input readOnly value={inviteResult.url} onFocus={e=>e.target.select()}/></label>
+       <button className="btn primary" onClick={()=>navigator.clipboard?.writeText(inviteResult.url).then(()=>setSuccess('Link copiado.')).catch(()=>setError('Selecione e copie o link manualmente.'))}>Copiar link</button>
+       <p className="muted">Válido por 72 horas e utilizável uma vez.</p>
+     </div>}
+     {tab==='partners'&&invitations.length>0&&<details className="card" style={{padding:14}}><summary>Convites emitidos ({invitations.length})</summary>
+       <div style={{display:'grid',gap:8,marginTop:12}}>{invitations.map(inv=><div className="row" key={inv.id} style={{justifyContent:'space-between',flexWrap:'wrap'}}>
+         <span>{inv.email} · {plans.find(p=>p.key===inv.planKey)?.name||'Plano'} · {inv.acceptedAt?'Concluído':inv.revokedAt?'Revogado':new Date(inv.expiresAt)<new Date()?'Expirado':'Pendente'}</span>
+         {!inv.acceptedAt&&!inv.revokedAt&&<button className="btn sm" disabled={busy} onClick={()=>act(()=>request(`invitations/${inv.id}/revoke`,{method:'POST'}),'Convite revogado.')}>Revogar</button>}
+       </div>)}</div></details>}
      {accountForm&&renderAccountForm(accountForm,setAccountForm)}
      {editingAccount&&renderAccountForm(editingAccount,setEditingAccount,true)}
      <div className="card" style={{padding:16}}>
@@ -180,8 +217,20 @@ export default function NetworkWorkspace(){
        <p>Plano: {plans.find(p=>p.key===selected.plan?.tier)?.name||selected.plan?.tier||"Não definido"} · Ativações: {selected.contract?.activationLimit??"Sem limite"}</p>
        <div className="actions"><button className="btn" onClick={()=>setSelected(null)}>Fechar</button>
          {permits(selected.partner.kind==="reseller"?"network:resellers:write":"network:partners:write")&&<button className="btn primary" onClick={editPartner}>Editar contrato</button>}
+         {selected.partner.statusReason==='awaiting_payment'&&permits('network:billing:write')&&permits('network:partners:write')&&
+         <button className="btn primary" disabled={busy} onClick={()=>setConfirmingPayment(v=>!v)}>Confirmar recebimento</button>}
          {permits("network:members:write")&&<button className="btn" onClick={()=>setNewUser({name:"",email:"",password:""})}>Adicionar usuário</button>}
        </div>
+       {confirmingPayment&&selected.partner.statusReason==='awaiting_payment'&&<div className="card" style={{padding:14,display:'grid',gap:10,maxWidth:520}}>
+         <strong>Confirmação financeira</strong>
+         <p className="muted">Confirme o recebimento real antes de liberar os recursos pagos. O comprovante sozinho não confirma a transação.</p>
+         {field('Referência do pagamento recebido',<input placeholder="ID Pix ou identificação bancária" value={paymentReference} onChange={e=>setPaymentReference(e.target.value)}/>)}
+         <div className="actions"><button className="btn" onClick={()=>setConfirmingPayment(false)}>Cancelar</button>
+           <button className="btn primary" disabled={busy||paymentReference.trim().length<3} onClick={async()=>{
+             const ok=await act(()=>request(`partners/${selected.partner.id}/confirm-payment`,{method:'POST',body:{reference:paymentReference.trim()}}),'Recebimento registrado. Acesso ativado.');
+             if(ok){setPaymentReference('');setConfirmingPayment(false);setSelected(null);}
+           }}>Confirmar e ativar</button></div>
+       </div>}
        {selected.users?.length>0&&<><h4>Usuários do painel</h4>{selected.users.map(u=><div key={u.id} className="row" style={{justifyContent:"space-between"}}><span>{u.name} · {u.email} · {u.status}</span>{permits("network:members:write")&&<button className="btn sm" onClick={()=>void act(()=>request(`partners/${selected.partner.id}/users/${u.id}`,{method:"PATCH",body:{status:u.status==="active"?"disabled":"active"}}),"Acesso atualizado.").then(()=>openPartner(selected.partner))}>{u.status==="active"?"Desativar":"Ativar"}</button>}</div>)}</>}
        {(permits("network:resources:read")||permits("network:devices:read")||permits("network:billing:read"))&&
           <NetworkResources key={selected.partner.id} account={selected.partner} request={request} permits={permits}/>}

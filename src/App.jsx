@@ -172,6 +172,10 @@ function UserMenu({ user, onAccount }) {
         <div className="usermenu-pop" role="menu">
           <div className="who"><strong>{user.name}</strong><span>{user.email}</span></div>
           <button type="button" className="btn sm" role="menuitem" onClick={() => {setOpen(false);onAccount();}}>Minha conta</button>
+          {user.role === 'admin' && user.partnerId && ['content','both'].includes(user.partnerKind) &&
+            <a className="btn sm" role="menuitem" href="https://parceiro.deltatv.com.br" target="_blank" rel="noopener noreferrer">Abrir meu Painel do Parceiro</a>}
+          {user.role === 'admin' && user.partnerId && ['reseller','both'].includes(user.partnerKind) &&
+            <a className="btn sm" role="menuitem" href="https://revenda.deltatv.com.br" target="_blank" rel="noopener noreferrer">Abrir minha Revenda</a>}
           <button type="button" className="btn sm" role="menuitem" onClick={logout}>Sair</button>
         </div>
       )}
