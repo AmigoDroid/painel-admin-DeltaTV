@@ -176,6 +176,10 @@ export default function Dashboard({ menu, onNavigate }) {
         </div>
       </Section>
 
+      {user?.role === "superadmin" && <div className="card" style={{padding:18,display:'flex',gap:12,flexWrap:'wrap',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+        <div><strong>Gerenciar parceiros</strong><p className="muted" style={{margin:'5px 0 0'}}>Acesse a lista de todos os parceiros e edite contas, pacotes, DNS e vigência.</p></div>
+        <button className="btn primary" type="button" onClick={() => onNavigate('partners')}>Abrir lista de parceiros</button>
+      </div>}
       <Section title="Parceiros e revendas" hint="Cada um com a sua tela no menu">
         <div className="grid cards">
           <Stat icon="store" tone="ok" label="Revendas online" value={livePartners?.onlineCount ?? "—"} hint="Portais conectados agora" href="#resellers" />

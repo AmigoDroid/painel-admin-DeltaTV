@@ -26,7 +26,7 @@ const KIND_LABEL = { content: "Parceiro (conteúdo)", reseller: "Revenda", both:
 // "both" aparece nas duas telas, com uma etiqueta avisando que também pertence à outra.
 const SCOPES = {
   content: {
-    title: "Parceiros", sub: "Provedores de conteúdo: servidores IPTV, códigos de ativação e mensalidade.",
+    title: "Gerenciar parceiros", sub: "Lista completa dos parceiros de conteúdo. Edite dados, vigência, pacote, DNS e condições em um só lugar.",
     kinds: ["content", "both"], defaultKind: "content", newLabel: "Novo parceiro", noun: "parceiro", saved: "Parceiro salvo.",
     search: "Buscar por empresa, responsável, e-mail ou identificador", also: "também é revenda", billing: "Modelo",
   },
@@ -88,6 +88,7 @@ function PartnersList({ scope, onChanged }) {
   const [inviteRevision, setInviteRevision] = useState(0);
   const [creating, setCreating] = useState(false);
   const [openId, setOpenId] = useState(null);
+  const [editingPartner, setEditingPartner] = useState(null);
   useEffect(() => { list.filter({ q: dq }); /* eslint-disable-next-line */ }, [dq]);
   useEffect(() => { const timer = setInterval(() => list.reload(), 60_000); return () => clearInterval(timer); }, [list.reload]);
   useEffect(() => {
@@ -152,7 +153,7 @@ function PartnersList({ scope, onChanged }) {
         </select>
       </div>
       <Table>
-        <thead><tr><th>{scope === "reseller" ? "Revenda" : "Parceiro"}</th><th>Status</th><th>Portal</th><th>{cfg.billing}</th><th>Dispositivos</th><th>Término</th></tr></thead>
+        <thead><tr><th>{scope === "reseller" ? "Revenda" : "Parceiro"}</th><th>Status</th><th>Portal</th><th>{cfg.billing}</th><th>Dispositivos</th><th>Término</th><th>Ações</th></tr></thead>
         <tbody>{rows.map((p) => (
           <tr key={p.id} className="click" onClick={() => setOpenId(p.id)}>
             <td><div className="partner-list-identity">
@@ -169,11 +170,16 @@ function PartnersList({ scope, onChanged }) {
               />
             </td>
             <td>{MODELS[p.billingModel]}</td><td>{p.deviceCount}{p.deviceLimit != null ? `/${p.deviceLimit}` : ""}</td><td>{fmtDate(p.endsAt)}</td>
+            <td><div className="partner-direct-actions">
+              <button type="button" className="btn sm primary" onClick={event => { event.stopPropagation(); setEditingPartner(p); }}>Editar</button>
+              <button type="button" className="btn sm" onClick={event => { event.stopPropagation(); setOpenId(p.id); }}>Gerenciar</button>
+            </div></td>
           </tr>))}</tbody>
       </Table>
       <Empty loading={list.loading} error={list.error} count={rows.length} />
       {list.meta?.totalPages > 1 && <Pager meta={list.meta} onPage={list.setPage} />}
       {creating && <PartnerForm scope={scope} onClose={() => setCreating(false)} onSaved={() => { setCreating(false); changed(); }} />}
+      {editingPartner && <PartnerForm partner={editingPartner} scope={scope} onClose={() => setEditingPartner(null)} onSaved={() => { setEditingPartner(null); changed(); }} />}
       {openId && <PartnerDetail id={openId} onClose={() => setOpenId(null)} onChanged={changed} />}
     </>
   );
@@ -247,10 +253,25 @@ function PartnerForm({ partner, scope, onClose, onSaved }) {
       dueDay: Number(f.dueDay), graceDays: Number(f.graceDays), suspendPolicy: f.suspendPolicy, kind: f.kind,
     };
     if (edit) {
-      // Só envia o que mudou: reenviar a data igual a regravaria (fim do dia) sem necessidade.
-      if (f.slug !== partner.slug) body.slug = f.slug;
-      if (f.startsAt !== dateInput(partner.startsAt)) body.startsAt = spDateToIso(f.startsAt);
-      if (f.endsAt !== dateInput(partner.endsAt)) body.endsAt = spDateToIso(f.endsAt, true);
+      // Envia APENAS campos modificados. Um parceiro com Pacote de Serviço possui
+      // contrato técnico ativo: reenviar preços/modelo antigos na mesma requisição
+      // provoca conflito e impede editar até telefone ou nome.
+      const updates = {};
+      for (const field of ["name", "contactName", "contactEmail", "contactPhone", "billingModel", "deviceLimit", "dueDay", "graceDays", "suspendPolicy", "kind"]) {
+        const next = body[field];
+        const previous = partner[field] ?? (next === null ? null : undefined);
+        if (next !== previous) updates[field] = next;
+      }
+      for (const field of ["monthlyFeeCents", "perDeviceCents", "minFeeCents"]) {
+        if (body[field] !== Number(partner[field] ?? 0)) updates[field] = body[field];
+      }
+      if (f.billingModel === "tiered" && f.tiers !== tiersToText(partner.tiers)) updates.tiers = tiers;
+      if (f.slug !== partner.slug) updates.slug = f.slug;
+      if (f.startsAt !== dateInput(partner.startsAt)) updates.startsAt = spDateToIso(f.startsAt);
+      if (f.endsAt !== dateInput(partner.endsAt)) updates.endsAt = spDateToIso(f.endsAt, true);
+      if (!Object.keys(updates).length) return toast("Nenhuma alteração para salvar.");
+      for (const key of Object.keys(body)) delete body[key];
+      Object.assign(body, updates);
     } else {
       Object.assign(body, { slug: f.slug, startsAt: spDateToIso(f.startsAt), endsAt: spDateToIso(f.endsAt, true) });
       if (f.portalEmail) body.portalUser = { name: f.portalName || f.name, email: f.portalEmail, password: f.portalPassword };
@@ -260,6 +281,7 @@ function PartnerForm({ partner, scope, onClose, onSaved }) {
   };
   return (
     <Modal title={edit ? `Editar ${SCOPES[scope].noun}` : SCOPES[scope].newLabel} onClose={onClose} wide>
+      {edit && scope === "content" && <div className="notice">Dados cadastrais são editados aqui. Para mudar DNS, ativações e benefícios, use <b>Gerenciar → Pacote de Serviço</b>. Isso evita alterações conflitantes no contrato.</div>}
       <div className="row"><Field label="Nome / empresa"><input value={f.name} onChange={set("name")} /></Field><Field label="Identificador (slug)" hint="minúsculas, números e hífens"><input value={f.slug} onChange={set("slug")} /></Field></div>
       <div className="row"><Field label="Contato"><input value={f.contactName} onChange={set("contactName")} /></Field><Field label="E-mail do contato"><input value={f.contactEmail} onChange={set("contactEmail")} /></Field></div>
       <Field label="Telefone do contato"><input value={f.contactPhone} onChange={set("contactPhone")} /></Field>
@@ -368,7 +390,7 @@ function PartnerDetail({ id, onClose, onChanged }) {
         <dt>Dispositivos</dt><dd>{p.deviceCount}{p.deviceLimit != null ? ` de ${p.deviceLimit}` : " (sem limite)"}</dd>
       </dl>
       <div className="actions left">
-        <button className="btn" onClick={() => setEditing(true)}>Editar condições</button>
+        <button className="btn primary" onClick={() => setEditing(true)}>Editar parceiro</button>
         {role === "superadmin" && <button className="btn danger" onClick={() => setDeleting(true)}>Excluir revenda / parceiro</button>}
         {p.status === "active" && <button className="btn" onClick={() => act("suspend", { title: `Suspender ${what}`, message: "Todos os dispositivos vinculados perdem o acesso até a reativação.", reason: "required", danger: true, confirmLabel: "Suspender" })}>Suspender</button>}
         {["active", "suspended"].includes(p.status) && <button className="btn danger" onClick={() => act("block", { title: `Bloquear ${what}`, message: "Todos os dispositivos da parceria perdem o acesso, independentemente do código usado.", reason: "required", danger: true, confirmLabel: "Bloquear" })}>Bloquear</button>}

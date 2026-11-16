@@ -437,3 +437,8 @@ pre,code,.mono{overflow-wrap:anywhere;word-break:break-word}
   .device-list .table-wrap tbody td:nth-child(7) { display:grid; }
   .device-list .table-wrap tbody td:nth-child(6) { display:none; }
 }
+
+/* Ações imediatas da lista de parceiros (inclusive em telas menores). */
+.partner-direct-actions{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+.partner-direct-actions .btn{white-space:nowrap;min-height:36px}
+@media(max-width:720px){.partner-direct-actions{flex-direction:column;align-items:stretch}.partner-direct-actions .btn{width:100%}}
