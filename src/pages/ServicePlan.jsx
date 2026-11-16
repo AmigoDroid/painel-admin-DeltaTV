@@ -21,23 +21,26 @@ export default function ServicePlan({partnerId}){
   setBusy(true);setDone("");setError("");try{
   const p=await api(`/admin/partners/${partnerId}/service-plan`,{method:"PUT",body:form});setPlan(p);setForm({tier:p.tier,...p.overrides});setDone("Plano atualizado e auditado.");
  }catch(e){setError(e.message)}finally{setBusy(false)}};
- return <section style={{display:"grid",gap:16,minWidth:0}}><p className="muted">Recursos técnicos por plano. Mensalidade, créditos e limites de licenças são negociados separadamente no contrato. Um downgrade não remove URLs existentes automaticamente.</p>
+ return <section style={{display:"grid",gap:16,minWidth:0}}><p className="muted">O plano original define DNS, recursos e o direito de revender o painel. A mensalidade padrão é definida no catálogo; exceções contratuais continuam no perfil. Um downgrade não remove DNS existentes.</p>
  {error&&<p style={{color:"var(--bad,#df5763)"}} role="alert">{error}</p>}
  {!form?<p>Carregando plano…</p>:<>
- <div className="mini-stats"><div><strong>{plan?.planName || plan?.tier}</strong><span>Plano atual</span></div><div><strong>{plan?.features.maxServers == null ? "Ilimitadas" : plan.features.maxServers}</strong><span>URLs por código</span></div><div><strong>{plan?.features.autoFailover?"Sim":"Não"}</strong><span>Failover</span></div></div>
+ <div className="mini-stats"><div><strong>{plan?.planName || plan?.tier}</strong><span>Plano atual</span></div><div><strong>{plan?.features.maxServers == null ? "Ilimitadas" : plan.features.maxServers}</strong><span>DNS por código</span></div><div><strong>{plan?.features.autoFailover?"Sim":"Não"}</strong><span>Failover</span></div></div>
  <form onSubmit={save} style={{display:"grid",gap:14}}>
- <label>Plano de recursos<select value={form.tier} disabled={!allowed||busy} onChange={e=>set("tier",e.target.value)}>{catalog.filter(c=>c.active||c.key===form.tier).map(c=><option value={c.key} key={c.key}>{c.name}{!c.active?" (inativo)":""}</option>)}</select></label>
+ <label>Plano do parceiro<select value={form.tier} disabled={!allowed||busy} onChange={e=>set("tier",e.target.value)}>{catalog.filter(c=>c.active||c.key===form.tier).map(c=><option value={c.key} key={c.key}>{c.name}{!c.active?" (inativo)":""}</option>)}</select></label>
  <p className="muted">Exceções individuais: “Padrão do plano” aplica as regras do nível escolhido; outros valores permitem negociação específica.</p>
- <label>Limite de URLs por código<select disabled={!allowed||busy}
+ <label>Limite de DNS por código<select disabled={!allowed||busy}
    value={form.maxServersOverride == null ? "default" : form.maxServersOverride === 0 ? "unlimited" : "custom"}
    onChange={e=>set("maxServersOverride",e.target.value==="default"?null:e.target.value==="unlimited"?0:(plan?.features.maxServers || 1))}>
-   <option value="default">Padrão do plano</option><option value="unlimited">Sem limite</option><option value="custom">Limite personalizado</option>
+   <option value="default">Padrão do plano</option><option value="unlimited">Sem limite de DNS</option><option value="custom">Limite personalizado</option>
  </select></label>
  {form.maxServersOverride !== null && form.maxServersOverride !== undefined && form.maxServersOverride !== 0 && <label>Quantidade máxima<input type="number" min="1" step="1" required disabled={!allowed||busy}
    value={form.maxServersOverride} onChange={e=>set("maxServersOverride",e.target.value===""?"":Number(e.target.value))}/></label>}
  {FIELDS.map(([field,name])=><label key={field}>{name}<select disabled={!allowed||busy} value={form[field]===null||form[field]===undefined?"default":String(form[field])} onChange={e=>set(field,e.target.value==="default"?null:e.target.value==="true")}>
  <option value="default">Padrão do plano</option><option value="true">Permitir</option><option value="false">Desativar</option>
  </select></label>)}
+ <div className="panel" style={{padding:14}}><strong>Permissões deste plano</strong>
+  <p className="muted">{plan?.features.canResellPanel?'✓ Pode revender acesso ao painel':'Sem permissão de revenda'} · {plan?.features.canCreateSubmasters?'✓ Pode cadastrar Submasters':'Não pode cadastrar Submasters'} · {plan?.features.canManageGateways?'✓ Gateways próprios':'Sem gateway próprio'}</p>
+  <p className="muted">Para alterar essas permissões para todas as contas do plano, edite o catálogo em Planos do Parceiro.</p></div>
  <div className="panel" style={{padding:14}}><strong>Recursos efetivos atuais</strong><p className="muted">{plan?.features.maxServers == null ? "URLs ilimitadas" : `${plan.features.maxServers} URLs`} por código · Failover {plan?.features.autoFailover?"ativo":"desligado"} · Prioridade {plan?.features.autoPriority?"automática":"manual"} · Alertas {plan?.features.emailAlerts?"ativos":"desligados"}</p></div>
  {allowed?<button className="btn primary" disabled={busy}>{busy?"Salvando…":"Salvar plano e exceções"}</button>:<p className="muted">Apenas a DeltaTV pode modificar planos de serviço.</p>}
  </form>{done&&<p style={{color:"var(--ok,#29a980)"}} role="status">{done}</p>}

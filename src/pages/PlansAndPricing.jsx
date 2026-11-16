@@ -63,10 +63,10 @@ function ResellerBillingEditor({ partner, onSaved }) {
 function ContractModal({ partner, onClose, reload }) {
   const [tab, setTab] = useState("commercial");
   const content = partner.kind !== "reseller";
-  if(content)return <Modal wide title={`Pacote de Serviço · ${partner.name}`} onClose={onClose}>
-   <p className="muted">Os benefícios e limites deste parceiro são administrados na central de Pacotes de Serviço, não nesta tela de planos de TV.</p>
+  if(content)return <Modal wide title={`Plano atual · ${partner.name}`} onClose={onClose}>
+   <p className="muted">Os benefícios e limites deste parceiro são administrados pelo plano existente, no perfil dele.</p>
    <a className="btn primary" href="#partners" onClick={onClose}>Abrir cadastro de parceiros</a>
-   <a className="btn" href="#service-packages" onClick={onClose}>Central de Pacotes de Serviço</a>
+   <a className="btn" href="#service-packages" onClick={onClose}>Planos do parceiro</a>
    <details><summary>Consultar contrato legado</summary><ContentContract partnerId={partner.id}/><ServicePlan partnerId={partner.id}/></details>
   </Modal>;
   return <Modal wide title={`Condições · ${partner.name}`} onClose={onClose}>
@@ -126,7 +126,8 @@ function ContractList() {
   </>;
 }
 
-const blankPlan = () => ({key:"",name:"",description:"",audience:"content",monthlyPriceCents:null,
+const blankPlan = () => ({key:"",name:"",description:"",audience:"content",monthlyPriceCents:0,
+  canResellPanel:false,canCreateSubmasters:false,canViewFinance:false,canManageGateways:false,
   maxServers:1,autoFailover:false,autoPriority:false,emailAlerts:false,detailedHistory:false,
   sortOrder:100,active:true});
 function CatalogEditor({plan,onClose,onSaved}) {
@@ -143,6 +144,9 @@ function CatalogEditor({plan,onClose,onSaved}) {
       const payload={name:data.name.trim(),description:data.description.trim(),audience:data.audience,
         monthlyPriceCents:cents,maxServers:data.maxServers == null ? null : Number(data.maxServers),autoFailover:!!data.autoFailover,
         autoPriority:!!data.autoPriority,emailAlerts:!!data.emailAlerts,detailedHistory:!!data.detailedHistory,
+        canResellPanel:!!data.canResellPanel,canCreateSubmasters:!!data.canResellPanel&&!!data.canCreateSubmasters,
+        canViewFinance:!!data.canResellPanel&&!!data.canViewFinance,
+        canManageGateways:!!data.canResellPanel&&!!data.canManageGateways,
         sortOrder:Number(data.sortOrder)};
       if(isNew) await api("/admin/service-plans",{method:"POST",body:{key:data.key.trim(),...payload}});
       else await api(`/admin/service-plans/${encodeURIComponent(plan.key)}`,{method:"PUT",body:{...payload,active:!!data.active}});
@@ -159,15 +163,22 @@ function CatalogEditor({plan,onClose,onSaved}) {
       <Field label="Descrição"><textarea maxLength={500} rows={2} value={data.description} onChange={e=>set("description",e.target.value)}/></Field>
       <div className="pricing-form-grid">
         <Field label="Disponível para"><select value={data.audience} onChange={e=>set("audience",e.target.value)}><option value="content">Parceiros de conteúdo</option><option value="reseller">Revendas</option><option value="both">Ambos</option></select></Field>
-        <Field label="Preço mensal de referência (R$)"><input inputMode="decimal" value={price} onChange={e=>setPrice(e.target.value)} placeholder="Opcional; ex.: 99,90"/></Field>
-        <Field label="URLs por código">
-          <label className="pricing-check"><input type="checkbox" checked={data.maxServers == null} onChange={e=>set("maxServers",e.target.checked ? null : 1)}/> Sem limite de URLs</label>
+        <Field label="Mensalidade paga à DeltaTV (R$)"><input inputMode="decimal" value={price} onChange={e=>setPrice(e.target.value)} placeholder="0,00 para acesso gratuito"/></Field>
+        <Field label="DNS por código">
+          <label className="pricing-check"><input type="checkbox" checked={data.maxServers == null} onChange={e=>set("maxServers",e.target.checked ? null : 1)}/> DNS ilimitados</label>
           {data.maxServers != null && <input type="number" min="1" step="1" required value={data.maxServers} onChange={e=>set("maxServers",e.target.value)}/>}
         </Field>
         <Field label="Ordem de exibição"><input type="number" min="0" max="9999" required value={data.sortOrder} onChange={e=>set("sortOrder",e.target.value)}/></Field>
       </div>
       <div className="pricing-feature-options">
         {[["autoFailover","Failover automático"],["autoPriority","Prioridade por desempenho"],["emailAlerts","Alertas por e-mail"],["detailedHistory","Histórico detalhado"]].map(([id,label])=><label key={id} className="pricing-check"><input type="checkbox" checked={!!data[id]} disabled={id==="autoPriority"&&!data.autoFailover} onChange={e=>set(id,e.target.checked)}/>{label}</label>)}
+        <div className="pricing-form-grid" style={{gridColumn:'1/-1',borderTop:'1px solid var(--border,#ddd)',paddingTop:14}}>
+          <label className="pricing-check"><input type="checkbox" checked={!!data.canResellPanel} onChange={e=>set('canResellPanel',e.target.checked)}/> Permitir revender o Painel do Parceiro</label>
+          {data.canResellPanel&&<>
+          <label className="pricing-check"><input type="checkbox" checked={!!data.canCreateSubmasters} onChange={e=>set('canCreateSubmasters',e.target.checked)}/> Criar novos Submasters</label>
+          <label className="pricing-check"><input type="checkbox" checked={!!data.canViewFinance} onChange={e=>set('canViewFinance',e.target.checked)}/> Consultar financeiro da rede</label>
+          <label className="pricing-check"><input type="checkbox" checked={!!data.canManageGateways} onChange={e=>set('canManageGateways',e.target.checked)}/> Configurar Mercado Pago / InfinitePay</label></>}
+        </div>
         {!isNew&&!plan.system&&<label className="pricing-check"><input type="checkbox" checked={!!data.active} onChange={e=>set("active",e.target.checked)}/> Plano disponível para novas atribuições</label>}
       </div>
       {error&&<p className="error" role="alert">{error}</p>}
@@ -188,7 +199,7 @@ function CatalogPlans(){
     await api(`/admin/service-plans/${encodeURIComponent(deleting.key)}`,{method:"DELETE"});setDeleting(null);reload();
   }catch(e){setError(e.message);setDeleting(null)}finally{setBusy(false)}};
   return <>
-    <div className="pricing-info">Crie, personalize, duplique ou exclua planos técnicos. O valor é uma <strong>referência comercial</strong>; contratos e cobranças atuais continuam negociados individualmente.</div>
+    <div className="pricing-info">Este é o catálogo de planos que já existia. Defina os recursos, permissões de revenda e a mensalidade paga à DeltaTV (inclusive R$ 0). Contratos com preço negociado individualmente continuam preservados.</div>
     <div className="toolbar"><button className="btn primary" type="button" onClick={()=>setEditing(blankPlan())}>+ Criar novo plano</button><button className="btn" type="button" disabled={loading} onClick={reload}>Atualizar</button></div>
     {error&&<p className="error" role="alert">{error}</p>}
     {loading&&<p className="muted">Carregando planos…</p>}
@@ -198,12 +209,14 @@ function CatalogPlans(){
       <p className="muted">{p.description||"Sem descrição"}</p>
       <div className="pricing-tier-big">{p.maxServers == null ? "Ilimitadas" : `${p.maxServers} ${p.maxServers===1?"URL":"URLs"}`}</div>
       <dl>
-        <div><dt>Preço de referência</dt><dd>{p.monthlyPriceCents==null?"Negociável":`${money(p.monthlyPriceCents)} / mês`}</dd></div>
+        <div><dt>Mensalidade DeltaTV</dt><dd>{p.monthlyPriceCents==null?"A definir":`${money(p.monthlyPriceCents)} / mês`}</dd></div>
         <div><dt>Disponível para</dt><dd>{p.audience==="content"?"Parceiros":p.audience==="reseller"?"Revendas":"Ambos"}</dd></div>
         <div><dt>Failover</dt><dd>{p.autoFailover?"Sim":"Não"}</dd></div>
         <div><dt>Prioridade automática</dt><dd>{p.autoPriority?"Sim":"Não"}</dd></div>
         <div><dt>Alertas por e-mail</dt><dd>{p.emailAlerts?"Sim":"Não"}</dd></div>
         <div><dt>Histórico detalhado</dt><dd>{p.detailedHistory?"Sim":"Não"}</dd></div>
+        <div><dt>Revender o painel</dt><dd>{p.canResellPanel?'Sim':'Não'}</dd></div>
+        <div><dt>Criar Submasters</dt><dd>{p.canCreateSubmasters?'Sim':'Não'}</dd></div>
         <div><dt>Cadastros vinculados</dt><dd>{p.assignedCount}</dd></div>
       </dl>
       <div className="pricing-plan-actions">
@@ -263,20 +276,16 @@ function LicensePrices() {
 }
 
 export default function PlansAndPricing() {
-  const [tab, setTab] = useState("contracts");
+  const [tab, setTab] = useState("tiers");
   if (getAuth()?.user?.role !== "superadmin") return <p className="error">Esta área é exclusiva da DeltaTV.</p>;
   return <div className="pricing-page">
     <div className="page-head"><div><h2>Planos e valores</h2><p className="muted page-sub">Uma visão central dos recursos, contratos de parceiros e preços das licenças.</p></div></div>
     <div className="tabs pricing-tabs" role="tablist" aria-label="Planos e valores">
-      {[["contracts", "Contratos e mensalidades"], ["tiers", "Pacotes de Serviço"], ["prices", "Preços das licenças"]].map(([id, label]) =>
+      {[["tiers", "Planos do parceiro"], ["contracts", "Contratos atuais"], ["prices", "Preços das licenças de TV"]].map(([id, label]) =>
         <button key={id} type="button" className={`tab ${tab === id ? "active" : ""}`} onClick={() => setTab(id)}>{label}</button>)}
     </div>
     {tab === "contracts" && <ContractList />}
-    {tab === "tiers" && <section className="panel" style={{padding:22,display:'grid',gap:12}}>
-      <h3>Pacotes de Serviço do Painel do Parceiro</h3><p>O catálogo de DNS, ativações e benefícios agora é configurado em uma só página.</p>
-      <a href="#service-packages" className="btn primary">Abrir Pacotes de Serviço</a>
-      <details><summary>Planos técnicos antigos — manutenção de contas legadas</summary><CatalogPlans/></details>
-     </section>}
+    {tab === "tiers" && <CatalogPlans/>}
     {tab === "prices" && <LicensePrices />}
   </div>;
 }

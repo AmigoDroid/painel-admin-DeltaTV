@@ -17,7 +17,6 @@ export const WORK_AREAS = {
   'area/planos': {id:'area/planos',label:'Planos e licenças',icon:'licenses',description:'Gerencie os planos SaaS e o licenciamento das TVs sem misturar operações financeiras.',items:[
     {id:'commerce3',page:'commerce3',tab:'plans',label:'Planos SaaS',description:'Catálogo de assinaturas e franquias dos Masters',icon:'commerce3'},
     {id:'area/planos/contratos',page:'commerce3',tab:'contracts',label:'Contratos dos Masters',description:'Consultar e associar planos a contas',icon:'commerce3'},
-    {id:'service-packages',page:'service-packages',label:'Pacotes de Serviço',description:'DNS, ativações e benefícios do Painel do Parceiro',icon:'pricing'},
     {id:'licenses',page:'licenses',label:'Licenças das TVs',description:'Consultar, renovar e supervisionar licenças',icon:'licenses'},
   ]},
   'area/financeiro': {id:'area/financeiro',label:'Financeiro',icon:'billing',description:'Um único local para cobranças, saldos, créditos e pagamentos Pix.',items:[

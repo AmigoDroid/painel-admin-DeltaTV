@@ -9,9 +9,7 @@ import { ClientsPanel } from "./Clients.jsx";
 import { UsersPanel } from "./Users.jsx";
 import CodeModal, { CodeEditModal } from "./CodeModal.jsx";
 import { StockAdmin } from "./Stock.jsx";
-import ContentContract from "./ContentContract.jsx";
 import ServicePlan from "./ServicePlan.jsx";
-import PartnerPackage from "./PartnerPackage.jsx";
 import { Badge, DeliveryBadge, accessStatus, Empty, Field, LoadError, Modal, Pager, Table, dateInput, fmtDate, fmtDateTime, fmtMoney, spDateToIso, toCents, useAction, useDebounced, useList, useLoad, useUi, RowMenu } from "../ui.jsx";
 
 // Mesmo texto gravado pelo back-end no autocadastro de revendedor (ver reseller-signup.service.js).
@@ -26,9 +24,9 @@ const KIND_LABEL = { content: "Parceiro (conteúdo)", reseller: "Revenda", both:
 // "both" aparece nas duas telas, com uma etiqueta avisando que também pertence à outra.
 const SCOPES = {
   content: {
-    title: "Gerenciar parceiros", sub: "Lista completa dos parceiros de conteúdo. Edite dados, vigência, pacote, DNS e condições em um só lugar.",
+    title: "Gerenciar parceiros", sub: "Cadastre parceiros e defina mensalidade, DNS, ativações e contrato de serviços em um único formulário.",
     kinds: ["content", "both"], defaultKind: "content", newLabel: "Novo parceiro", noun: "parceiro", saved: "Parceiro salvo.",
-    search: "Buscar por empresa, responsável, e-mail ou identificador", also: "também é revenda", billing: "Modelo",
+    search: "Buscar por empresa, responsável, e-mail ou identificador", also: "também é revenda", billing: "Mensalidade",
   },
   reseller: {
     title: "Revendas", sub: "Quem compra licenças, mantém estoque e atende os clientes finais por MAC.",
@@ -169,7 +167,7 @@ function PartnersList({ scope, onChanged }) {
                 now={clock}
               />
             </td>
-            <td>{MODELS[p.billingModel]}</td><td>{p.deviceCount}{p.deviceLimit != null ? `/${p.deviceLimit}` : ""}</td><td>{fmtDate(p.endsAt)}</td>
+            <td>{scope === "content" ? fmtMoney(p.monthlyFeeCents || 0) : MODELS[p.billingModel]}</td><td>{p.deviceCount}{p.deviceLimit != null ? `/${p.deviceLimit}` : ""}</td><td>{fmtDate(p.endsAt)}</td>
             <td><div className="partner-direct-actions">
               <button type="button" className="btn sm primary" onClick={event => { event.stopPropagation(); setEditingPartner(p); }}>Editar</button>
               <button type="button" className="btn sm" onClick={event => { event.stopPropagation(); setOpenId(p.id); }}>Gerenciar</button>
@@ -232,15 +230,71 @@ function PartnerForm({ partner, scope, onClose, onSaved }) {
   const edit = !!partner;
   const [f, setF] = useState({
     name: partner?.name || "", slug: partner?.slug || "", contactName: partner?.contactName || "", contactEmail: partner?.contactEmail || "", contactPhone: partner?.contactPhone || "",
-    startsAt: dateInput(partner?.startsAt) || dateInput(new Date()), endsAt: dateInput(partner?.endsAt) || dateInput(new Date(Date.now() + 365 * 86400000)),
+    startsAt: dateInput(partner?.startsAt) || dateInput(new Date()), endsAt: dateInput(partner?.endsAt) || dateInput(new Date(new Date().setMonth(new Date().getMonth() + (scope === "content" ? 1 : 12)))),
     billingModel: partner?.billingModel || (scope === "reseller" ? "none" : "fixed"), monthly: partner ? String(partner.monthlyFeeCents / 100) : "", perDevice: partner ? String(partner.perDeviceCents / 100) : "",
     minFee: partner ? String(partner.minFeeCents / 100) : "", tiers: tiersToText(partner?.tiers), deviceLimit: partner?.deviceLimit ?? "",
     dueDay: partner?.dueDay || 10, graceDays: partner?.graceDays ?? 5, suspendPolicy: partner?.suspendPolicy || "auto_after_grace", kind: partner?.kind || SCOPES[scope].defaultKind,
     portalName: "", portalEmail: "", portalPassword: "",
+    activationLimit: partner?.deviceLimit == null ? "" : String(partner.deviceLimit),
+    unlimitedActivations: partner?.deviceLimit == null,
+    dnsLimit: "0", // 0 = sem limite, definido pela DeltaTV
+    licensePolicy: "partner_only",
   });
-  const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  const set = (k) => (e) => setF(previous => ({ ...previous, [k]: e.target.value }));
+  const [contractLoaded,setContractLoaded] = useState(!edit || scope !== 'content');
+  const [contractError,setContractError] = useState('');
+  const [legacyContractMode,setLegacyContractMode] = useState('');
+  const [convertLegacy,setConvertLegacy] = useState(false);
+  // A edição sempre lê o contrato efetivo, nunca presume que o limite de
+  // dispositivos da listagem equivale ao contrato de conteúdo.
+  useEffect(() => {
+    if(!edit || scope !== 'content') return;
+    let live=true;
+    Promise.all([api(`/admin/partners/${partner.id}/commercial`),api(`/admin/partners/${partner.id}/service-plan`)])
+      .then(([commercial, plan]) => {
+        if(!live)return;
+        const terms=commercial.terms||{};
+        if(!['fixed_limited','fixed_unlimited'].includes(terms.mode))setLegacyContractMode(terms.mode||'legacy');
+        const selectedLimit=terms.mode==='fixed_limited' ? terms.activationLimit : null;
+        const dns=plan.overrides?.maxServersOverride ?? plan.features?.maxServers ?? 0;
+        setF(old=>({...old,
+          activationLimit:selectedLimit===null?'':String(selectedLimit),
+          unlimitedActivations:selectedLimit===null,
+          dnsLimit:String(dns),
+          licensePolicy:terms.licensePolicy || 'partner_only',
+          monthly:String((terms.fixedFeeCents ?? partner.monthlyFeeCents ?? 0)/100),
+        }));
+        setContractLoaded(true);
+      }).catch(err=>{if(live)setContractError(err.message||'Não foi possível carregar o contrato.');});
+    return()=>{live=false};
+  },[edit,scope,partner?.id]);
   const { toast } = useUi();
   const submit = async () => {
+    if(scope==='content' && !contractLoaded) return toast(contractError||'Carregando contrato de serviço.', 'bad');
+    if(scope==='content') {
+      const fee=toCents(f.monthly||'0');
+      const max=f.unlimitedActivations?null:Number(f.activationLimit);
+      const dns=Number(f.dnsLimit);
+      if(fee===null || fee<0 || (!f.unlimitedActivations && (!String(f.activationLimit).trim() || !Number.isInteger(max)||max<0)) ||
+        !String(f.dnsLimit).trim() || !Number.isInteger(dns)||dns<0) return toast('Confira mensalidade, DNS e limite de ativações.', 'bad');
+      if(!f.name.trim() || !f.slug.trim()) return toast('Informe empresa e identificador.', 'bad');
+      if(!edit && f.portalEmail && (!f.portalPassword || f.portalPassword.length<12)) return toast('A senha inicial deve ter pelo menos 12 caracteres.', 'bad');
+      const input={
+        name:f.name.trim(),slug:f.slug.trim(),contactName:f.contactName||null,contactEmail:f.contactEmail||null,contactPhone:f.contactPhone||null,
+        startsAt:spDateToIso(f.startsAt),endsAt:spDateToIso(f.endsAt,true),
+        ...(edit && legacyContractMode && !convertLegacy ? {} : {
+          billingModel:'fixed',monthlyFeeCents:fee,deviceLimit:max,kind:edit?partner.kind:'content',
+          dueDay:Number(f.dueDay),graceDays:Number(f.graceDays),suspendPolicy:f.suspendPolicy,
+          serviceContract:{activationLimit:max,dnsLimit:dns,licensePolicy:f.licensePolicy},
+        }),
+      };
+      if(!edit && f.portalEmail) input.portalUser={name:f.portalName||f.name,email:f.portalEmail,password:f.portalPassword};
+      const result=await run(()=>api(edit?`/admin/partners/${partner.id}`:'/admin/partners',
+        {method:edit?'PATCH':'POST',body:input}),edit?'Contrato e cadastro atualizados.':'Parceiro criado com contrato de serviço.');
+      if(result)onSaved(result);
+      return;
+    }
+
     const money = { monthlyFeeCents: toCents(f.monthly || 0), perDeviceCents: toCents(f.perDevice || 0), minFeeCents: toCents(f.minFee || 0) };
     const tiers = f.billingModel === "tiered" ? textToTiers(f.tiers) : [];
     if (Object.values(money).includes(null) || tiers.some((t) => t.amountCents === null || Number.isNaN(t.upTo))) {
@@ -279,9 +333,53 @@ function PartnerForm({ partner, scope, onClose, onSaved }) {
     const r = await run(() => api(edit ? `/admin/partners/${partner.id}` : "/admin/partners", { method: edit ? "PATCH" : "POST", body }), SCOPES[scope].saved);
     if (r) onSaved(r);
   };
+  if(scope==='content') return <Modal title={edit?'Editar parceiro e contrato':'Novo parceiro'} onClose={onClose} wide>
+    <div className="notice">Cadastre o parceiro uma única vez. Mensalidade, DNS, ativações e vigência fazem parte do mesmo contrato. Não há estoque, Master ou plano de revenda.</div>
+    {contractError&&<p className="alert" role="alert">{contractError}</p>}
+    {!contractLoaded?<p role="status">Carregando contrato…</p>:<>
+      <h3>Dados do parceiro</h3>
+      <div className="row"><Field label="Empresa / parceiro"><input required value={f.name} onChange={set('name')}/></Field>
+      <Field label="Identificador"><input required value={f.slug} onChange={set('slug')}/></Field></div>
+      <div className="row"><Field label="Responsável"><input value={f.contactName} onChange={set('contactName')}/></Field>
+      <Field label="E-mail do contato"><input type="email" value={f.contactEmail} onChange={set('contactEmail')}/></Field></div>
+      <Field label="Telefone"><input value={f.contactPhone} onChange={set('contactPhone')}/></Field>
+      <h3>Contrato de serviços</h3>
+      {edit&&legacyContractMode&&<div className="notice">
+        Contrato antigo: {legacyContractMode==='credits'?'pré-pago por créditos':'regras legadas'}.
+        {legacyContractMode==='credits'
+          ? ' Para preservar créditos, este formulário salva apenas os dados cadastrais. A migração exige conciliar o saldo antigo.'
+          : ' Para manter as regras antigas, deixe a conversão desmarcada.'}
+        {legacyContractMode!=='credits'&&<label style={{display:'flex',alignItems:'center',gap:8,marginTop:10}}>
+          <input type="checkbox" checked={convertLegacy} onChange={e=>setConvertLegacy(e.target.checked)}/>
+          Migrar esta conta para contrato mensal com os limites informados
+        </label>}
+      </div>}
+      {(!edit || !legacyContractMode || convertLegacy) && <>
+      <div className="row"><Field label="Mensalidade negociada (R$)" hint="R$ 0,00 para parceiro gratuito"><input inputMode="decimal" value={f.monthly} onChange={set('monthly')}/></Field>
+      <Field label="Limite de DNS por código" hint="0 = sem limite"><input type="number" min="0" step="1" value={f.dnsLimit} onChange={set('dnsLimit')}/></Field></div>
+      <label className="row" style={{alignItems:'center',gap:10,marginBottom:10}}><input type="checkbox" checked={f.unlimitedActivations} onChange={e=>setF(old=>({...old,unlimitedActivations:e.target.checked}))}/> Ativações ilimitadas</label>
+      {!f.unlimitedActivations&&<Field label="Limite de ativações"><input type="number" min="0" step="1" value={f.activationLimit} onChange={set('activationLimit')}/></Field>}
+      <div className="row"><Field label="Início"><input type="date" value={f.startsAt} onChange={set('startsAt')}/></Field>
+      <Field label="Vencimento"><input type="date" value={f.endsAt} onChange={set('endsAt')}/></Field></div>
+      <div className="row"><Field label="Dia de cobrança"><input type="number" min="1" max="28" value={f.dueDay} onChange={set('dueDay')}/></Field>
+      <Field label="Tolerância (dias)"><input type="number" min="0" max="90" value={f.graceDays} onChange={set('graceDays')}/></Field></div>
+      <Field label="Quando a parceria vencer"><select value={f.licensePolicy} onChange={set('licensePolicy')}>
+        <option value="partner_only">Bloquear também as ativações dependentes</option>
+        <option value="standard">Manter a política padrão das licenças independentes</option>
+      </select></Field>
+      </>}
+      {!edit&&<><h3>Acesso ao Painel do Parceiro (opcional)</h3>
+        <div className="row"><Field label="Nome do usuário"><input value={f.portalName} onChange={set('portalName')}/></Field>
+        <Field label="E-mail de login"><input type="email" value={f.portalEmail} onChange={set('portalEmail')}/></Field></div>
+        {f.portalEmail&&<Field label="Senha inicial (mínimo 12 caracteres)"><input type="password" minLength="12" value={f.portalPassword} onChange={set('portalPassword')}/></Field>}
+      </>}
+      <div className="actions"><button type="button" className="btn" onClick={onClose}>Cancelar</button>
+      <button type="button" className="btn primary" onClick={submit}>{edit?'Salvar alterações':'Criar parceiro'}</button></div>
+    </>}
+  </Modal>;
   return (
     <Modal title={edit ? `Editar ${SCOPES[scope].noun}` : SCOPES[scope].newLabel} onClose={onClose} wide>
-      {edit && scope === "content" && <div className="notice">Dados cadastrais são editados aqui. Para mudar DNS, ativações e benefícios, use <b>Gerenciar → Pacote de Serviço</b>. Isso evita alterações conflitantes no contrato.</div>}
+      {edit && scope === "content" && <div className="notice">Dados cadastrais são editados aqui. Para ajustar recursos e permissão de revenda, use <b>Gerenciar → Plano e permissões</b>. Isso evita alterações conflitantes no contrato.</div>}
       <div className="row"><Field label="Nome / empresa"><input value={f.name} onChange={set("name")} /></Field><Field label="Identificador (slug)" hint="minúsculas, números e hífens"><input value={f.slug} onChange={set("slug")} /></Field></div>
       <div className="row"><Field label="Contato"><input value={f.contactName} onChange={set("contactName")} /></Field><Field label="E-mail do contato"><input value={f.contactEmail} onChange={set("contactEmail")} /></Field></div>
       <Field label="Telefone do contato"><input value={f.contactPhone} onChange={set("contactPhone")} /></Field>
@@ -347,10 +445,8 @@ function PartnerDetail({ id, onClose, onChanged }) {
   const what = p.kind === "content" ? "parceria" : "revenda";
   const tabList = [
     ...(p.kind !== "content" ? [["stock", "Estoque de licenças"]] : []),
-    ...(p.kind !== "reseller" && role === "superadmin" ? [["package", "Pacote de Serviço"]] : []),
     ["clients", "Clientes e avisos"],
     ...(p.kind === "reseller" ? [["service-plan", "Plano de recursos"]] : []),
-    ...(p.kind !== "reseller" && role === "superadmin" ? [["legacy-plan", "Configurações legadas"]] : []),
     ["codes", "Códigos"], ["providers", "Servidores IPTV"], ["devices", "Dispositivos"],
     ...(p.billingModel !== "none" || p.invoices.length ? [["invoices", "Mensalidades"]] : []),
     ...(["superadmin", "admin"].includes(role) ? [["users", "Usuários do portal"]] : []),
@@ -372,6 +468,11 @@ function PartnerDetail({ id, onClose, onChanged }) {
     if (!c) return;
     if (await run(() => api(`/admin/devices/activations/${a.id}/${action}`, { method: "POST", body: { reason: c.reason } }), "Dispositivo atualizado.")) { loadDevices(); load(); }
   };
+  const renewOneMonth=async()=>{
+    if(!(await confirm({title:"Renovar acesso por 1 mês",message:`Prorrogar em um mês o acesso de ${p.name} e seus dispositivos? Esta ação administrativa NÃO confirma nem cobra pagamento automaticamente.`,confirmLabel:"Renovar +1 mês"})))return;
+    const result=await run(()=>api(`/admin/partners/${id}/renew-month`,{method:"POST"}),"Vigência prorrogada em um mês.");
+    if(result){setP(result);load();onChanged();}
+  };
   const generate = async () => {
     const now = new Date();
     const competence = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1)).toISOString().slice(0, 7);
@@ -386,11 +487,12 @@ function PartnerDetail({ id, onClose, onChanged }) {
         <dt>Contato</dt><dd>{[p.contactName, p.contactEmail, p.contactPhone].filter(Boolean).join(" · ") || "—"}</dd>
         <dt>Identificador</dt><dd>{p.slug}</dd><dt>Vigência</dt><dd>{fmtDate(p.startsAt)} → {fmtDate(p.endsAt)}</dd>
         <dt>Tipo</dt><dd><span className={`kind ${p.kind}`}>{KIND_LABEL[p.kind] || p.kind}</span></dd>
-        <dt>Cobrança</dt><dd>{p.billingModel === "none" ? "Sem mensalidade" : `${MODELS[p.billingModel]} · vence dia ${p.dueDay} · tolerância ${p.graceDays} dia(s)`}</dd>
+        <dt>Mensalidade</dt><dd>{p.billingModel === "none" ? "Sem cobrança" : fmtMoney(p.monthlyFeeCents || 0)} · vence dia {p.dueDay} · tolerância {p.graceDays} dia(s)</dd>
         <dt>Dispositivos</dt><dd>{p.deviceCount}{p.deviceLimit != null ? ` de ${p.deviceLimit}` : " (sem limite)"}</dd>
       </dl>
       <div className="actions left">
-        <button className="btn primary" onClick={() => setEditing(true)}>Editar parceiro</button>
+        <button className="btn primary" onClick={() => setEditing(true)}>Editar parceiro e contrato</button>
+        {role === "superadmin" && p.kind !== "reseller" && <button className="btn" onClick={renewOneMonth}>Renovar +1 mês</button>}
         {role === "superadmin" && <button className="btn danger" onClick={() => setDeleting(true)}>Excluir revenda / parceiro</button>}
         {p.status === "active" && <button className="btn" onClick={() => act("suspend", { title: `Suspender ${what}`, message: "Todos os dispositivos vinculados perdem o acesso até a reativação.", reason: "required", danger: true, confirmLabel: "Suspender" })}>Suspender</button>}
         {["active", "suspended"].includes(p.status) && <button className="btn danger" onClick={() => act("block", { title: `Bloquear ${what}`, message: "Todos os dispositivos da parceria perdem o acesso, independentemente do código usado.", reason: "required", danger: true, confirmLabel: "Bloquear" })}>Bloquear</button>}
@@ -399,8 +501,6 @@ function PartnerDetail({ id, onClose, onChanged }) {
       </div>
       {deleteItem&&<DeletionDialog kind={deleteItem.kind} item={deleteItem.item} url={deleteItem.url} onClose={()=>setDeleteItem(null)} onDeleted={()=>{setDeleteItem(null);load();onChanged()}}/>}
       <div className="tabs">{tabList.map(([k, n]) => <button key={k} className={`tab ${cur === k ? "active" : ""}`} onClick={() => setTab(k)}>{n}</button>)}</div>
-      {cur === "package" && <PartnerPackage partnerId={id} onSaved={() => { load(); onChanged(); }} />}
-      {cur === "legacy-plan" && <details><summary>Contrato e recursos anteriores — somente para migração</summary><ContentContract partnerId={id} onSaved={() => {load();onChanged();}}/><ServicePlan partnerId={id}/></details>}
       {cur === "service-plan" && <ServicePlan partnerId={id} />}
       {cur === "codes" && <>
         <div className="actions left"><button className="btn primary" onClick={() => setNewCode(true)}>Novo código</button></div>

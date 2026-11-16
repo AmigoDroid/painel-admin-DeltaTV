@@ -15,7 +15,6 @@ import { EasyPageGuide } from "@deltatv/ui/EasyStart";
 import ServerMonitor from "./pages/ServerMonitor.jsx";
 import VpsMonitor from "./pages/VpsMonitor.jsx";
 import VpsFiles from "./pages/VpsFiles.jsx";
-import PlansAndPricing from "./pages/PlansAndPricing.jsx";
 import Licenses from "./pages/Licenses.jsx";
 import Partners, { Resellers } from "./pages/Partners.jsx";
 import PartnerTrash from "./pages/PartnerTrash.jsx";
@@ -27,11 +26,9 @@ import Sources from "./pages/Sources.jsx";
 import Billing from "./pages/Billing.jsx";
 import Pix from "./pages/Pix.jsx";
 import PaymentGateways from "./pages/PaymentGateways.jsx";
-import ServicePackages from "./pages/ServicePackages.jsx";
 import GlobalSettings from "./pages/GlobalSettings.jsx";
 import Credits from "./pages/Credits.jsx";
 import DistributionNetwork from "./pages/DistributionNetwork.jsx";
-import PortalSales from "./pages/PortalSales.jsx";
 import Audit from "./pages/Audit.jsx";
 import DeviceAccess from "./pages/DeviceAccess.jsx";
 import Clients from "./pages/Clients.jsx";
@@ -57,8 +54,8 @@ const PAGES = {
   legados: ["Migração de legados", LegacyMigration],
   "ativar-tv": ["Ativar TV", LicenseActivation], licenses: ["Licenças das TVs", Licenses], devices: ["TVs e dispositivos", Devices], unlinked: ["TVs sem configuração", Unlinked],
   partners: ["Gerenciar parceiros", Partners], servermonitor: ["Qualidade dos servidores", ServerMonitor], sources: ["Fontes globais de conteúdo", Sources],
-  resellers: ["Revendas", Resellers], network: ["Rede de distribuição", DistributionNetwork], "portal-sales": ["Venda do Painel do Parceiro", PortalSales], support: ["Resolver problema da TV", () => <SupportCenter base="/admin" />], trash: ["Lixeira", PartnerTrash], clients: ["Clientes", Clients], credits: ["Créditos", Credits], downloads: ["Downloads e links", Downloads],
-  billing: ["Financeiro", Billing], gateways: ["Gateways de pagamento", PaymentGateways], pix: ["Pix (legado)", Pix], pricing: ["Planos e valores legados", PlansAndPricing], "service-packages": ["Pacotes de Serviço", ServicePackages], "global-config": ["Configurações Globais", GlobalSettings], commerce3: ["Planos SaaS e comissões", Commerce3],
+  resellers: ["Revendas", Resellers], network: ["Rede de distribuição", DistributionNetwork], "portal-sales": ["Gerenciar parceiros", Partners], support: ["Resolver problema da TV", () => <SupportCenter base="/admin" />], trash: ["Lixeira", PartnerTrash], clients: ["Clientes", Clients], credits: ["Créditos", Credits], downloads: ["Downloads e links", Downloads],
+  billing: ["Financeiro", Billing], gateways: ["Gateways de pagamento", PaymentGateways], pix: ["Pix (legado)", Pix], pricing: ["Gerenciar parceiros", Partners], "service-packages": ["Gerenciar parceiros", Partners], "global-config": ["Configurações Globais", GlobalSettings], commerce3: ["Planos SaaS e comissões", Commerce3],
   help: ["Central de Ajuda", HelpManagement], users: ["Usuários", Users], loginhistory: ["Histórico de login", LoginHistory], notifications: ["Notificações", Notifications], mail: ["E-mails", Mail], audit: ["Auditoria", Audit],
 };
 
@@ -67,9 +64,9 @@ const PAGES = {
 const GROUPS = [
  {label:null,items:['dashboard','control','partners']},
  {label:'Atendimento e operação',items:['ativar-tv','clients','devices','legados','support','unlinked']},
- {label:'Planos e licenças',items:['service-packages','commerce3','licenses','credits']},
+ {label:'Licenças e créditos',items:['licenses','credits']},
  {label:'Financeiro',items:['billing','gateways']},
- {label:'Rede comercial',items:['portal-sales','resellers','network']},
+ {label:'Rede e parceiros',items:['resellers','network']},
  {label:'Aplicativos e servidores',items:['whiteLabel','webaccess','downloads','sources','servermonitor']},
  {label:'Administração',items:['vpsmonitor','vpsfiles','trash','global-config','help','users','loginhistory','notifications','mail','audit','conta']},
 ];
