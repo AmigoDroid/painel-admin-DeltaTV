@@ -64,13 +64,16 @@ const PAGES = {
 // Menu único e direto (como no painel do parceiro): cada função abre a própria página,
 // sem passar por sub-dashboards. A mesma lista alimenta o menu lateral e a tela inicial.
 const GROUPS = [
- {label:null,items:['dashboard','workspace','control','partners']},
- {label:'Atendimento e operação',items:['ativar-tv','clients','devices','legados','support','unlinked']},
- {label:'Licenças e créditos',items:['licenses','credits']},
- {label:'Financeiro',items:['billing','gateways']},
- {label:'Rede e parceiros',items:['resellers','network']},
- {label:'Aplicativos e servidores',items:['whiteLabel','webaccess','downloads','sources','servermonitor']},
- {label:'Administração',items:['vpsmonitor','vpsfiles','trash','global-config','help','users','loginhistory','notifications','mail','audit','conta']},
+ {label:null,items:['dashboard','workspace','partners','resellers','devices']},
+ {label:'Operação',items:['licenses','billing','support']},
+ {label:'Administração',items:['users','global-config']},
+];
+// Ferramentas avançadas continuam acessíveis sem poluir a navegação principal.
+// As permissões e as rotas permanecem iguais às da versão anterior.
+const EXTRA_GROUPS = [
+ {label:'Operações avançadas',items:['control','ativar-tv','clients','legados','unlinked','credits','network']},
+ {label:'Aplicativos e DNS',items:['whiteLabel','webaccess','downloads','sources','servermonitor']},
+ {label:'Infraestrutura e auditoria',items:['gateways','vpsmonitor','vpsfiles','trash','loginhistory','audit','notifications','mail','help','conta']},
 ];
 
 // Ícones do menu (traço simples, herdam a cor do texto).
@@ -189,6 +192,7 @@ function Shell({ user }) {
   };
   const [page, setPage] = useState(fromHash);
   const [open, setOpen] = useState(false); // gaveta do menu em tela pequena
+  const [moreTools,setMoreTools] = useState(false);
   useEffect(() => { if (location.hash.slice(1) !== page) location.hash = page; }, [page]);
   // Botão voltar/avançar do navegador e links #pagina: sincroniza a tela com o endereço (e barra páginas sem permissão).
   useEffect(() => {
@@ -235,7 +239,7 @@ function Shell({ user }) {
     </div>;
   };
   // Mesmas funções do menu lateral, em cartões na tela inicial (o painel inicial já é a primeira entrada).
-  const homeGroups = GROUPS.map(g => ({
+  const homeGroups = [...GROUPS,...EXTRA_GROUPS].map(g => ({
     label: g.label || "Geral",
     items: g.items.filter(k => k !== "dashboard" && allowed(k)).map(k => ({ id: k, label: PAGES[k][0], icon: <NavIcon k={k} />, badge: badges[k] })),
   }));
@@ -245,6 +249,12 @@ function Shell({ user }) {
         <div className="brand"><BrandMark size={32} /><div><strong><PlatformBrand/></strong><span>Administração</span></div><button type="button" className="sidebar-close" aria-label="Fechar menu" onClick={() => setOpen(false)}>×</button></div>
         <nav className="nav-scroll" aria-label="Menu principal">
           {GROUPS.map(renderMenuGroup)}
+          {EXTRA_GROUPS.some(g=>g.items.some(allowed)) && <div className="nav-group">
+            <button type="button" className="nav" aria-expanded={moreTools} onClick={()=>setMoreTools(v=>!v)}>
+              <span className="nav__label"><NavIcon k="settings"/> Mais ferramentas</span><span aria-hidden="true">{moreTools?'−':'+'}</span>
+            </button>
+            {moreTools && EXTRA_GROUPS.map(renderMenuGroup)}
+          </div>}
         </nav>
       </aside>
       {open && <div className="scrim" onClick={() => setOpen(false)} />}
@@ -258,8 +268,8 @@ function Shell({ user }) {
           <button type="button" className="easy-mode-button" aria-pressed={!simpleMode} onClick={() => setSimpleMode((s) => !s)}>{simpleMode ? "Guia das telas: ligado" : "Guia das telas: desligado"}</button>
           <UserMenu user={user} onAccount={() => go("conta")} />
         </div>
-        <main className="content"><Breadcrumb panel="admin" current={PAGES[page][0]} onHome={()=>go("dashboard")}/>
-          <TaskFinder tasks={user.role === 'admin' ? [] : TASKS.filter(task => allowed(task.route))} onNavigate={go} />
+        <main className="content"><Breadcrumb panel="admin" current={PAGES[page][0]} onHome={()=>go(canOpenPage('dashboard')?'dashboard':'workspace')}/>
+          <TaskFinder tasks={TASKS.filter(task => allowed(task.route))} onNavigate={go} />
           {simpleMode && page !== "dashboard" && <EasyPageGuide role="admin" page={page} onBack={() => go("dashboard")} />}
           <Current onChanged={refreshCounts} menu={homeGroups} onNavigate={go} />
         </main>

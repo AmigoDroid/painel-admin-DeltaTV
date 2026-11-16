@@ -136,10 +136,10 @@ function PartnersList({ scope, onChanged }) {
       {rows.length > 0 && (
         <div className="mini-stats">
           <div><strong>{list.meta?.total ?? rows.length}</strong><span>cadastrados</span></div>
-          <div><strong>{count((p) => p.effectiveStatus === "active")}</strong><span>ativos</span></div>
+          <div><strong>{count((p) => p.effectiveStatus === "active")}</strong><span>ativos nesta página</span></div>
           <div><strong>{rows.filter((p) => liveIds ? liveIds.has(p.id) : p.online).length}</strong><span>online agora (na página)</span></div>
-          {pending > 0 && <div className="warn"><strong>{pending}</strong><span>aguardando aprovação</span></div>}
-          <div><strong>{count((p) => ["suspended", "blocked"].includes(p.effectiveStatus) && !isPending(p))}</strong><span>suspensos ou bloqueados</span></div>
+          {pending > 0 && <div className="warn"><strong>{pending}</strong><span>aguardando aprovação nesta página</span></div>}
+          <div><strong>{count((p) => ["suspended", "blocked"].includes(p.effectiveStatus) && !isPending(p))}</strong><span>suspensos ou bloqueados nesta página</span></div>
         </div>
       )}
       {scope === "content" && <PartnerPreRegistrations onOpenPartner={setOpenId} onRefresh={list.reload} refreshKey={inviteRevision} />}
@@ -334,7 +334,7 @@ function PartnerForm({ partner, scope, onClose, onSaved }) {
     if (r) onSaved(r);
   };
   if(scope==='content') return <Modal title={edit?'Editar parceiro e contrato':'Novo parceiro'} onClose={onClose} wide>
-    <div className="notice">Cadastre o parceiro uma única vez. Mensalidade, DNS, ativações e vigência fazem parte do mesmo contrato. Não há estoque, Master ou plano de revenda.</div>
+    <p className="muted">Informe os dados da empresa e o contrato. As configurações menos frequentes estão em opções avançadas.</p>
     {contractError&&<p className="alert" role="alert">{contractError}</p>}
     {!contractLoaded?<p role="status">Carregando contrato…</p>:<>
       <h3>Dados do parceiro</h3>
@@ -361,12 +361,15 @@ function PartnerForm({ partner, scope, onClose, onSaved }) {
       {!f.unlimitedActivations&&<Field label="Limite de ativações"><input type="number" min="0" step="1" value={f.activationLimit} onChange={set('activationLimit')}/></Field>}
       <div className="row"><Field label="Início"><input type="date" value={f.startsAt} onChange={set('startsAt')}/></Field>
       <Field label="Vencimento"><input type="date" value={f.endsAt} onChange={set('endsAt')}/></Field></div>
-      <div className="row"><Field label="Dia de cobrança"><input type="number" min="1" max="28" value={f.dueDay} onChange={set('dueDay')}/></Field>
-      <Field label="Tolerância (dias)"><input type="number" min="0" max="90" value={f.graceDays} onChange={set('graceDays')}/></Field></div>
-      <Field label="Quando a parceria vencer"><select value={f.licensePolicy} onChange={set('licensePolicy')}>
-        <option value="partner_only">Bloquear também as ativações dependentes</option>
-        <option value="standard">Manter a política padrão das licenças independentes</option>
-      </select></Field>
+      <details className="partner-contract-advanced"><summary>Opções avançadas de cobrança e vencimento</summary>
+        <p className="muted">Normalmente não precisa alterar. Padrão: cobrança no dia {f.dueDay}, com {f.graceDays} dia(s) de tolerância.</p>
+        <div className="row"><Field label="Dia de cobrança"><input type="number" min="1" max="28" value={f.dueDay} onChange={set('dueDay')}/></Field>
+        <Field label="Tolerância (dias)"><input type="number" min="0" max="90" value={f.graceDays} onChange={set('graceDays')}/></Field></div>
+        <Field label="Quando a parceria vencer"><select value={f.licensePolicy} onChange={set('licensePolicy')}>
+          <option value="partner_only">Bloquear também as ativações dependentes</option>
+          <option value="standard">Manter a política padrão das licenças independentes</option>
+        </select></Field>
+      </details>
       </>}
       {!edit&&<><h3>Acesso ao Painel do Parceiro (opcional)</h3>
         <div className="row"><Field label="Nome do usuário"><input value={f.portalName} onChange={set('portalName')}/></Field>

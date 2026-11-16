@@ -11,7 +11,8 @@ test("Lixeira aparece no menu só para o superadmin", () => {
   assert.match(app, /trash: \["Lixeira", PartnerTrash\]/);
   assert.match(app, /user\.role !== "superadmin"/);
   assert.match(app, /k === "trash"/);
-  assert.match(app, /items:\s*\[['" ]vpsmonitor['"],\s*['"]vpsfiles['"],\s*['"]trash['"],/);
+  assert.match(app, /EXTRA_GROUPS/);
+  assert.match(app, /items:\s*\[[^\]]*['"]vpsmonitor['"][^\]]*['"]vpsfiles['"][^\]]*['"]trash['"]/);
 });
 test("rotas de lixeira exigem override e id validado", () => {
   for (const endpoint of ["/trash", "/trash/:id/preview", "/trash/:id/restore", "/trash/:id/permanent"])

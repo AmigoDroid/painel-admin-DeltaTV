@@ -1,5 +1,6 @@
-import {useCallback,useEffect,useState} from "react";
+import {useCallback,useEffect,useMemo,useRef,useState} from "react";
 import {api,getAuth} from "../api.js";
+import {addMonthsClamped} from "../workspace-dates.js";
 
 // Administração de rede isolada: nenhum componente desta tela usa APIs globais
 // como /admin/partners, /admin/dashboard ou /admin/service-plans.
@@ -14,7 +15,7 @@ const LABELS={
 };
 const currency=cents=>new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format((Number(cents)||0)/100);
 const toCents=value=>Math.round(Number(String(value).replace(",","."))*100);
-const nextMonth=()=>{const d=new Date();d.setMonth(d.getMonth()+1);return d.toISOString().slice(0,10);};
+const nextMonth=()=>addMonthsClamped();
 const blankPlan=()=>({name:"",description:"",audience:"content",monthlyPrice:"0,00",maxServers:"5",noDnsLimit:false,
   autoFailover:true,autoPriority:false,emailAlerts:false,detailedHistory:false});
 const blankAccount=kind=>({name:"",slug:"",kind,planKey:"",monthlyFee:"0,00",activationLimit:"100",noActivationLimit:false,
@@ -26,7 +27,7 @@ function StatusMessage({message}){return message?<div className="notice" role="s
 const between=(min,max)=>value=>Number.isInteger(Number(value))&&Number(value)>=min&&Number(value)<=max;
 
 export default function NetworkWorkspace(){
- const viewer=getAuth()?.user;
+ const viewer=useMemo(()=>getAuth()?.user,[]);
  const central=viewer?.role==="superadmin";
  const permissions=permsOf(viewer);
  const permits=key=>central||permissions.has(key);
@@ -37,24 +38,30 @@ export default function NetworkWorkspace(){
  const [selected,setSelected]=useState(null);
  const [planForm,setPlanForm]=useState(null),[accountForm,setAccountForm]=useState(null),[editingAccount,setEditingAccount]=useState(null);
  const [newUser,setNewUser]=useState(null);
- const [q,setQ]=useState(""),[busy,setBusy]=useState(false),[error,setError]=useState(""),[success,setSuccess]=useState("");
+ const [q,setQ]=useState(""),[search,setSearch]=useState(""),[page,setPage]=useState(1),[pageMeta,setPageMeta]=useState(null),
+   [busy,setBusy]=useState(false),[error,setError]=useState(""),[success,setSuccess]=useState("");
+ const requestGeneration=useRef(0);
  const request=useCallback((path,params={})=>api(`/admin/workspace/${path}`,{
    ...params, query:{...(params.query||{}),...(central?{adminId}: {})},
  }),[adminId,central]);
  const available=central?Boolean(adminId):true;
  useEffect(()=>{if(!central)return;api("/admin/workspace/admins").then(v=>setAdmins(v.data||[])).catch(e=>setError(e.message));},[central]);
  useEffect(()=>{if(central&&adminId)sessionStorage.setItem("deltatv-selected-admin",adminId);},[central,adminId]);
+ useEffect(()=>{const timer=setTimeout(()=>{setSearch(q.trim());setPage(1);},300);return()=>clearTimeout(timer);},[q]);
  const reload=useCallback(async()=>{
-   if(!available)return;
+   const generation=++requestGeneration.current;
+   if(!available){setOverview(null);setPlans([]);setPartners([]);setPageMeta(null);return;}
    setError("");
    const jobs=[];
-   if(permits("network:dashboard:read"))jobs.push(request("summary").then(setOverview));
-   if(permits("network:plans:read"))jobs.push(request("plans").then(v=>setPlans(v.data||[])));
-   if(permits("network:partners:read")||permits("network:resellers:read"))jobs.push(request("partners",{query:{pageSize:100}}).then(v=>setPartners(v.data||[])));
+   if(permits("network:dashboard:read"))jobs.push(request("summary").then(v=>{if(requestGeneration.current===generation)setOverview(v);}));
+   if(permits("network:plans:read"))jobs.push(request("plans").then(v=>{if(requestGeneration.current===generation)setPlans(v.data||[]);}));
+   if(permits("network:partners:read")||permits("network:resellers:read"))
+     jobs.push(request("partners",{query:{pageSize:20,page,q:search,kind:tab==="plans"?undefined:tab==="resellers"?"reseller":"content"}})
+       .then(v=>{if(requestGeneration.current===generation){setPartners(v.data||[]);setPageMeta(v.meta||null);}}));
    const failures=await Promise.allSettled(jobs);
-   const first=failures.find(x=>x.status==="rejected");if(first)setError(first.reason?.message||"Falha ao carregar a rede.");
- },[adminId,available,request,viewer?.id,viewer?.role,viewer?.permissions]);
- useEffect(()=>{void reload();},[reload]);
+   const first=failures.find(x=>x.status==="rejected");if(first&&requestGeneration.current===generation)setError(first.reason?.message||"Falha ao carregar a rede.");
+ },[available,request,page,search,tab,viewer?.id,viewer?.role,viewer?.permissions]);
+ useEffect(()=>{void reload();return()=>{requestGeneration.current++;};},[reload]);
  const act=async(action,notice)=>{
    setBusy(true);setError("");setSuccess("");
    try{await action();setSuccess(notice);await reload();return true;}
@@ -62,11 +69,11 @@ export default function NetworkWorkspace(){
    finally{setBusy(false);}
  };
  const initialTab=tab==="plans"?"network:plans:read":tab==="resellers"?"network:resellers:read":"network:partners:read";
- const visibleAccounts=partners.filter(p=>(tab==="resellers"?["reseller","both"].includes(p.kind):["content","both"].includes(p.kind))&&
-   `${p.name} ${p.slug}`.toLowerCase().includes(q.toLowerCase()));
+ const visibleAccounts=partners.filter(p=>(tab==="resellers"?["reseller","both"].includes(p.kind):["content","both"].includes(p.kind)));
  const openPartner=async p=>{
-   setError("");try{const d=await request(`partners/${p.id}`);setSelected(d);}
-   catch(e){setError(e.message);}
+   const generation=requestGeneration.current;
+   setError("");try{const d=await request(`partners/${p.id}`);if(requestGeneration.current===generation)setSelected(d);}
+   catch(e){if(requestGeneration.current===generation)setError(e.message);}
  };
  const editPartner=()=>{
    if(!selected)return;
@@ -128,7 +135,7 @@ export default function NetworkWorkspace(){
  </div>;
  return <div className="workspace-admin-page" style={{display:"grid",gap:18}}>
   <div className="page-head"><h2>{central?"Administração das redes":"Minha rede"}</h2><p className="muted">Parceiros, revendas, planos e usuários da sua rede. Os dados de outras administrações não ficam disponíveis.</p></div>
-  {central&&<div className="card" style={{padding:16}}>{field("Admin responsável pela rede",<select value={adminId} onChange={e=>{setAdminId(e.target.value);setPartners([]);setPlans([]);setSelected(null);}}><option value="">Selecione um Admin</option>{admins.map(a=><option key={a.id} value={a.id}>{a.name} — {a.email}</option>)}</select>)}</div>}
+  {central&&<div className="card" style={{padding:16}}>{field("Admin responsável pela rede",<select value={adminId} onChange={e=>{requestGeneration.current++;setAdminId(e.target.value);setPage(1);setQ("");setPartners([]);setPlans([]);setPageMeta(null);setOverview(null);setSelected(null);}}><option value="">Selecione um Admin</option>{admins.map(a=><option key={a.id} value={a.id}>{a.name} — {a.email}</option>)}</select>)}</div>}
   {!available?<p className="muted">Selecione um Admin para abrir os cadastros de sua rede.</p>:<>
    {overview&&<div className="grid cards" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10}}>
      {[{label:"Parceiros",value:overview.partners},{label:"Revendas",value:overview.resellers},{label:"Planos",value:overview.plans}].map(x=><div className="card" key={x.label} style={{padding:16}}><small>{x.label}</small><h2>{x.value}</h2></div>)}
@@ -136,7 +143,7 @@ export default function NetworkWorkspace(){
    <ErrorMessage message={error}/><StatusMessage message={success}/>
    <div className="toolbar" style={{display:"flex",flexWrap:"wrap",gap:8}}>
      {[["partners","Parceiros","network:partners:read"],["resellers","Revendas","network:resellers:read"],["plans","Planos e recursos","network:plans:read"]]
-       .filter(x=>permits(x[2])).map(([key,name])=><button key={key} className={`btn ${tab===key?"primary":""}`} onClick={()=>{setTab(key);setSelected(null);setEditingAccount(null);setPlanForm(null);}}>{name}</button>)}
+       .filter(x=>permits(x[2])).map(([key,name])=><button key={key} className={`btn ${tab===key?"primary":""}`} onClick={()=>{setTab(key);setPage(1);setSelected(null);setEditingAccount(null);setPlanForm(null);}}>{name}</button>)}
      <button className="btn" onClick={()=>void reload()}>Atualizar</button>
    </div>
    {tab==="plans"&&permits("network:plans:read")&&<>
@@ -160,8 +167,13 @@ export default function NetworkWorkspace(){
      {accountForm&&renderAccountForm(accountForm,setAccountForm)}
      {editingAccount&&renderAccountForm(editingAccount,setEditingAccount,true)}
      <div className="card" style={{padding:16}}>
-       <div className="row" style={{justifyContent:"space-between",alignItems:"center"}}><h3>{tab==="resellers"?"Minhas revendas":"Meus parceiros"}</h3><input placeholder="Buscar nesta rede" value={q} onChange={e=>setQ(e.target.value)}/></div>
-       {visibleAccounts.length?<table className="table"><thead><tr><th>Empresa</th><th>Mensalidade</th><th>Vencimento</th><th>Status</th><th>Ações</th></tr></thead><tbody>{visibleAccounts.map(p=><tr key={p.id}><td>{p.name}</td><td>{currency(p.monthlyFeeCents)}</td><td>{new Date(p.endsAt).toLocaleDateString("pt-BR")}</td><td>{p.status}</td><td><button className="btn sm" onClick={()=>openPartner(p)}>Gerenciar</button></td></tr>)}</tbody></table>:<p className="muted">Nenhuma conta desta rede.</p>}
+       <div className="row" style={{justifyContent:"space-between",alignItems:"center"}}><h3>{tab==="resellers"?"Minhas revendas":"Meus parceiros"}</h3><input aria-label="Buscar contas nesta rede" placeholder="Buscar nesta rede" value={q} onChange={e=>setQ(e.target.value)}/></div>
+       {visibleAccounts.length?<table className="table"><thead><tr><th>Empresa</th><th>Mensalidade</th><th>Vencimento</th><th>Status</th><th>Ações</th></tr></thead><tbody>{visibleAccounts.map(p=><tr key={p.id}><td>{p.name}</td><td>{currency(p.monthlyFeeCents)}</td><td>{new Date(p.endsAt).toLocaleDateString("pt-BR")}</td><td>{p.status}</td><td><button className="btn sm" onClick={()=>openPartner(p)}>Gerenciar</button></td></tr>)}</tbody></table>:<p className="muted">Nenhuma conta corresponde à pesquisa nesta rede.</p>}
+       {pageMeta&&<nav className="row" aria-label="Páginas de contas" style={{justifyContent:"space-between",marginTop:12,flexWrap:"wrap"}}>
+         <span className="muted">{pageMeta.total} conta(s) · página {pageMeta.page} de {Math.max(1,pageMeta.totalPages)}</span>
+         <div className="actions"><button className="btn sm" disabled={page<=1||busy} onClick={()=>setPage(x=>Math.max(1,x-1))}>Anterior</button>
+         <button className="btn sm" disabled={page>=pageMeta.totalPages||busy} onClick={()=>setPage(x=>x+1)}>Próxima</button></div>
+       </nav>}
      </div>
      {selected&&<div className="card" style={{padding:20,display:"grid",gap:12}}>
        <h3>{selected.partner.name}</h3>
@@ -229,8 +241,9 @@ function NetworkResources({account,request,permits}){
       </div>}
     </>}
     <h5>Códigos — {codes.length}</h5>
+    {account.kind==="reseller"&&<p className="muted">Para emitir códigos de Revenda, use o fluxo de licenças das TVs autorizado pela DeltaTV. Esta tela não emite licenças.</p>}
     {codes.map(c=><div className="row" key={c.id} style={{justifyContent:"space-between"}}><span>{c.code} · {c.label||"Sem nome"}</span></div>)}
-    {permits("network:resources:write")&&<>
+    {permits("network:resources:write") && account.kind!=="reseller" && <>
        {!codeForm?<button className="btn sm" onClick={()=>setCodeForm({code:"",label:"",providerId:""})}>Criar código de ativação</button>:
        <div className="card" style={{padding:12,display:"grid",gap:10}}><h5>Novo código</h5>
          {field("Código (opcional, gera automático)",<input value={codeForm.code} onChange={e=>setCodeForm({...codeForm,code:e.target.value})}/>)}

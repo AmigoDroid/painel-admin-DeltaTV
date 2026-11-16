@@ -39,8 +39,8 @@ export default function GlobalSettings(){
   {data?.errors?.[tab]&&<div className="alert" role="alert">{data.errors[tab].message} ({data.errors[tab].code})</div>}
   {tab==='payments'&&data&&<div style={{display:'grid',gap:14}}>
    <section className="card" style={{padding:18,display:'grid',gap:12}}>
-    <h2>Gateway padrão — venda do Painel do Parceiro</h2>
-    <p className="muted">Credenciais globais no .env do backend. Cada Master pode ter suas próprias credenciais e pagamentos, sem acesso às chaves da DeltaTV. Pedidos existentes mantêm seu gateway.</p>
+    <h2>Gateway padrão para cobranças integradas</h2>
+    <p className="muted">Credenciais globais no .env do backend. A mensalidade de cada parceiro é definida no próprio contrato; este gateway vale somente para os fluxos de checkout já integrados. Pedidos anteriores mantêm seu provedor.</p>
     {edit?.payments&&<form onSubmit={save} style={{display:'grid',gap:12,maxWidth:600}}>
      <Field label="Recebimento padrão da DeltaTV"><select value={edit.payments.defaultGateway} onChange={e=>update('payments','defaultGateway',e.target.value)}>
       {(data.payment?.availableGateways||[]).map(g=><option key={g.provider} disabled={!g.enabled} value={g.provider}>{g.label}{g.enabled?'':' (não configurado)'}</option>)}
@@ -55,7 +55,7 @@ export default function GlobalSettings(){
     <p className="muted">Aqui aparecem os endereços calculados pelo servidor, não o status real de entrega. O backend confirma pagamentos consultando o provedor antes de liberar acesso.</p>
     {(data.webhooks||[]).map(w=><div key={w.id} style={{borderTop:'1px solid var(--border,#ddd)',paddingTop:12,display:'grid',gap:6}}>
      <strong>{w.provider} — {w.group}</strong><code style={{overflowWrap:'anywhere'}}>{w.url||'Origem não configurada'}</code>
-     <small className="muted">{w.authentication}{w.dynamic?' · Webhook vinculado ao Master':''}</small>
+     <small className="muted">{w.authentication}{w.dynamic?' · Fluxo comercial histórico':''}</small>
      <div><button className="btn sm" type="button" disabled={!w.url||w.dynamic} onClick={()=>copy(w.url)}>Copiar URL</button></div>
     </div>)}
    </section>

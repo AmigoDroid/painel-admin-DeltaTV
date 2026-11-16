@@ -442,3 +442,16 @@ pre,code,.mono{overflow-wrap:anywhere;word-break:break-word}
 .partner-direct-actions{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
 .partner-direct-actions .btn{white-space:nowrap;min-height:36px}
 @media(max-width:720px){.partner-direct-actions{flex-direction:column;align-items:stretch}.partner-direct-actions .btn{width:100%}}
+
+/* UX audit: edição avançada recolhida, foco e áreas tocáveis */
+.partner-contract-advanced {border:1px solid var(--border,#d6dae6);border-radius:12px;padding:12px 14px;margin:12px 0;}
+.partner-contract-advanced summary {cursor:pointer;font-weight:650;min-height:32px;}
+.partner-contract-advanced[open] summary {margin-bottom:12px;}
+.nav:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible {outline:3px solid var(--accent,#6d6bff);outline-offset:2px;}
+@media (max-width:600px) {.partner-contract-advanced .row {display:grid;grid-template-columns:minmax(0,1fr);}}
+
+/* Navegação por tarefas, extras em grupo recolhível */
+:root{--deltatv-accent:#8394ff;--deltatv-radius:14px;--deltatv-font:Inter,system-ui,sans-serif}
+.nav-group>.nav[aria-expanded]{font-weight:700;justify-content:space-between;border:1px solid var(--line)}
+@media(max-width:700px){.nav{min-height:44px}.content,.main{min-width:0}.toolbar{flex-wrap:wrap}.toolbar input{min-width:0;max-width:100%}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}}
