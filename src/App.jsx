@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { api, getAuth, login, logout } from "./api.js";
 import { UiProvider, Field, useAction, BrandMark } from "./ui.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
+import NetworkWorkspace from "./pages/NetworkWorkspace.jsx";
 import AllFunctions from "./AllFunctions.jsx";
 import { resolveLegacyRoute } from "./work-areas.js";
 import { useSimpleMode } from "@deltatv/ui/useSimpleMode";
@@ -48,6 +49,7 @@ const WebAccess = () => <WebAccessPage admin />;
 
 const PAGES = {
   control: ["Central DeltaTV", Superadmin],
+  workspace: ["Minha rede", NetworkWorkspace],
   conta: ["Minha conta", ProfilePage],
   dashboard: ["Visão geral", Dashboard], vpsmonitor: ["Servidor / VPS", VpsMonitor], vpsfiles: ["Arquivos da VPS", VpsFiles],
   webaccess: ["Player Web", WebAccess], whiteLabel: ["Aplicativos white-label", WhiteLabel],
@@ -62,7 +64,7 @@ const PAGES = {
 // Menu único e direto (como no painel do parceiro): cada função abre a própria página,
 // sem passar por sub-dashboards. A mesma lista alimenta o menu lateral e a tela inicial.
 const GROUPS = [
- {label:null,items:['dashboard','control','partners']},
+ {label:null,items:['dashboard','workspace','control','partners']},
  {label:'Atendimento e operação',items:['ativar-tv','clients','devices','legados','support','unlinked']},
  {label:'Licenças e créditos',items:['licenses','credits']},
  {label:'Financeiro',items:['billing','gateways']},
@@ -78,6 +80,7 @@ const ICONS = {
   licenciamento: <><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9"/></>,
   ativacao: <><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 12l2 2 4-5"/></>,
   conta: <><circle cx="12" cy="8" r="4"/><path d="M4 21c1-8 15-8 16 0"/></>,
+  workspace: <><circle cx="12" cy="5" r="2"/><circle cx="5" cy="18" r="2"/><circle cx="19" cy="18" r="2"/><path d="M12 7v5M5 16l7-4 7 4"/></>,
   dashboard: <><rect x="3" y="3" width="7.5" height="7.5" rx="2" /><rect x="13.5" y="3" width="7.5" height="7.5" rx="2" /><rect x="3" y="13.5" width="7.5" height="7.5" rx="2" /><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2" /></>,
   vpsmonitor: <><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h10M7 13h4m3 0h3M7 17h10"/></>,
   vpsfiles: <><path d="M3 6h6l2 2h10v12H3z"/><path d="M3 10h18"/></>,
@@ -176,13 +179,13 @@ function UserMenu({ user, onAccount }) {
 function Shell({ user }) {
   const [simpleMode, setSimpleMode] = useSimpleMode("admin");
   // Itens do menu são conveniência: cada rota é protegida por permissão no backend.
-  const hidden = (k) => !adminPageAllowed(k,user) || (k === "control" && user.role !== "superadmin") || ((k === "portal-sales" || k === "service-packages" || k === "global-config" || k === "gateways" || k === "network" || k === "ativar-tv" || k === "legados") && user.role !== "superadmin") || ((k === "whiteLabel" || k === "help") && user.role !== "superadmin") || ((k === "vpsmonitor" || k === "vpsfiles" || k === "pricing" || k === "commerce3" || k === "trash") && user.role !== "superadmin") || (user.role === "support" && k === "audit") || ((k === "users" || k === "loginhistory" || k === "mail" || k === "notifications") && user.role !== "superadmin");
+  const hidden = (k) => !adminPageAllowed(k,user) || (k === "dashboard" && user.role === "admin") || (k === "control" && user.role !== "superadmin") || ((k === "portal-sales" || k === "service-packages" || k === "global-config" || k === "gateways" || k === "network" || k === "ativar-tv" || k === "legados") && user.role !== "superadmin") || ((k === "whiteLabel" || k === "help") && user.role !== "superadmin") || ((k === "vpsmonitor" || k === "vpsfiles" || k === "pricing" || k === "commerce3" || k === "trash") && user.role !== "superadmin") || (user.role === "support" && k === "audit") || ((k === "users" || k === "loginhistory" || k === "mail" || k === "notifications") && user.role !== "superadmin");
   const canOpenPage = id => Boolean(PAGES[id]) && !hidden(id);
   const allowed = id => canOpenPage(id);
   // Endereços antigos de sub-dashboards (#area/..., #pagamentos) abrem direto a função correspondente.
   const fromHash = () => {
     const id = resolveLegacyRoute(location.hash.slice(1));
-    return allowed(id) ? id : (canOpenPage('dashboard') ? 'dashboard' : 'conta');
+    return allowed(id) ? id : (canOpenPage('workspace') ? 'workspace' : canOpenPage('dashboard') ? 'dashboard' : 'conta');
   };
   const [page, setPage] = useState(fromHash);
   const [open, setOpen] = useState(false); // gaveta do menu em tela pequena
@@ -207,6 +210,7 @@ function Shell({ user }) {
   // Selos do menu: dispositivos aguardando vínculo e cadastros de revenda aguardando aprovação. Falhar aqui nunca atrapalha o painel.
   const [badges, setBadges] = useState({});
   const refreshCounts = () => {
+    if (user.role === "admin") return; // não consultar contagens globais da DeltaTV
     api("/admin/devices/unlinked", { query: { pageSize: 1 } }).then((r) => setBadges((b) => ({ ...b, unlinked: r.meta.total }))).catch(() => {});
     api("/admin/partners", { query: { status: "pending", pageSize: 1 } }).then((r) => setBadges((b) => ({ ...b, resellers: r.meta.total }))).catch(() => {});
   };
@@ -255,7 +259,7 @@ function Shell({ user }) {
           <UserMenu user={user} onAccount={() => go("conta")} />
         </div>
         <main className="content"><Breadcrumb panel="admin" current={PAGES[page][0]} onHome={()=>go("dashboard")}/>
-          <TaskFinder tasks={TASKS.filter(task => allowed(task.route))} onNavigate={go} />
+          <TaskFinder tasks={user.role === 'admin' ? [] : TASKS.filter(task => allowed(task.route))} onNavigate={go} />
           {simpleMode && page !== "dashboard" && <EasyPageGuide role="admin" page={page} onBack={() => go("dashboard")} />}
           <Current onChanged={refreshCounts} menu={homeGroups} onNavigate={go} />
         </main>

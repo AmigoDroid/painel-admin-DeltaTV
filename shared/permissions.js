@@ -29,7 +29,10 @@ const ADMIN_PAGES = {
   servermonitor: "devices:read",
 };
 export function adminPageAllowed(page, user) {
-  if (user?.role === "superadmin" || !user?.permissionRoleId) return true;
+  if (user?.role === "superadmin") return true;
+  // Administradores de rede só podem abrir o workspace isolado; jamais telas globais.
+  if (user?.role === "admin") return page === "workspace" || page === "conta";
+  if (!user?.permissionRoleId) return true;
   if (page === "conta") return true;
   const needed = ADMIN_PAGES[page];
   return Boolean(needed && user.permissions?.includes(needed));

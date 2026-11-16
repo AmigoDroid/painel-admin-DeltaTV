@@ -10,6 +10,21 @@ import { Badge, Empty, Field, Modal, PasswordInput, Pager, Table, fmtDateTime, u
  * `partnerId` fixo = aba dentro do detalhe de uma revenda.
  */
 const ROLE = { superadmin: "DeltaTV", admin: "Admin", support: "Suporte", partner: "Portal do parceiro" };
+const ADMIN_RIGHTS = [
+  ["network:dashboard:read","Visualizar resumo da própria rede"],
+  ["network:partners:read","Ver parceiros"],["network:partners:write","Cadastrar e editar parceiros"],
+  ["network:resellers:read","Ver revendas"],["network:resellers:write","Cadastrar e editar revendas"],
+  ["network:plans:read","Consultar planos"],["network:plans:write","Criar e editar planos próprios"],
+  ["network:members:read","Consultar usuários dos portais"],["network:members:write","Criar usuários dos próprios parceiros e revendas"],
+  ["network:resources:read","Consultar códigos e DNS"],["network:resources:write","Cadastrar e editar códigos e DNS"],
+  ["network:devices:read","Consultar dispositivos da rede"],
+  ["network:billing:read","Consultar cobranças da rede"],["network:billing:write","Emitir faturas da rede"],
+];
+const ADMIN_LIMITS = [
+  ["maxPartners","Máximo de parceiros"],["maxResellers","Máximo de revendas"],
+  ["maxPlans","Máximo de planos"],["maxDnsPerCode","Máximo de DNS por código"],
+  ["maxActivationsPerPartner","Máximo de ativações por parceiro"],
+];
 
 export function UsersPanel({ partnerId: fixedPartnerId }) {
   const me = getAuth()?.user;
@@ -42,7 +57,8 @@ export function UsersPanel({ partnerId: fixedPartnerId }) {
               <RowMenu items={[
                 { label: "Editar", onClick: () => setForm({ user: u }) },
                 ...(full && u.role === "partner" && u.status === "active" ? [{label:"Entrar como",onClick:()=>setImpersonating(u)}] : []),
-                ...(full && u.role !== "superadmin" ? [{label:"Papel e permissões",onClick:()=>setRoleUser(u)}] : []),
+                ...(full && u.role === "admin" ? [{label:"Abrir rede do Admin",onClick:()=>{sessionStorage.setItem("deltatv-selected-admin",u.id);location.hash="workspace";}}] : []),
+                ...(full && u.role !== "superadmin" && u.role !== "admin" ? [{label:"Papel e permissões",onClick:()=>setRoleUser(u)}] : []),
                 ...(full && u.id !== me?.id ? [{label:"Excluir usuário",danger:true,onClick:()=>setDeleting(u)}] : []),
                 ...(u.status === "active" ? [{ label: "Enviar link de redefinição de senha", onClick: () => {
                   if (window.confirm(`Enviar um link de redefinição para ${u.email}? O link expira em 30 minutos.`)) {
@@ -70,12 +86,17 @@ function UserForm({ user, me, full, fixedPartnerId, onClose, onSaved }) {
   const [f, setF] = useState({
     name: user?.name || "", email: user?.email || "", role: user?.role || (full && !fixedPartnerId ? "admin" : "partner"),
     partnerId: user?.partnerId || fixedPartnerId || "", status: user?.status || "active", password: "",
+    delegatedPermissions: user?.delegatedPermissions || [], networkLimits: user?.networkLimits || {},
   });
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   const isPartner = f.role === "partner";
   const roleLocked = !full || !!fixedPartnerId || self;
   const submit = async () => {
     const body = { name: f.name, email: f.email, role: f.role, partnerId: isPartner ? f.partnerId : null, status: f.status };
+    if (f.role === "admin" && full) {
+      body.delegatedPermissions = f.delegatedPermissions;
+      body.networkLimits = f.networkLimits;
+    }
     if (f.password) body.password = f.password;
     if (!edit) { body.password = f.password; if (!isPartner) delete body.partnerId; if (isPartner && !body.partnerId) return; delete body.status; }
     const r = await run(() => api(edit ? `/admin/users/${user.id}` : "/admin/users", { method: edit ? "PATCH" : "POST", body }), "Usuário salvo.");
@@ -92,6 +113,23 @@ function UserForm({ user, me, full, fixedPartnerId, onClose, onSaved }) {
           <Field label="Revenda / parceiro"><PartnerPicker value={f.partnerId} onChange={(v) => setF((f) => ({ ...f, partnerId: v }))} /></Field>
         )}
       </div>
+      {full && f.role === "admin" && <section className="card" style={{padding:16,display:"grid",gap:12}}>
+        <h3>Permissões deste Admin</h3>
+        <p className="muted">A DeltaTV controla cada função. Recursos não autorizados ficam ocultos e suas APIs retornam 403. Gestão da VPS e configurações globais são sempre exclusivas da DeltaTV.</p>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(225px,1fr))",gap:10}}>
+          {ADMIN_RIGHTS.map(([permission,label])=><label key={permission} style={{display:"flex",alignItems:"center",gap:8}}>
+            <input type="checkbox" checked={f.delegatedPermissions.includes(permission)} onChange={e=>setF(v=>({...v,
+              delegatedPermissions:e.target.checked?[...v.delegatedPermissions,permission]:v.delegatedPermissions.filter(p=>p!==permission)}))}/>{label}
+          </label>)}
+        </div>
+        <h4>Limites desta rede</h4>
+        <p className="muted">Vazio significa sem limite definido. A DeltaTV pode alterar esses valores quando quiser.</p>
+        <div className="row">
+          {ADMIN_LIMITS.map(([key,label])=><Field key={key} label={label}><input type="number" min="0" step="1"
+            value={f.networkLimits[key]??""} placeholder="Sem limite"
+            onChange={e=>setF(v=>({...v,networkLimits:{...v.networkLimits,[key]:e.target.value===""?null:Number(e.target.value)}}))}/></Field>)}
+        </div>
+      </section>}
       {edit && <Field label="Status" hint={self ? "Você não pode desativar a própria conta." : "Desativar encerra as sessões abertas do usuário."}><select value={f.status} onChange={set("status")} disabled={self}><option value="active">Ativo</option><option value="disabled">Desativado</option></select></Field>}
       <Field label={edit ? "Nova senha (deixe vazio para manter)" : "Senha inicial (mín. 12 caracteres)"} hint={edit ? "Ao trocar senha, função, revenda ou e-mail, as sessões abertas do usuário são encerradas." : undefined}>
         <PasswordInput value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} />
