@@ -151,7 +151,7 @@ function UserForm({ user, me, full, fixedPartnerId, onClose, onSaved }) {
             </select></Field>)}
         </div>}
         {isAdmin && f.partnerId && <div className="notice" role="status">O Admin poderá entrar também nos portais operacionais da conta vinculada, com o mesmo e-mail e senha. Ao salvar, a DeltaTV transfere a gestão desta conta para a rede dele, sem transferir outros parceiros, planos ou recursos globais.</div>}
-        <p className="muted">A DeltaTV controla cada função. Recursos não autorizados ficam ocultos e suas APIs retornam 403. Gestão da VPS e configurações globais são sempre exclusivas da DeltaTV.</p>
+        <p className="muted">O Admin utiliza o mesmo painel da DeltaTV nas funcionalidades autorizadas, com dados limitados à sua própria rede. O acesso às APIs globais, à VPS e às configurações centrais permanece exclusivo da DeltaTV. Funcionalidades ainda sem versão isolada não serão liberadas até serem adaptadas.</p>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(225px,1fr))",gap:10}}>
           {ADMIN_RIGHTS.map(([permission,label])=><label key={permission} style={{display:"flex",alignItems:"center",gap:8}}>
             <input type="checkbox" checked={f.delegatedPermissions.includes(permission)} onChange={e=>setF(v=>({...v,

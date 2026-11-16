@@ -9,8 +9,9 @@ const guard = readFileSync(new URL("../../backend/src/db/schema-preflight.js", i
 
 test("Lixeira aparece no menu só para o superadmin", () => {
   assert.match(app, /trash: \["Lixeira", PartnerTrash\]/);
-  assert.match(app, /user\.role !== "superadmin"/);
-  assert.match(app, /k === "trash"/);
+  const permissions=readFileSync(new URL("../shared/permissions.js",import.meta.url),"utf8");
+  assert.doesNotMatch(permissions, /trash:\s*\{permission:/);
+  assert.match(permissions, /if \(user\?\.role === "superadmin"\) return true/);
   assert.match(app, /EXTRA_GROUPS/);
   assert.match(app, /items:\s*\[[^\]]*['"]vpsmonitor['"][^\]]*['"]vpsfiles['"][^\]]*['"]trash['"]/);
 });

@@ -1,6 +1,6 @@
 import {Breadcrumb,PlatformBrand} from "../shared/PanelExperience.jsx";
 import Superadmin from "./pages/Superadmin.jsx";
-import { panelAllows, adminPageAllowed } from "../shared/permissions.js";
+import { panelAllows, adminPageAllowed, adminScopedView } from "../shared/permissions.js";
 import TaskFinder from "@deltatv/ui/TaskFinder";
 import { TASKS } from "./task-directory.js";
 import { connectRealtime } from "./realtime.js";
@@ -57,22 +57,22 @@ const PAGES = {
   "ativar-tv": ["Ativar TV", LicenseActivation], licenses: ["Licenças das TVs", Licenses], devices: ["TVs e dispositivos", Devices], unlinked: ["TVs sem configuração", Unlinked],
   partners: ["Gerenciar parceiros", Partners], servermonitor: ["Qualidade dos servidores", ServerMonitor], sources: ["Fontes globais de conteúdo", Sources],
   resellers: ["Revendas", Resellers], network: ["Rede de distribuição", DistributionNetwork], "portal-sales": ["Gerenciar parceiros", Partners], support: ["Resolver problema da TV", () => <SupportCenter base="/admin" />], trash: ["Lixeira", PartnerTrash], clients: ["Clientes", Clients], credits: ["Créditos", Credits], downloads: ["Downloads e links", Downloads],
-  billing: ["Financeiro", Billing], gateways: ["Gateways de pagamento", PaymentGateways], pix: ["Pix (legado)", Pix], pricing: ["Gerenciar parceiros", Partners], "service-packages": ["Gerenciar parceiros", Partners], "global-config": ["Configurações Globais", GlobalSettings], commerce3: ["Planos SaaS e comissões", Commerce3],
+  billing: ["Financeiro", Billing], gateways: ["Gateways de pagamento", PaymentGateways], pix: ["Pix (legado)", Pix], pricing: ["Planos e recursos", Partners], "service-packages": ["Gerenciar parceiros", Partners], "global-config": ["Configurações Globais", GlobalSettings], commerce3: ["Planos SaaS e comissões", Commerce3],
   help: ["Central de Ajuda", HelpManagement], users: ["Usuários", Users], loginhistory: ["Histórico de login", LoginHistory], notifications: ["Notificações", Notifications], mail: ["E-mails", Mail], audit: ["Auditoria", Audit],
 };
 
 // Menu único e direto (como no painel do parceiro): cada função abre a própria página,
 // sem passar por sub-dashboards. A mesma lista alimenta o menu lateral e a tela inicial.
 const GROUPS = [
- {label:null,items:['dashboard','workspace','partners','resellers','devices']},
- {label:'Operação',items:['licenses','billing','support']},
+ {label:null,items:['dashboard','workspace','partners','resellers','pricing','devices']},
+ {label:'Operação',items:['licenses','billing','sources','support']},
  {label:'Administração',items:['users','global-config']},
 ];
 // Ferramentas avançadas continuam acessíveis sem poluir a navegação principal.
 // As permissões e as rotas permanecem iguais às da versão anterior.
 const EXTRA_GROUPS = [
  {label:'Operações avançadas',items:['control','ativar-tv','clients','legados','unlinked','credits','network']},
- {label:'Aplicativos e DNS',items:['whiteLabel','webaccess','downloads','sources','servermonitor']},
+ {label:'Aplicativos e DNS',items:['whiteLabel','webaccess','downloads','servermonitor']},
  {label:'Infraestrutura e auditoria',items:['gateways','vpsmonitor','vpsfiles','trash','loginhistory','audit','notifications','mail','help','conta']},
 ];
 
@@ -186,15 +186,24 @@ function UserMenu({ user, onAccount }) {
 function Shell({ user }) {
   const [simpleMode, setSimpleMode] = useSimpleMode("admin");
   // Itens do menu são conveniência: cada rota é protegida por permissão no backend.
-  const hidden = (k) => !adminPageAllowed(k,user) || (k === "dashboard" && user.role === "admin") || (k === "control" && user.role !== "superadmin") || ((k === "portal-sales" || k === "service-packages" || k === "global-config" || k === "gateways" || k === "network" || k === "ativar-tv" || k === "legados") && user.role !== "superadmin") || ((k === "whiteLabel" || k === "help") && user.role !== "superadmin") || ((k === "vpsmonitor" || k === "vpsfiles" || k === "pricing" || k === "commerce3" || k === "trash") && user.role !== "superadmin") || (user.role === "support" && k === "audit") || ((k === "users" || k === "loginhistory" || k === "mail" || k === "notifications") && user.role !== "superadmin");
+  // As opções dos Admins são permitidas pelo mesmo catálogo e aparecem na mesma navegação.
+  // APIs globais não são expostas: módulos delegáveis abrem sua versão isolada por rede.
+  const hidden = (k) => !adminPageAllowed(k,user) ||
+    (user.role === "support" && k === "audit");
   const canOpenPage = id => Boolean(PAGES[id]) && !hidden(id);
   const allowed = id => canOpenPage(id);
   // Endereços antigos de sub-dashboards (#area/..., #pagamentos) abrem direto a função correspondente.
   const fromHash = () => {
     const id = resolveLegacyRoute(location.hash.slice(1));
-    return allowed(id) ? id : (canOpenPage('workspace') ? 'workspace' : canOpenPage('dashboard') ? 'dashboard' : 'conta');
+    return allowed(id) ? id : (canOpenPage('dashboard') ? 'dashboard' : canOpenPage('workspace') ? 'workspace' : 'conta');
   };
   const [page, setPage] = useState(fromHash);
+  const permissionsFingerprint = (user.delegatedPermissions || user.permissions || []).join('|');
+  useEffect(() => {
+    if (!canOpenPage(page)) setPage(fromHash());
+    // Reavaliar menus, deep links e página aberta ao receber permissões novas.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [permissionsFingerprint, user.role]);
   const [open, setOpen] = useState(false); // gaveta do menu em tela pequena
   const [moreTools,setMoreTools] = useState(false);
   useEffect(() => { if (location.hash.slice(1) !== page) location.hash = page; }, [page]);
@@ -204,9 +213,10 @@ function Shell({ user }) {
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user.role]);
+  }, [user.role, permissionsFingerprint]);
   const Current = PAGES[page]?.[1] || Dashboard;
-  const go = (k) => { setPage(k); setOpen(false); window.scrollTo(0, 0); };
+  const adminView = user.role === "admin" ? adminScopedView(page) : null;
+  const go = (k) => { if (!allowed(k)) return; setPage(k); setOpen(false); window.scrollTo(0, 0); };
   // Esc fecha a gaveta; ao voltar para tela grande ela não fica "aberta" escondida.
   useEffect(() => {
     if (!open) return undefined;
@@ -275,7 +285,9 @@ function Shell({ user }) {
         <main className="content"><Breadcrumb panel="admin" current={PAGES[page][0]} onHome={()=>go(canOpenPage('dashboard')?'dashboard':'workspace')}/>
           <TaskFinder tasks={TASKS.filter(task => allowed(task.route))} onNavigate={go} />
           {simpleMode && page !== "dashboard" && <EasyPageGuide role="admin" page={page} onBack={() => go("dashboard")} />}
-          <Current onChanged={refreshCounts} menu={homeGroups} onNavigate={go} />
+          {user.role === "admin" ?
+            <NetworkWorkspace key={page} section={adminView || "workspace"} onNavigate={go} /> :
+            <Current onChanged={refreshCounts} menu={homeGroups} onNavigate={go} />}
         </main>
       </div>
     </div>

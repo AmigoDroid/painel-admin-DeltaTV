@@ -26,17 +26,29 @@ function ErrorMessage({message}){return message?<div className="notice error" ro
 function StatusMessage({message}){return message?<div className="notice" role="status">{message}</div>:null;}
 const between=(min,max)=>value=>Number.isInteger(Number(value))&&Number(value)>=min&&Number(value)<=max;
 
-export default function NetworkWorkspace(){
+const SECTION_TABS = Object.freeze({
+  partners:"partners",resellers:"resellers",plans:"plans",devices:"partners",
+  resources:"partners",billing:"partners",members:"partners",
+});
+const SECTION_NAMES = Object.freeze({
+  dashboard:"Visão geral",workspace:"Minha rede",partners:"Parceiros",resellers:"Revendas",
+  plans:"Planos e recursos",resources:"DNS e códigos",devices:"TVs e dispositivos",
+  billing:"Financeiro da rede",members:"Usuários dos portais",
+});
+export default function NetworkWorkspace({section="workspace", onNavigate}){
  const viewer=useMemo(()=>getAuth()?.user,[]);
  const central=viewer?.role==="superadmin";
  const permissions=permsOf(viewer);
  const permits=key=>central||permissions.has(key);
  const [admins,setAdmins]=useState([]);
  const [adminId,setAdminId]=useState(()=>central?sessionStorage.getItem("deltatv-selected-admin")||"":"");
- const [tab,setTab]=useState(()=>central || permissions.has('network:partners:read') ? 'partners' :
+ const [tab,setTab]=useState(()=>SECTION_TABS[section] || (
+   central || permissions.has('network:partners:read') ? 'partners' :
    permissions.has('network:resellers:read') ? 'resellers' :
-   permissions.has('network:plans:read') ? 'plans' : 'partners');
+   permissions.has('network:plans:read') ? 'plans' : 'partners'));
  const [overview,setOverview]=useState(null),[plans,setPlans]=useState([]),[partners,setPartners]=useState([]);
+ const scopedSection=section !== "workspace" && section !== "dashboard";
+ const selectedArea=section === "devices" ? "devices" : section === "billing" ? "billing" : "resources";
  const [selected,setSelected]=useState(null);
  const [planForm,setPlanForm]=useState(null),[accountForm,setAccountForm]=useState(null),[editingAccount,setEditingAccount]=useState(null);
  const [newUser,setNewUser]=useState(null);
@@ -61,8 +73,10 @@ export default function NetworkWorkspace(){
    if(permits("network:dashboard:read"))jobs.push(request("summary").then(v=>{if(requestGeneration.current===generation)setOverview(v);}));
    if(permits("network:plans:read"))jobs.push(request("plans").then(v=>{if(requestGeneration.current===generation)setPlans(v.data||[]);}));
    if(permits('network:partners:write'))jobs.push(request('invitations').then(v=>{if(requestGeneration.current===generation)setInvitations(v.data||[]);}));
-   if(permits("network:partners:read")||permits("network:resellers:read"))
-     jobs.push(request("partners",{query:{pageSize:20,page,q:search,kind:tab==="plans"?undefined:tab==="resellers"?"reseller":"content"}})
+   if(permits("network:partners:read")||permits("network:resellers:read")||
+      permits("network:devices:read")||permits("network:resources:read")||
+      permits("network:billing:read")||permits("network:members:read"))
+     jobs.push(request("partners",{query:{pageSize:20,page,q:search,kind:tab==="plans"?undefined:tab==="resellers"?"reseller":scopedSection&&tab==="partners"&&section!=="partners"?undefined:"content"}})
        .then(v=>{if(requestGeneration.current===generation){setPartners(v.data||[]);setPageMeta(v.meta||null);}}));
    const failures=await Promise.allSettled(jobs);
    const first=failures.find(x=>x.status==="rejected");if(first&&requestGeneration.current===generation)setError(first.reason?.message||"Falha ao carregar a rede.");
@@ -75,7 +89,11 @@ export default function NetworkWorkspace(){
    finally{setBusy(false);}
  };
  const initialTab=tab==="plans"?"network:plans:read":tab==="resellers"?"network:resellers:read":"network:partners:read";
- const visibleAccounts=partners.filter(p=>(tab==="resellers"?["reseller","both"].includes(p.kind):["content","both"].includes(p.kind)));
+ const sectionPermission=section==="devices"?"network:devices:read":section==="resources"?"network:resources:read":
+   section==="billing"?"network:billing:read":section==="members"?"network:members:read":initialTab;
+ const canBrowse=permits(sectionPermission);
+ const visibleAccounts=partners.filter(p=>(tab==="resellers"?["reseller","both"].includes(p.kind):
+   (section==="devices"||section==="resources"||section==="billing"||section==="members") ? true : ["content","both"].includes(p.kind)));
  const openPartner=async p=>{
    const generation=requestGeneration.current;
    setError("");try{const d=await request(`partners/${p.id}`);if(requestGeneration.current===generation)setSelected(d);}
@@ -141,7 +159,11 @@ export default function NetworkWorkspace(){
    </section>;
  };
  return <div className="workspace-admin-page" style={{display:"grid",gap:18}}>
-  <div className="page-head"><h2>{central?"Administração das redes":"Minha rede"}</h2><p className="muted">Parceiros, revendas, planos e usuários da sua rede. Os dados de outras administrações não ficam disponíveis.</p></div>
+  <div className="page-head"><h2>{central?"Administração das redes":SECTION_NAMES[section]||"Minha rede"}</h2>
+    <p className="muted">{section==="dashboard"?"Acompanhe os números e acesse as ferramentas liberadas para sua rede.":
+       section==="devices"||section==="resources"||section==="billing"||section==="members"?
+         "Selecione uma conta da sua rede para acessar os dados e ações autorizados.":
+         "Todos os registros nesta página pertencem à sua rede. Os dados da DeltaTV e de outros Admins ficam separados."}</p></div>
   {central&&<div className="card" style={{padding:16}}>{field("Admin responsável pela rede",<select value={adminId} onChange={e=>{requestGeneration.current++;setAdminId(e.target.value);setPage(1);setQ("");setPartners([]);setPlans([]);setPageMeta(null);setOverview(null);setSelected(null);}}><option value="">Selecione uma rede</option><option value="deltatv">DeltaTV — rede principal</option>{admins.map(a=><option key={a.id} value={a.id}>{a.name} — {a.email}</option>)}</select>)}</div>}
   {!central && permissions.size === 0 && <div className="card" role="status" style={{padding:20,display:"grid",gap:8}}>
     <h3>Permissões de administração ainda não configuradas</h3>
@@ -153,12 +175,21 @@ export default function NetworkWorkspace(){
      {[{label:"Parceiros",value:overview.partners},{label:"Revendas",value:overview.resellers},{label:"Planos",value:overview.plans}].map(x=><div className="card" key={x.label} style={{padding:16}}><small>{x.label}</small><h2>{x.value}</h2></div>)}
    </div>}
    <ErrorMessage message={error}/><StatusMessage message={success}/>
-   <div className="toolbar" style={{display:"flex",flexWrap:"wrap",gap:8}}>
-     {[["partners","Parceiros","network:partners:read"],["resellers","Revendas","network:resellers:read"],["plans","Planos e recursos","network:plans:read"]]
+   {section === "dashboard" && <div className="card" style={{padding:20,display:"grid",gap:12}}>
+     <h3>Gerenciar sua rede</h3><p className="muted">Abra diretamente a ferramenta desejada. Somente opções autorizadas pela DeltaTV aparecem.</p>
+     <div className="actions" style={{flexWrap:"wrap"}}>{[
+       ["partners","Parceiros","network:partners:read"],["resellers","Revendas","network:resellers:read"],
+       ["pricing","Planos e recursos","network:plans:read"],["sources","DNS e códigos","network:resources:read"],
+       ["devices","Dispositivos","network:devices:read"],["billing","Financeiro","network:billing:read"],
+       ["users","Usuários","network:members:read"],
+     ].filter(x=>permits(x[2])).map(([page,label])=><button type="button" className="btn" key={page} onClick={()=>onNavigate?.(page)}>{label}</button>)}</div>
+   </div>}
+   {section !== "dashboard" && <div className="toolbar" style={{display:"flex",flexWrap:"wrap",gap:8}}>
+     {section === "workspace" && [["partners","Parceiros","network:partners:read"],["resellers","Revendas","network:resellers:read"],["plans","Planos e recursos","network:plans:read"]]
        .filter(x=>permits(x[2])).map(([key,name])=><button key={key} className={`btn ${tab===key?"primary":""}`} onClick={()=>{setTab(key);setPage(1);setSelected(null);setEditingAccount(null);setPlanForm(null);}}>{name}</button>)}
      <button className="btn" onClick={()=>void reload()}>Atualizar</button>
-   </div>
-   {tab==="plans"&&permits("network:plans:read")&&<>
+   </div>}
+   {section !== "dashboard" && tab==="plans"&&permits("network:plans:read")&&<>
      {permits("network:plans:write")&&<div><button className="btn primary" onClick={()=>setPlanForm(blankPlan())}>Novo plano</button></div>}
      {planForm&&<div className="card" style={{display:"grid",gap:12,padding:20}}>
        <h3>{planForm.key?"Editar plano":"Novo plano"}</h3>
@@ -176,12 +207,12 @@ export default function NetworkWorkspace(){
        {plans.length?<table className="table"><thead><tr><th>Plano</th><th>Tipo</th><th>Preço mensal</th><th>DNS</th><th>Ativações</th><th>Validade</th><th>Gerenciar</th></tr></thead><tbody>{plans.map(p=><tr key={p.key}><td>{p.name}</td><td>{p.audience}</td><td>{currency(p.monthlyPriceCents)}</td><td>{p.maxServers??"Sem limite"}</td><td>{p.activationLimit??"Sem limite"}</td><td>{p.validityDays??30} dias</td><td>{permits("network:plans:write")&&<button className="btn sm" onClick={()=>setPlanForm({key:p.key,name:p.name,description:p.description,audience:p.audience,monthlyPrice:(p.monthlyPriceCents/100).toFixed(2),maxServers:String(p.maxServers??""),noDnsLimit:p.maxServers==null,activationLimit:String(p.activationLimit??''),noActivationLimit:p.activationLimit==null,validityDays:String(p.validityDays??30),autoFailover:p.autoFailover,autoPriority:p.autoPriority,emailAlerts:p.emailAlerts,detailedHistory:p.detailedHistory})}>Editar</button>}</td></tr>)}</tbody></table>:<p className="muted">Nenhum plano criado nesta rede.</p>}
      </div>
    </>}
-   {tab!=="plans"&&permits(initialTab)&&<>
-     {!editingAccount&&!accountForm&&permits(tab==="resellers"?"network:resellers:write":"network:partners:write")&&<div className="actions">
+   {section !== "dashboard" && tab!=="plans"&&canBrowse&&<>
+     {(section==="workspace"||section==="partners"||section==="resellers")&&!editingAccount&&!accountForm&&permits(tab==="resellers"?"network:resellers:write":"network:partners:write")&&<div className="actions">
        <button className="btn primary" onClick={()=>{setAccountForm(blankAccount(tab==="resellers"?"reseller":"content"));setInviteForm(null);setSelected(null);}}>Novo {tab==="resellers"?"revendedor":"parceiro"}</button>
        {tab==='partners'&&<button className="btn" onClick={()=>{setInviteForm(blankInvite());setAccountForm(null);setEditingAccount(null);setInviteResult(null);}}>Enviar convite</button>}
      </div>}
-     {tab==='partners'&&inviteForm&&<div className="card" style={{padding:20,maxWidth:640,display:'grid',gap:12}}>
+     {(section==="workspace"||section==="partners")&&tab==='partners'&&inviteForm&&<div className="card" style={{padding:20,maxWidth:640,display:'grid',gap:12}}>
        <h3>Convidar parceiro</h3><p className="muted">Escolha o plano e informe o e-mail. O convidado cria a conta e entra automaticamente na sua rede, com os recursos do plano.</p>
        {field('E-mail do destinatário',<input type="email" value={inviteForm.email} onChange={e=>setInviteForm({...inviteForm,email:e.target.value})}/>)}
        {field('Plano do convite',<select value={inviteForm.planKey} onChange={e=>setInviteForm({...inviteForm,planKey:e.target.value})}>
@@ -190,13 +221,13 @@ export default function NetworkWorkspace(){
        <label><input type="checkbox" checked={inviteForm.sendEmail} onChange={e=>setInviteForm({...inviteForm,sendEmail:e.target.checked})}/> Enviar por e-mail (requer SMTP configurado)</label>
        <div className="actions"><button className="btn" onClick={()=>setInviteForm(null)}>Cancelar</button><button className="btn primary" disabled={busy||!inviteForm.planKey||!inviteForm.email.includes('@')} onClick={issueInvite}>Gerar convite</button></div>
      </div>}
-     {tab==='partners'&&inviteResult?.url&&<div className="card" role="status" style={{padding:16,maxWidth:640}}>
+     {(section==="workspace"||section==="partners")&&tab==='partners'&&inviteResult?.url&&<div className="card" role="status" style={{padding:16,maxWidth:640}}>
        <strong>Convite criado</strong>{inviteResult.warning&&<p className="muted">{inviteResult.warning}</p>}
        <label className="field">Link de cadastro<input readOnly value={inviteResult.url} onFocus={e=>e.target.select()}/></label>
        <button className="btn primary" onClick={()=>navigator.clipboard?.writeText(inviteResult.url).then(()=>setSuccess('Link copiado.')).catch(()=>setError('Selecione e copie o link manualmente.'))}>Copiar link</button>
        <p className="muted">Válido por 72 horas e utilizável uma vez.</p>
      </div>}
-     {tab==='partners'&&invitations.length>0&&<details className="card" style={{padding:14}}><summary>Convites emitidos ({invitations.length})</summary>
+     {(section==="workspace"||section==="partners")&&tab==='partners'&&invitations.length>0&&<details className="card" style={{padding:14}}><summary>Convites emitidos ({invitations.length})</summary>
        <div style={{display:'grid',gap:8,marginTop:12}}>{invitations.map(inv=><div className="row" key={inv.id} style={{justifyContent:'space-between',flexWrap:'wrap'}}>
          <span>{inv.email} · {plans.find(p=>p.key===inv.planKey)?.name||'Plano'} · {inv.acceptedAt?'Concluído':inv.revokedAt?'Revogado':new Date(inv.expiresAt)<new Date()?'Expirado':'Pendente'}</span>
          {!inv.acceptedAt&&!inv.revokedAt&&<button className="btn sm" disabled={busy} onClick={()=>act(()=>request(`invitations/${inv.id}/revoke`,{method:'POST'}),'Convite revogado.')}>Revogar</button>}
@@ -204,8 +235,8 @@ export default function NetworkWorkspace(){
      {accountForm&&renderAccountForm(accountForm,setAccountForm)}
      {editingAccount&&renderAccountForm(editingAccount,setEditingAccount,true)}
      <div className="card" style={{padding:16}}>
-       <div className="row" style={{justifyContent:"space-between",alignItems:"center"}}><h3>{tab==="resellers"?"Minhas revendas":"Meus parceiros"}</h3><input aria-label="Buscar contas nesta rede" placeholder="Buscar nesta rede" value={q} onChange={e=>setQ(e.target.value)}/></div>
-       {visibleAccounts.length?<table className="table"><thead><tr><th>Empresa</th><th>Mensalidade</th><th>Vencimento</th><th>Status</th><th>Ações</th></tr></thead><tbody>{visibleAccounts.map(p=><tr key={p.id}><td>{p.name}</td><td>{currency(p.monthlyFeeCents)}</td><td>{new Date(p.endsAt).toLocaleDateString("pt-BR")}</td><td>{p.status}</td><td><button className="btn sm" onClick={()=>openPartner(p)}>Gerenciar</button></td></tr>)}</tbody></table>:<p className="muted">Nenhuma conta corresponde à pesquisa nesta rede.</p>}
+       <div className="row" style={{justifyContent:"space-between",alignItems:"center"}}><h3>{section==="devices"||section==="resources"||section==="billing"||section==="members"?"Contas da minha rede":tab==="resellers"?"Minhas revendas":"Meus parceiros"}</h3><input aria-label="Buscar contas nesta rede" placeholder="Buscar nesta rede" value={q} onChange={e=>setQ(e.target.value)}/></div>
+       {visibleAccounts.length?<table className="table"><thead><tr><th>Empresa</th><th>Mensalidade</th><th>Vencimento</th><th>Status</th><th>Ações</th></tr></thead><tbody>{visibleAccounts.map(p=><tr key={p.id}><td>{p.name}</td><td>{p.monthlyFeeCents == null ? "—" : currency(p.monthlyFeeCents)}</td><td>{p.endsAt ? new Date(p.endsAt).toLocaleDateString("pt-BR") : "—"}</td><td>{p.status}</td><td><button className="btn sm" onClick={()=>openPartner(p)}>Gerenciar</button></td></tr>)}</tbody></table>:<p className="muted">Nenhuma conta corresponde à pesquisa nesta rede.</p>}
        {pageMeta&&<nav className="row" aria-label="Páginas de contas" style={{justifyContent:"space-between",marginTop:12,flexWrap:"wrap"}}>
          <span className="muted">{pageMeta.total} conta(s) · página {pageMeta.page} de {Math.max(1,pageMeta.totalPages)}</span>
          <div className="actions"><button className="btn sm" disabled={page<=1||busy} onClick={()=>setPage(x=>Math.max(1,x-1))}>Anterior</button>
@@ -214,7 +245,7 @@ export default function NetworkWorkspace(){
      </div>
      {selected&&<div className="card" style={{padding:20,display:"grid",gap:12}}>
        <h3>{selected.partner.name}</h3>
-       <p>Plano: {plans.find(p=>p.key===selected.plan?.tier)?.name||selected.plan?.tier||"Não definido"} · Ativações: {selected.contract?.activationLimit??"Sem limite"}</p>
+       {(selected.plan || selected.contract) && <p>Plano: {plans.find(p=>p.key===selected.plan?.tier)?.name||selected.plan?.tier||"Não informado"} · Ativações: {selected.contract?.activationLimit ?? "Sem limite"}</p>}
        <div className="actions"><button className="btn" onClick={()=>setSelected(null)}>Fechar</button>
          {permits(selected.partner.kind==="reseller"?"network:resellers:write":"network:partners:write")&&<button className="btn primary" onClick={editPartner}>Editar contrato</button>}
          {selected.partner.statusReason==='awaiting_payment'&&permits('network:billing:write')&&permits('network:partners:write')&&
@@ -233,7 +264,7 @@ export default function NetworkWorkspace(){
        </div>}
        {selected.users?.length>0&&<><h4>Usuários do painel</h4>{selected.users.map(u=><div key={u.id} className="row" style={{justifyContent:"space-between"}}><span>{u.name} · {u.email} · {u.status}</span>{permits("network:members:write")&&<button className="btn sm" onClick={()=>void act(()=>request(`partners/${selected.partner.id}/users/${u.id}`,{method:"PATCH",body:{status:u.status==="active"?"disabled":"active"}}),"Acesso atualizado.").then(()=>openPartner(selected.partner))}>{u.status==="active"?"Desativar":"Ativar"}</button>}</div>)}</>}
        {(permits("network:resources:read")||permits("network:devices:read")||permits("network:billing:read"))&&
-          <NetworkResources key={selected.partner.id} account={selected.partner} request={request} permits={permits}/>}
+          <NetworkResources key={`${selected.partner.id}-${section}`} account={selected.partner} request={request} permits={permits} initialArea={selectedArea}/>}
        {newUser&&<div style={{display:"grid",gap:8}}><h4>Novo usuário do portal</h4><div className="row">{field("Nome",<input value={newUser.name} onChange={e=>setNewUser({...newUser,name:e.target.value})}/>)}{field("E-mail",<input type="email" value={newUser.email} onChange={e=>setNewUser({...newUser,email:e.target.value})}/>)}{field("Senha",<input type="password" value={newUser.password} onChange={e=>setNewUser({...newUser,password:e.target.value})}/>)}</div><div className="actions"><button className="btn" onClick={()=>setNewUser(null)}>Cancelar</button><button className="btn primary" disabled={busy||newUser.password.length<12} onClick={async()=>{const ok=await act(()=>request(`partners/${selected.partner.id}/users`,{method:"POST",body:newUser}),"Usuário criado.");if(ok){setNewUser(null);openPartner(selected.partner);}}}>Salvar usuário</button></div></div>}
      </div>}
    </>}
@@ -243,8 +274,8 @@ export default function NetworkWorkspace(){
 
 // Recursos operacionais sempre associados à conta selecionada e ao Admin titular.
 // Nenhuma chamada dessa seção usa endpoints globais da DeltaTV.
-function NetworkResources({account,request,permits}){
- const [area,setArea]=useState("resources"),[dns,setDns]=useState([]),[codes,setCodes]=useState([]),
+function NetworkResources({account,request,permits,initialArea="resources"}){
+ const [area,setArea]=useState(initialArea),[dns,setDns]=useState([]),[codes,setCodes]=useState([]),
    [devices,setDevices]=useState([]),[invoices,setInvoices]=useState([]),
    [providerForm,setProviderForm]=useState(null),[codeForm,setCodeForm]=useState(null),
    [competence,setCompetence]=useState(new Date().toISOString().slice(0,7)),

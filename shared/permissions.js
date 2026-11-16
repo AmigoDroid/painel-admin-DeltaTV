@@ -28,10 +28,31 @@ const ADMIN_PAGES = {
   audit: "audit:read",
   servermonitor: "devices:read",
 };
+// Páginas compartilhadas com a DeltaTV que já possuem leitura/escrita isoladas por rede.
+// Uma página ausente daqui continua indisponível para Admins até ter API tenant-safe.
+export const ADMIN_SCOPED_PAGES = Object.freeze({
+  dashboard: {permission:"network:dashboard:read", view:"dashboard"},
+  workspace: {permission:null, view:"workspace"},
+  partners: {permission:"network:partners:read", view:"partners"},
+  resellers: {permission:"network:resellers:read", view:"resellers"},
+  pricing: {permission:"network:plans:read", view:"plans"},
+  "service-packages": {permission:"network:plans:read", view:"plans"},
+  users: {permission:"network:members:read", view:"members"},
+  sources: {permission:"network:resources:read", view:"resources"},
+  devices: {permission:"network:devices:read", view:"devices"},
+  billing: {permission:"network:billing:read", view:"billing"},
+});
+export const adminScopedView = page => ADMIN_SCOPED_PAGES[page]?.view ?? null;
+
 export function adminPageAllowed(page, user) {
   if (user?.role === "superadmin") return true;
-  // Administradores de rede só podem abrir o workspace isolado; jamais telas globais.
-  if (user?.role === "admin") return page === "workspace" || page === "conta";
+  // O menu é espelhado, mas TODA página de Admin usa somente /admin/workspace.
+  // Não confundir permissão com liberação de rotas globais da DeltaTV.
+  if (user?.role === "admin") {
+    if (page === "conta") return true;
+    const entry = ADMIN_SCOPED_PAGES[page];
+    return Boolean(entry && (!entry.permission || user.delegatedPermissions?.includes(entry.permission)));
+  }
   if (!user?.permissionRoleId) return true;
   if (page === "conta") return true;
   const needed = ADMIN_PAGES[page];
