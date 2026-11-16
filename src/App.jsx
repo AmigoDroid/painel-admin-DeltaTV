@@ -27,6 +27,8 @@ import Sources from "./pages/Sources.jsx";
 import Billing from "./pages/Billing.jsx";
 import Pix from "./pages/Pix.jsx";
 import PaymentGateways from "./pages/PaymentGateways.jsx";
+import ServicePackages from "./pages/ServicePackages.jsx";
+import GlobalSettings from "./pages/GlobalSettings.jsx";
 import Credits from "./pages/Credits.jsx";
 import DistributionNetwork from "./pages/DistributionNetwork.jsx";
 import PortalSales from "./pages/PortalSales.jsx";
@@ -56,7 +58,7 @@ const PAGES = {
   "ativar-tv": ["Ativar TV", LicenseActivation], licenses: ["Licenças das TVs", Licenses], devices: ["TVs e dispositivos", Devices], unlinked: ["TVs sem configuração", Unlinked],
   partners: ["Parceiros", Partners], servermonitor: ["Qualidade dos servidores", ServerMonitor], sources: ["Fontes globais de conteúdo", Sources],
   resellers: ["Revendas", Resellers], network: ["Rede de distribuição", DistributionNetwork], "portal-sales": ["Venda do Painel do Parceiro", PortalSales], support: ["Resolver problema da TV", () => <SupportCenter base="/admin" />], trash: ["Lixeira", PartnerTrash], clients: ["Clientes", Clients], credits: ["Créditos", Credits], downloads: ["Downloads e links", Downloads],
-  billing: ["Financeiro", Billing], gateways: ["Gateways de pagamento", PaymentGateways], pix: ["Pix (legado)", Pix], pricing: ["Planos e valores", PlansAndPricing], commerce3: ["Planos SaaS e comissões", Commerce3],
+  billing: ["Financeiro", Billing], gateways: ["Gateways de pagamento", PaymentGateways], pix: ["Pix (legado)", Pix], pricing: ["Planos e valores legados", PlansAndPricing], "service-packages": ["Pacotes de Serviço", ServicePackages], "global-config": ["Configurações Globais", GlobalSettings], commerce3: ["Planos SaaS e comissões", Commerce3],
   help: ["Central de Ajuda", HelpManagement], users: ["Usuários", Users], loginhistory: ["Histórico de login", LoginHistory], notifications: ["Notificações", Notifications], mail: ["E-mails", Mail], audit: ["Auditoria", Audit],
 };
 
@@ -65,11 +67,11 @@ const PAGES = {
 const GROUPS = [
  {label:null,items:['dashboard','control']},
  {label:'Atendimento e operação',items:['ativar-tv','clients','devices','legados','support','unlinked']},
- {label:'Planos e licenças',items:['commerce3','licenses','pricing','credits']},
+ {label:'Planos e licenças',items:['service-packages','commerce3','licenses','credits']},
  {label:'Financeiro',items:['billing','gateways']},
  {label:'Rede comercial',items:['portal-sales','resellers','partners','network']},
  {label:'Aplicativos e servidores',items:['whiteLabel','webaccess','downloads','sources','servermonitor']},
- {label:'Administração',items:['vpsmonitor','vpsfiles','trash','help','users','loginhistory','notifications','mail','audit','conta']},
+ {label:'Administração',items:['vpsmonitor','vpsfiles','trash','global-config','help','users','loginhistory','notifications','mail','audit','conta']},
 ];
 
 // Ícones do menu (traço simples, herdam a cor do texto).
@@ -177,7 +179,7 @@ function UserMenu({ user, onAccount }) {
 function Shell({ user }) {
   const [simpleMode, setSimpleMode] = useSimpleMode("admin");
   // Itens do menu são conveniência: cada rota é protegida por permissão no backend.
-  const hidden = (k) => !adminPageAllowed(k,user) || (k === "control" && user.role !== "superadmin") || ((k === "portal-sales" || k === "gateways" || k === "network" || k === "ativar-tv" || k === "legados") && user.role !== "superadmin") || ((k === "whiteLabel" || k === "help") && user.role !== "superadmin") || ((k === "vpsmonitor" || k === "vpsfiles" || k === "pricing" || k === "commerce3" || k === "trash") && user.role !== "superadmin") || (user.role === "support" && k === "audit") || ((k === "users" || k === "loginhistory" || k === "mail" || k === "notifications") && user.role !== "superadmin");
+  const hidden = (k) => !adminPageAllowed(k,user) || (k === "control" && user.role !== "superadmin") || ((k === "portal-sales" || k === "service-packages" || k === "global-config" || k === "gateways" || k === "network" || k === "ativar-tv" || k === "legados") && user.role !== "superadmin") || ((k === "whiteLabel" || k === "help") && user.role !== "superadmin") || ((k === "vpsmonitor" || k === "vpsfiles" || k === "pricing" || k === "commerce3" || k === "trash") && user.role !== "superadmin") || (user.role === "support" && k === "audit") || ((k === "users" || k === "loginhistory" || k === "mail" || k === "notifications") && user.role !== "superadmin");
   const canOpenPage = id => Boolean(PAGES[id]) && !hidden(id);
   const allowed = id => canOpenPage(id);
   // Endereços antigos de sub-dashboards (#area/..., #pagamentos) abrem direto a função correspondente.

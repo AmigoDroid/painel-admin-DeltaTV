@@ -11,6 +11,7 @@ import CodeModal, { CodeEditModal } from "./CodeModal.jsx";
 import { StockAdmin } from "./Stock.jsx";
 import ContentContract from "./ContentContract.jsx";
 import ServicePlan from "./ServicePlan.jsx";
+import PartnerPackage from "./PartnerPackage.jsx";
 import { Badge, DeliveryBadge, accessStatus, Empty, Field, LoadError, Modal, Pager, Table, dateInput, fmtDate, fmtDateTime, fmtMoney, spDateToIso, toCents, useAction, useDebounced, useList, useLoad, useUi, RowMenu } from "../ui.jsx";
 
 // Mesmo texto gravado pelo back-end no autocadastro de revendedor (ver reseller-signup.service.js).
@@ -324,9 +325,10 @@ function PartnerDetail({ id, onClose, onChanged }) {
   const what = p.kind === "content" ? "parceria" : "revenda";
   const tabList = [
     ...(p.kind !== "content" ? [["stock", "Estoque de licenças"]] : []),
+    ...(p.kind !== "reseller" && role === "superadmin" ? [["package", "Pacote de Serviço"]] : []),
     ["clients", "Clientes e avisos"],
-    ...(p.kind !== "reseller" ? [["commercial", "Contrato de conteúdo"]] : []),
-    ["service-plan", "Plano de recursos"],
+    ...(p.kind === "reseller" ? [["service-plan", "Plano de recursos"]] : []),
+    ...(p.kind !== "reseller" && role === "superadmin" ? [["legacy-plan", "Configurações legadas"]] : []),
     ["codes", "Códigos"], ["providers", "Servidores IPTV"], ["devices", "Dispositivos"],
     ...(p.billingModel !== "none" || p.invoices.length ? [["invoices", "Mensalidades"]] : []),
     ...(["superadmin", "admin"].includes(role) ? [["users", "Usuários do portal"]] : []),
@@ -375,7 +377,8 @@ function PartnerDetail({ id, onClose, onChanged }) {
       </div>
       {deleteItem&&<DeletionDialog kind={deleteItem.kind} item={deleteItem.item} url={deleteItem.url} onClose={()=>setDeleteItem(null)} onDeleted={()=>{setDeleteItem(null);load();onChanged()}}/>}
       <div className="tabs">{tabList.map(([k, n]) => <button key={k} className={`tab ${cur === k ? "active" : ""}`} onClick={() => setTab(k)}>{n}</button>)}</div>
-      {cur === "commercial" && <ContentContract partnerId={id} onSaved={() => { load(); onChanged(); }} />}
+      {cur === "package" && <PartnerPackage partnerId={id} onSaved={() => { load(); onChanged(); }} />}
+      {cur === "legacy-plan" && <details><summary>Contrato e recursos anteriores — somente para migração</summary><ContentContract partnerId={id} onSaved={() => {load();onChanged();}}/><ServicePlan partnerId={id}/></details>}
       {cur === "service-plan" && <ServicePlan partnerId={id} />}
       {cur === "codes" && <>
         <div className="actions left"><button className="btn primary" onClick={() => setNewCode(true)}>Novo código</button></div>

@@ -63,6 +63,12 @@ function ResellerBillingEditor({ partner, onSaved }) {
 function ContractModal({ partner, onClose, reload }) {
   const [tab, setTab] = useState("commercial");
   const content = partner.kind !== "reseller";
+  if(content)return <Modal wide title={`Pacote de Serviço · ${partner.name}`} onClose={onClose}>
+   <p className="muted">Os benefícios e limites deste parceiro são administrados na central de Pacotes de Serviço, não nesta tela de planos de TV.</p>
+   <a className="btn primary" href="#partners" onClick={onClose}>Abrir cadastro de parceiros</a>
+   <a className="btn" href="#service-packages" onClick={onClose}>Central de Pacotes de Serviço</a>
+   <details><summary>Consultar contrato legado</summary><ContentContract partnerId={partner.id}/><ServicePlan partnerId={partner.id}/></details>
+  </Modal>;
   return <Modal wide title={`Condições · ${partner.name}`} onClose={onClose}>
     <div className="tabs" role="tablist" aria-label="Detalhes do contrato">
       <button type="button" className={`tab ${tab === "commercial" ? "active" : ""}`} onClick={() => setTab("commercial")}>{content ? "Contrato e valores" : "Cobrança da revenda"}</button>
@@ -262,11 +268,15 @@ export default function PlansAndPricing() {
   return <div className="pricing-page">
     <div className="page-head"><div><h2>Planos e valores</h2><p className="muted page-sub">Uma visão central dos recursos, contratos de parceiros e preços das licenças.</p></div></div>
     <div className="tabs pricing-tabs" role="tablist" aria-label="Planos e valores">
-      {[["contracts", "Contratos e mensalidades"], ["tiers", "Planos de recursos"], ["prices", "Preços das licenças"]].map(([id, label]) =>
+      {[["contracts", "Contratos e mensalidades"], ["tiers", "Pacotes de Serviço"], ["prices", "Preços das licenças"]].map(([id, label]) =>
         <button key={id} type="button" className={`tab ${tab === id ? "active" : ""}`} onClick={() => setTab(id)}>{label}</button>)}
     </div>
     {tab === "contracts" && <ContractList />}
-    {tab === "tiers" && <CatalogPlans />}
+    {tab === "tiers" && <section className="panel" style={{padding:22,display:'grid',gap:12}}>
+      <h3>Pacotes de Serviço do Painel do Parceiro</h3><p>O catálogo de DNS, ativações e benefícios agora é configurado em uma só página.</p>
+      <a href="#service-packages" className="btn primary">Abrir Pacotes de Serviço</a>
+      <details><summary>Planos técnicos antigos — manutenção de contas legadas</summary><CatalogPlans/></details>
+     </section>}
     {tab === "prices" && <LicensePrices />}
   </div>;
 }

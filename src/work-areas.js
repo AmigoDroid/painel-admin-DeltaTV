@@ -17,12 +17,12 @@ export const WORK_AREAS = {
   'area/planos': {id:'area/planos',label:'Planos e licenças',icon:'licenses',description:'Gerencie os planos SaaS e o licenciamento das TVs sem misturar operações financeiras.',items:[
     {id:'commerce3',page:'commerce3',tab:'plans',label:'Planos SaaS',description:'Catálogo de assinaturas e franquias dos Masters',icon:'commerce3'},
     {id:'area/planos/contratos',page:'commerce3',tab:'contracts',label:'Contratos dos Masters',description:'Consultar e associar planos a contas',icon:'commerce3'},
-    {id:'pricing',page:'pricing',label:'Preços e condições',description:'Tabela comercial e políticas de preços',icon:'pricing'},
+    {id:'service-packages',page:'service-packages',label:'Pacotes de Serviço',description:'DNS, ativações e benefícios do Painel do Parceiro',icon:'pricing'},
     {id:'licenses',page:'licenses',label:'Licenças das TVs',description:'Consultar, renovar e supervisionar licenças',icon:'licenses'},
   ]},
   'area/financeiro': {id:'area/financeiro',label:'Financeiro',icon:'billing',description:'Um único local para cobranças, saldos, créditos e pagamentos Pix.',items:[
     {id:'billing',page:'billing',label:'Faturas e financeiro',description:'Cobranças, vencimentos e relatórios',icon:'billing'},
-    {id:'gateways',page:'gateways',label:'Gateways de pagamento',description:'Padrão, webhooks e cobranças Pix',icon:'pix'},
+    {id:'gateways',page:'gateways',label:'Cobranças e Pix legado',description:'Consulta histórica, sem duplicar configurações',icon:'pix'},
     {id:'pix',page:'pix',label:'Pagamentos Pix (legado)',description:'Acesso preservado para rotas antigas',icon:'pix'},
     {id:'credits',page:'credits',label:'Créditos comerciais',description:'Saldos e movimentações de créditos',icon:'credits'},
   ]},
@@ -38,6 +38,7 @@ export const WORK_AREAS = {
     {id:'vpsfiles',page:'vpsfiles',label:'Arquivos da VPS',description:'Ferramentas avançadas de arquivos',icon:'vpsfiles'},
   ]},
   'area/administracao': {id:'area/administracao',label:'Administração',icon:'users',description:'Controle de usuários, auditoria, lixeira e comunicação administrativa.',items:[
+    {id:'global-config',page:'global-config',label:'Configurações Globais',description:'Gateways, webhooks, teste grátis, Player Web e custos',icon:'users'},
     {id:'users',page:'users',label:'Usuários e acessos',description:'Controle de contas administrativas',icon:'users'},
     {id:'audit',page:'audit',label:'Auditoria',description:'Eventos e ações da plataforma',icon:'audit'},
     {id:'trash',page:'trash',label:'Lixeira',description:'Recuperação e exclusão definitiva',icon:'trash'},
