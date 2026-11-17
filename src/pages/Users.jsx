@@ -14,7 +14,7 @@ const ADMIN_RIGHTS = [
   ["network:dashboard:read","Visualizar resumo da própria rede"],
   ["network:partners:read","Ver parceiros"],["network:partners:write","Cadastrar e editar parceiros"],["network:partners:delete","Excluir parceiros da própria rede"],
   ["network:resellers:read","Ver revendas"],["network:resellers:write","Cadastrar e editar revendas"],["network:resellers:delete","Excluir revendas da própria rede"],
-  ["network:plans:read","Consultar planos"],["network:plans:write","Criar e editar planos próprios"],
+  ["network:plans:read","Consultar planos"],["network:plans:write","Criar, editar e excluir planos próprios"],
   ["network:members:read","Consultar usuários dos portais"],["network:members:write","Criar usuários dos próprios parceiros e revendas"],
   ["network:resources:read","Consultar códigos e DNS"],["network:resources:write","Cadastrar e editar códigos e DNS"],
   ["network:devices:read","Consultar dispositivos da rede"],["network:devices:write","Bloquear, desbloquear e remover ativações da rede"],

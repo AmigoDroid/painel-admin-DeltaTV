@@ -8,7 +8,7 @@ const LABELS={
  "network:dashboard:read":"Visão geral",
  "network:partners:read":"Ver parceiros", "network:partners:write":"Cadastrar/editar parceiros", "network:partners:delete":"Excluir parceiros",
  "network:resellers:read":"Ver revendas", "network:resellers:write":"Cadastrar/editar revendas", "network:resellers:delete":"Excluir revendas",
- "network:plans:read":"Consultar planos", "network:plans:write":"Criar e editar planos",
+ "network:plans:read":"Consultar planos", "network:plans:write":"Criar, editar e excluir planos",
  "network:members:read":"Consultar usuários", "network:members:write":"Cadastrar usuários do portal",
  "network:resources:read":"Ver códigos e DNS", "network:resources:write":"Editar códigos e DNS",
  "network:devices:read":"Ver dispositivos", "network:devices:write":"Gerenciar ativações de TVs", "network:billing:read":"Ver faturas", "network:billing:write":"Emitir faturas",
@@ -55,7 +55,8 @@ export default function NetworkWorkspace({section="workspace", onNavigate}){
  const scopedSection=section !== "workspace" && section !== "dashboard";
  const selectedArea=section === "devices" ? "devices" : section === "billing" ? "billing" : "resources";
  const [selected,setSelected]=useState(null);
- const [planForm,setPlanForm]=useState(null),[accountForm,setAccountForm]=useState(null),[editingAccount,setEditingAccount]=useState(null);
+ const [deletingPlan,setDeletingPlan]=useState(null),[planDeletePreview,setPlanDeletePreview]=useState(null),[planDeleteReason,setPlanDeleteReason]=useState(""),[planDeleteConfirmation,setPlanDeleteConfirmation]=useState(""),
+ [planForm,setPlanForm]=useState(null),[accountForm,setAccountForm]=useState(null),[editingAccount,setEditingAccount]=useState(null);
  const [newUser,setNewUser]=useState(null),[editUser,setEditUser]=useState(null),[deleteUser,setDeleteUser]=useState(null),[userDeleteReason,setUserDeleteReason]=useState(""),[userDeleteConfirm,setUserDeleteConfirm]=useState("");
  const [deletePreview,setDeletePreview]=useState(null),[deleteReason,setDeleteReason]=useState(''),[deleteConfirmation,setDeleteConfirmation]=useState('');
  const [paymentReference,setPaymentReference]=useState(''),[confirmingPayment,setConfirmingPayment]=useState(false);
@@ -142,6 +143,16 @@ export default function NetworkWorkspace({section="workspace", onNavigate}){
     emailAlerts:f.emailAlerts,detailedHistory:f.detailedHistory};
    const ok=await act(()=>request(f.key?`plans/${f.key}`:"plans",{method:f.key?"PUT":"POST",body}),"Plano salvo para esta rede.");
    if(ok)setPlanForm(null);
+ };
+ const previewPlanDeletion=async plan=>{
+   setError("");setPlanDeletePreview(null);setPlanDeleteReason("");setPlanDeleteConfirmation("");setDeletingPlan(plan);
+   try{setPlanDeletePreview(await request(`plans/${plan.key}/deletion-preview`));}
+   catch(e){setDeletingPlan(null);setError(e?.message||"Falha ao consultar vínculos do plano.");}
+ };
+ const confirmPlanDeletion=async()=>{
+   if(!deletingPlan||planDeleteConfirmation!==deletingPlan.name||planDeleteReason.trim().length<5)return;
+   const ok=await act(()=>request(`plans/${deletingPlan.key}`,{method:"DELETE",body:{confirmation:planDeleteConfirmation,reason:planDeleteReason.trim()}}),"Plano excluído da gestão desta rede.");
+   if(ok){setDeletingPlan(null);setPlanDeletePreview(null);setPlanForm(null);}
  };
  const savePartner=async()=>{
    const f=editingAccount||accountForm,edit=Boolean(editingAccount);
@@ -246,9 +257,17 @@ export default function NetworkWorkspace({section="workspace", onNavigate}){
        <div className="actions"><button className="btn" onClick={()=>setPlanForm(null)}>Cancelar</button><button className="btn primary" disabled={busy||!planForm.name} onClick={savePlan}>Salvar plano</button></div>
      </div>}
      <div className="card" style={{padding:16}}><h3>Planos desta rede</h3>
-       {plans.length?<table className="table"><thead><tr><th>Plano</th><th>Tipo</th><th>Preço mensal</th><th>DNS</th><th>Ativações</th><th>Validade</th><th>Gerenciar</th></tr></thead><tbody>{plans.map(p=><tr key={p.key}><td>{p.name}</td><td>{p.audience}</td><td>{currency(p.monthlyPriceCents)}</td><td>{p.maxServers??"Sem limite"}</td><td>{p.activationLimit??"Sem limite"}</td><td>{p.validityDays??30} dias · {p.active?"Ativo":"Inativo"}</td><td>{permits("network:plans:write")&&<div className="actions"><button className="btn sm" onClick={()=>setPlanForm({key:p.key,name:p.name,description:p.description,audience:p.audience,monthlyPrice:(p.monthlyPriceCents/100).toFixed(2),maxServers:String(p.maxServers??""),noDnsLimit:p.maxServers==null,activationLimit:String(p.activationLimit??''),noActivationLimit:p.activationLimit==null,validityDays:String(p.validityDays??30),autoFailover:p.autoFailover,autoPriority:p.autoPriority,emailAlerts:p.emailAlerts,detailedHistory:p.detailedHistory})}>Editar</button><button className="btn sm" disabled={busy} onClick={()=>void act(()=>request(`plans/${p.key}`,{method:"PUT",body:{active:!p.active}}),p.active?"Plano desativado.":"Plano reativado.")}>{p.active?"Desativar":"Reativar"}</button></div>}</td></tr>)}</tbody></table>:<p className="muted">Nenhum plano criado nesta rede.</p>}
+       {plans.length?<table className="table"><thead><tr><th>Plano</th><th>Tipo</th><th>Preço mensal</th><th>DNS</th><th>Ativações</th><th>Validade</th><th>Gerenciar</th></tr></thead><tbody>{plans.map(p=><tr key={p.key}><td>{p.name}</td><td>{p.audience}</td><td>{currency(p.monthlyPriceCents)}</td><td>{p.maxServers??"Sem limite"}</td><td>{p.activationLimit??"Sem limite"}</td><td>{p.validityDays??30} dias · {p.active?"Ativo":"Inativo"}</td><td>{permits("network:plans:write")&&<div className="actions"><button className="btn sm" onClick={()=>setPlanForm({key:p.key,name:p.name,description:p.description,audience:p.audience,monthlyPrice:(p.monthlyPriceCents/100).toFixed(2),maxServers:String(p.maxServers??""),noDnsLimit:p.maxServers==null,activationLimit:String(p.activationLimit??''),noActivationLimit:p.activationLimit==null,validityDays:String(p.validityDays??30),autoFailover:p.autoFailover,autoPriority:p.autoPriority,emailAlerts:p.emailAlerts,detailedHistory:p.detailedHistory})}>Editar</button><button className="btn sm" disabled={busy} onClick={()=>void act(()=>request(`plans/${p.key}`,{method:"PUT",body:{active:!p.active}}),p.active?"Plano desativado.":"Plano reativado.")}>{p.active?"Desativar":"Reativar"}</button><button className="btn sm" disabled={busy} onClick={()=>void previewPlanDeletion(p)}>Excluir</button></div>}</td></tr>)}</tbody></table>:<p className="muted">Nenhum plano criado nesta rede.</p>}
      </div>
    </>}
+   {deletingPlan&&<div className="card" role="dialog" aria-modal="true" aria-label="Excluir plano" style={{padding:20,display:"grid",gap:12}}>
+     <h3>Excluir plano: {deletingPlan.name}</h3>
+     {planDeletePreview?<><p>{planDeletePreview.warning}</p><p>Contas vinculadas: {planDeletePreview.accounts} · Convites históricos: {planDeletePreview.invitations}</p></>:<p>Consultando os vínculos...</p>}
+     {field("Motivo da exclusão",<input value={planDeleteReason} onChange={e=>setPlanDeleteReason(e.target.value)} placeholder="Informe o motivo (mínimo de 5 caracteres)"/>)}
+     {field(`Digite ${deletingPlan.name} para confirmar`,<input value={planDeleteConfirmation} onChange={e=>setPlanDeleteConfirmation(e.target.value)} autoComplete="off"/>)}
+     <div className="actions"><button className="btn" onClick={()=>{setDeletingPlan(null);setPlanDeletePreview(null);}}>Cancelar</button>
+       <button className="btn danger" disabled={busy||!planDeletePreview||planDeleteReason.trim().length<5||planDeleteConfirmation!==deletingPlan.name} onClick={()=>void confirmPlanDeletion()}>Confirmar exclusão</button></div>
+   </div>}
    {section !== "dashboard" && section!=="audit" && showWorkspaceManager && tab!=="plans"&&canBrowse&&<>
      {(section==="workspace"||section==="partners"||section==="resellers")&&!editingAccount&&!accountForm&&permits(tab==="resellers"?"network:resellers:write":"network:partners:write")&&<div className="actions">
        <button className="btn primary" onClick={()=>{setAccountForm(blankAccount(tab==="resellers"?"reseller":"content"));setInviteForm(null);setSelected(null);}}>Novo {tab==="resellers"?"revendedor":"parceiro"}</button>
