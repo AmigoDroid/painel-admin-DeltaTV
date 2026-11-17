@@ -50,6 +50,7 @@ const WebAccess = () => <WebAccessPage admin />;
 const PAGES = {
   control: ["Central DeltaTV", Superadmin],
   workspace: ["Minha rede", NetworkWorkspace],
+  invitations: ["Links de convite", () => <NetworkWorkspace section="invitations" />],
   conta: ["Minha conta", ProfilePage],
   dashboard: ["Visão geral", Dashboard], vpsmonitor: ["Servidor / VPS", VpsMonitor], vpsfiles: ["Arquivos da VPS", VpsFiles],
   webaccess: ["Player Web", WebAccess], whiteLabel: ["Aplicativos white-label", WhiteLabel],
@@ -64,7 +65,7 @@ const PAGES = {
 // Menu único e direto (como no painel do parceiro): cada função abre a própria página,
 // sem passar por sub-dashboards. A mesma lista alimenta o menu lateral e a tela inicial.
 const GROUPS = [
- {label:null,items:['dashboard','workspace','partners','resellers','pricing','devices']},
+ {label:null,items:['dashboard','workspace','partners','resellers','pricing','invitations','devices']},
  {label:'Operação',items:['licenses','billing','sources','support']},
  {label:'Administração',items:['users','global-config']},
 ];
@@ -94,6 +95,7 @@ const ICONS = {
   commerce3: <><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 10h10M7 14h8"/></>,
   "portal-sales": <><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M7 12h10M7 16h6"/></>,
   network: <><circle cx="12" cy="5" r="2"/><circle cx="5" cy="18" r="2"/><circle cx="19" cy="18" r="2"/><path d="M12 7v5M5 16l7-4 7 4"/></>,
+  invitations: <><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 8 9 6 9-6"/></>,
   resellers: <><path d="M4 9l1.5-5h13L20 9" /><path d="M4 9a2.5 2.5 0 005 0 2.5 2.5 0 005 0 2.5 2.5 0 005 0" /><path d="M5 12v8h14v-8M10 20v-5h4v5" /></>,
   clients: <><circle cx="12" cy="8" r="4" /><path d="M4 21c.8-4 4-6 8-6s7.2 2 8 6" /></>,
   support: <><circle cx="10" cy="10" r="7"/><path d="m15 15 6 6M7 10h6M10 7v6"/></>,

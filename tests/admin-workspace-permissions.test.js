@@ -14,6 +14,14 @@ test("Admin autorizado vê as mesmas seções delegáveis, sem acesso global ou 
    assert.equal(adminPageAllowed(page,admin),false,page);
  assert.equal(adminPageAllowed("vpsmonitor",{role:"superadmin",id:"d"}),true);
 });
+test("Permissão específica de convite e exclusão fica disponível somente quando concedida",()=>{
+ const admin={role:"admin",id:"a",delegatedPermissions:["network:partners:write","network:partners:delete"]};
+ assert.equal(adminPageAllowed("invitations",admin),true);
+ assert.equal(adminScopedView("invitations"),"invitations");
+ assert.equal(adminPageAllowed("vpsmonitor",admin),false);
+ assert.equal(adminPageAllowed("vpsfiles",admin),false);
+ assert.equal(adminPageAllowed("billing",admin),false);
+});
 test("Permissão revogada oculta seu módulo de imediato",()=>{
  const admin={role:"admin",id:"a",delegatedPermissions:["network:partners:read"]};
  assert.equal(adminPageAllowed("partners",admin),true);

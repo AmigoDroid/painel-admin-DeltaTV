@@ -33,6 +33,7 @@ const ADMIN_PAGES = {
 export const ADMIN_SCOPED_PAGES = Object.freeze({
   dashboard: {permission:"network:dashboard:read", view:"dashboard"},
   workspace: {permission:null, view:"workspace"},
+  invitations: {permission:"network:partners:write", view:"invitations"},
   partners: {permission:"network:partners:read", view:"partners"},
   resellers: {permission:"network:resellers:read", view:"resellers"},
   pricing: {permission:"network:plans:read", view:"plans"},
@@ -41,6 +42,7 @@ export const ADMIN_SCOPED_PAGES = Object.freeze({
   sources: {permission:"network:resources:read", view:"resources"},
   devices: {permission:"network:devices:read", view:"devices"},
   billing: {permission:"network:billing:read", view:"billing"},
+  audit: {permission:"network:audit:read", view:"audit"},
 });
 export const adminScopedView = page => ADMIN_SCOPED_PAGES[page]?.view ?? null;
 
@@ -50,9 +52,11 @@ export function adminPageAllowed(page, user) {
   // Não confundir permissão com liberação de rotas globais da DeltaTV.
   if (user?.role === "admin") {
     if (page === "conta") return true;
+    if (page === "invitations") return Boolean(user.delegatedPermissions?.includes('network:partners:write')||user.delegatedPermissions?.includes('network:resellers:write'));
     const entry = ADMIN_SCOPED_PAGES[page];
     return Boolean(entry && (!entry.permission || user.delegatedPermissions?.includes(entry.permission)));
   }
+  if (page === "invitations") return false; // somente DeltaTV ou Admin delegado
   if (!user?.permissionRoleId) return true;
   if (page === "conta") return true;
   const needed = ADMIN_PAGES[page];
