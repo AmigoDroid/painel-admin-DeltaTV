@@ -61,7 +61,7 @@ export default function NetworkWorkspace({section="workspace", onNavigate}){
  const [paymentReference,setPaymentReference]=useState(''),[confirmingPayment,setConfirmingPayment]=useState(false);
  const [inviteForm,setInviteForm]=useState(null),[inviteResult,setInviteResult]=useState(null),
   [invitations,setInvitations]=useState([]),[invitePage,setInvitePage]=useState(1),[inviteMeta,setInviteMeta]=useState(null),
-  [registrations,setRegistrations]=useState(null);
+  [registrations,setRegistrations]=useState(null),[editingInvite,setEditingInvite]=useState(null);
  const [q,setQ]=useState(""),[search,setSearch]=useState(""),[page,setPage]=useState(1),[pageMeta,setPageMeta]=useState(null),
    [busy,setBusy]=useState(false),[error,setError]=useState(""),[success,setSuccess]=useState("");
  const requestGeneration=useRef(0);
@@ -254,7 +254,7 @@ export default function NetworkWorkspace({section="workspace", onNavigate}){
        <button className="btn primary" onClick={()=>{setAccountForm(blankAccount(tab==="resellers"?"reseller":"content"));setInviteForm(null);setSelected(null);}}>Novo {tab==="resellers"?"revendedor":"parceiro"}</button>
        {tab==='partners'&&<button className="btn" onClick={()=>{onNavigate?.('invitations');setInviteForm(blankInvite());setAccountForm(null);setEditingAccount(null);setInviteResult(null);}}>Gerar link de convite</button>}
      </div>}
-     {(section==="invitations" || section==="workspace" || section==="partners")&&tab==='partners'&&(permits('network:partners:write')||permits('network:resellers:write'))&&<section className="card" style={{padding:20,maxWidth:720,display:'grid',gap:12}}>
+     {(section==="invitations" || section==="workspace" || section==="partners")&&tab==='partners'&&(permits('network:partners:write')||permits('network:resellers:write'))&&<section className="card network-invite-panel" style={{padding:20,display:'grid',gap:12}}>
        <div><h3>Links de convite por plano</h3><p className="muted">Escolha o plano e gere um link para compartilhar por WhatsApp ou onde preferir. O cliente se cadastra na sua rede; o plano determina preço, DNS, ativações e prazo.</p></div>
        {!inviteForm&&<button type="button" className="btn primary" onClick={()=>{setInviteForm(blankInvite(permits('network:partners:write')?'content':'reseller'));setInviteResult(null);}}>Novo link de convite</button>}
        {inviteForm&&<>
@@ -286,12 +286,22 @@ export default function NetworkWorkspace({section="workspace", onNavigate}){
          <button className="btn primary" onClick={()=>{if(!navigator.clipboard){setError('Selecione e copie o link manualmente.');return;}navigator.clipboard.writeText(inviteResult.url).then(()=>setSuccess('Link copiado.')).catch(()=>setError('Selecione e copie manualmente.'));}}>Copiar link</button>
          <p className="muted">Guarde o link: por segurança, o token completo só é exibido agora. É possível gerar outros links para planos diferentes.</p>
        </div>}
-       {invitations.length>0&&<div style={{display:'grid',gap:8}}><h4>Links gerados ({invitations.length})</h4>
-         {invitations.map(inv=><div key={inv.id} className="row" style={{justifyContent:'space-between',flexWrap:'wrap',borderTop:'1px solid var(--border,#334155)',paddingTop:10}}>
-           <span>{inv.kind==='reseller'?'Revenda':'Parceiro'} · {inv.label||inv.email||'Link compartilhável'} · {invitePlans.find(p=>p.key===inv.planKey)?.name||inv.planKey} · {inv.useCount||0} uso(s){inv.maxUses==null?' / ilimitado':` / ${inv.maxUses}`} · {inv.revokedAt?'Revogado':inv.remainingUses===0||new Date(inv.expiresAt)<new Date()?'Encerrado':'Ativo'}</span>
-           <span className="actions"><button className="btn sm" onClick={async()=>{try{const r=await request(`invitations/${inv.id}/registrations`);setRegistrations({id:inv.id,label:inv.label||inv.email||'Link compartilhável',data:r.data||[],meta:r.meta||null});}catch(e){setError(e.message);}}}>Ver cadastros</button>
+       {<div className="network-invite-list"><div className="network-invite-header"><h4>Links gerados ({inviteMeta?.total ?? invitations.length})</h4><span className="muted">Controle dos convites emitidos para sua rede</span></div>{invitations.length===0&&<p className="muted">Nenhum link emitido nesta rede.</p>}
+         {invitations.map(inv=><div key={inv.id} className="network-invite-row">
+           <span className="network-invite-summary">{inv.kind==='reseller'?'Revenda':'Parceiro'} · {inv.label||inv.email||'Link compartilhável'} · {invitePlans.find(p=>p.key===inv.planKey)?.name||inv.planKey} · {inv.useCount||0} uso(s){inv.maxUses==null?' / ilimitado':` / ${inv.maxUses}`} · {inv.revokedAt?'Revogado':inv.remainingUses===0||new Date(inv.expiresAt)<new Date()?'Encerrado':'Ativo'}</span>
+           <span className="actions network-invite-actions"><button className="btn sm" onClick={async()=>{try{const r=await request(`invitations/${inv.id}/registrations`);setRegistrations({id:inv.id,label:inv.label||inv.email||'Link compartilhável',data:r.data||[],meta:r.meta||null});}catch(e){setError(e.message);}}}>Ver cadastros</button>
+           <button className="btn sm" disabled={busy||Boolean(inv.revokedAt)} onClick={()=>setEditingInvite({id:inv.id,label:inv.label||'',maxUses:inv.maxUses,validityDays:7,useCount:inv.useCount||0,email:inv.email})}>Editar</button>
+           <button className="btn sm" disabled={busy||Boolean(inv.revokedAt)||inv.remainingUses===0||new Date(inv.expiresAt)<=new Date()} onClick={async()=>{if(!window.confirm('Gerar outro endereço? O link anterior deixará de funcionar imediatamente.'))return;setBusy(true);try{const r=await request(`invitations/${inv.id}/rotate`,{method:'POST'});setInviteResult({url:r.url});setSuccess('Link substituído. Copie o novo endereço abaixo.');await reload();}catch(e){setError(e.message)}finally{setBusy(false)}}}>Novo endereço</button>
+           <button className="btn sm" disabled={busy} onClick={async()=>{if(!window.confirm('Apagar este link? Ele será revogado imediatamente e os cadastros já efetuados serão preservados.'))return;await act(()=>request(`invitations/${inv.id}`,{method:'DELETE'}),'Convite excluído.');}}>Apagar</button>
            {!inv.revokedAt&&inv.remainingUses!==0&&new Date(inv.expiresAt)>new Date()&&<button className="btn sm" disabled={busy} onClick={()=>act(()=>request(`invitations/${inv.id}/revoke`,{method:'POST'}),'Link revogado.')}>Revogar</button>}</span>
          </div>)}</div>}
+       {editingInvite&&<div className="card" style={{padding:16,display:'grid',gap:10}}><h4>Editar convite</h4>
+         {field('Identificação',<input maxLength={120} value={editingInvite.label} onChange={e=>setEditingInvite({...editingInvite,label:e.target.value})}/>)}
+         {field('Prorrogar validade a partir de hoje (dias)',<input type="number" min="1" max="90" value={editingInvite.validityDays} onChange={e=>setEditingInvite({...editingInvite,validityDays:Number(e.target.value)})}/>)}
+         {field('Total de cadastros permitido',<select disabled={Boolean(editingInvite.email)} value={editingInvite.maxUses===null?'unlimited':String(editingInvite.maxUses)} onChange={e=>setEditingInvite({...editingInvite,maxUses:e.target.value==='unlimited'?null:Number(e.target.value)})}>{[1,5,10,25,100,1000].filter(n=>n>=editingInvite.useCount).map(n=><option key={n} value={n}>{n}</option>)}<option value="unlimited">Ilimitado</option></select>)}
+         <p className="muted">O plano e o destinatário permanecem vinculados ao convite original. Alterações não modificam cadastros concluídos.</p>
+         <div className="actions"><button className="btn" onClick={()=>setEditingInvite(null)}>Cancelar</button><button className="btn primary" disabled={busy||!Number.isInteger(editingInvite.validityDays)||editingInvite.validityDays<1||editingInvite.validityDays>90} onClick={async()=>{const f=editingInvite;const ok=await act(()=>request(`invitations/${f.id}`,{method:'PATCH',body:{label:f.label,validityDays:f.validityDays,maxUses:f.maxUses}}),'Convite atualizado.');if(ok)setEditingInvite(null)}}>Salvar alterações</button></div>
+       </div>}
        {registrations&&<div className="card" style={{padding:14,display:'grid',gap:8}}><div className="row" style={{justifyContent:'space-between'}}>
          <h4>Cadastros: {registrations.label}</h4><button className="btn sm" onClick={()=>setRegistrations(null)}>Fechar</button></div>
          {registrations.data.length?registrations.data.map(row=><div className="row" key={row.partnerId||row.email+row.createdAt} style={{justifyContent:'space-between'}}>
@@ -311,9 +321,9 @@ export default function NetworkWorkspace({section="workspace", onNavigate}){
      </section>}
      {accountForm&&renderAccountForm(accountForm,setAccountForm)}
      {editingAccount&&renderAccountForm(editingAccount,setEditingAccount,true)}
-     {section!=="invitations"&&<div className="card" style={{padding:16}}>
+     {section!=="invitations"&&<div className="card network-partner-panel" style={{padding:16}}>
        <div className="row" style={{justifyContent:"space-between",alignItems:"center"}}><h3>{section==="devices"||section==="resources"||section==="billing"||section==="members"?"Contas da minha rede":tab==="resellers"?"Minhas revendas":"Meus parceiros"}</h3><input aria-label="Buscar contas nesta rede" placeholder="Buscar nesta rede" value={q} onChange={e=>setQ(e.target.value)}/></div>
-       {visibleAccounts.length?<table className="table"><thead><tr><th>Empresa</th><th>Mensalidade</th><th>Vencimento</th><th>Status</th><th>Ações</th></tr></thead><tbody>{visibleAccounts.map(p=><tr key={p.id}><td>{p.name}</td><td>{p.monthlyFeeCents == null ? "—" : currency(p.monthlyFeeCents)}</td><td>{p.endsAt ? new Date(p.endsAt).toLocaleDateString("pt-BR") : "—"}</td><td>{p.status}</td><td><button className="btn sm" onClick={()=>openPartner(p)}>Gerenciar</button></td></tr>)}</tbody></table>:<p className="muted">Nenhuma conta corresponde à pesquisa nesta rede.</p>}
+       {visibleAccounts.length?<div className="network-partner-table-scroll"><table className="table network-partner-table"><thead><tr><th>Empresa</th><th>Mensalidade</th><th>Vencimento</th><th>Status</th><th>Ações</th></tr></thead><tbody>{visibleAccounts.map(p=><tr key={p.id}><td>{p.name}</td><td>{p.monthlyFeeCents == null ? "—" : currency(p.monthlyFeeCents)}</td><td>{p.endsAt ? new Date(p.endsAt).toLocaleDateString("pt-BR") : "—"}</td><td>{p.status}</td><td><button className="btn sm" onClick={()=>openPartner(p)}>Gerenciar</button></td></tr>)}</tbody></table></div>:<p className="muted">Nenhuma conta corresponde à pesquisa nesta rede.</p>}
        {pageMeta&&<nav className="row" aria-label="Páginas de contas" style={{justifyContent:"space-between",marginTop:12,flexWrap:"wrap"}}>
          <span className="muted">{pageMeta.total} conta(s) · página {pageMeta.page} de {Math.max(1,pageMeta.totalPages)}</span>
          <div className="actions"><button className="btn sm" disabled={page<=1||busy} onClick={()=>setPage(x=>Math.max(1,x-1))}>Anterior</button>

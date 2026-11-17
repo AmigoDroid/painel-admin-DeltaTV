@@ -455,3 +455,23 @@ pre,code,.mono{overflow-wrap:anywhere;word-break:break-word}
 .nav-group>.nav[aria-expanded]{font-weight:700;justify-content:space-between;border:1px solid var(--line)}
 @media(max-width:700px){.nav{min-height:44px}.content,.main{min-width:0}.toolbar{flex-wrap:wrap}.toolbar input{min-width:0;max-width:100%}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
+/* Rede de convites: mesmo acabamento do catálogo administrativo DeltaTV. */
+.workspace-admin-page .network-invite-panel{max-width:none;min-width:0;border-radius:16px;}
+.workspace-admin-page .network-invite-list{display:grid;gap:0;min-width:0;margin-top:12px;border:1px solid var(--border,#334155);border-radius:14px;overflow:hidden;}
+.workspace-admin-page .network-invite-header{padding:16px 18px;background:var(--surface-muted,#1d293d);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+.workspace-admin-page .network-invite-header h4{margin:0;}
+.workspace-admin-page .network-invite-row{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px 18px;border-top:1px solid var(--border,#334155);min-width:0;}
+.workspace-admin-page .network-invite-row:nth-child(odd){background:rgba(120,145,195,.045);}
+.workspace-admin-page .network-invite-summary{flex:1;min-width:220px;overflow-wrap:anywhere;line-height:1.6;}
+.workspace-admin-page .network-invite-actions{display:flex;flex-wrap:wrap;gap:7px;justify-content:flex-end;}
+.workspace-admin-page .network-invite-actions .btn{white-space:nowrap;}
+@media(max-width:960px){.workspace-admin-page .network-invite-row{align-items:stretch;flex-direction:column;}.workspace-admin-page .network-invite-actions{justify-content:flex-start;}.workspace-admin-page .network-invite-panel{padding:14px!important;}}
+
+.workspace-admin-page .network-partner-panel{border-radius:16px;min-width:0;}
+.workspace-admin-page .network-partner-table-scroll{max-width:100%;overflow-x:auto;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y;}
+.workspace-admin-page .network-partner-table{width:100%;min-width:630px;border-collapse:separate;border-spacing:0;}
+.workspace-admin-page .network-partner-table th{text-align:left;font-size:12px;letter-spacing:.025em;color:var(--text-muted,#94a3b8);background:var(--surface-muted,#1d293d);}
+.workspace-admin-page .network-partner-table th,.workspace-admin-page .network-partner-table td{padding:13px 12px;vertical-align:middle;}
+.workspace-admin-page .network-partner-table tbody tr:hover{background:rgba(110,133,200,.07);}
+.workspace-admin-page .network-partner-table td .btn{white-space:nowrap;}
