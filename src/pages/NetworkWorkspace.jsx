@@ -11,7 +11,7 @@ const LABELS={
  "network:plans:read":"Consultar planos", "network:plans:write":"Criar e editar planos",
  "network:members:read":"Consultar usuários", "network:members:write":"Cadastrar usuários do portal",
  "network:resources:read":"Ver códigos e DNS", "network:resources:write":"Editar códigos e DNS",
- "network:devices:read":"Ver dispositivos", "network:billing:read":"Ver faturas", "network:billing:write":"Emitir faturas",
+ "network:devices:read":"Ver dispositivos", "network:devices:write":"Gerenciar ativações de TVs", "network:billing:read":"Ver faturas", "network:billing:write":"Emitir faturas",
  "network:audit:read":"Consultar auditoria da rede",
 };
 const currency=cents=>new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format((Number(cents)||0)/100);
@@ -321,7 +321,8 @@ export default function NetworkWorkspace({section="workspace", onNavigate}){
      </section>}
      {accountForm&&renderAccountForm(accountForm,setAccountForm)}
      {editingAccount&&renderAccountForm(editingAccount,setEditingAccount,true)}
-     {section!=="invitations"&&<div className="card network-partner-panel" style={{padding:16}}>
+     {section==="devices"&&permits("network:devices:read")&&<NetworkDevices accounts={visibleAccounts} request={request} permits={permits} accountPage={page} accountMeta={pageMeta} setAccountPage={setPage} accountQuery={q} setAccountQuery={setQ}/>}
+     {section!=="invitations"&&section!=="devices"&&<div className="card network-partner-panel" style={{padding:16}}>
        <div className="row" style={{justifyContent:"space-between",alignItems:"center"}}><h3>{section==="devices"||section==="resources"||section==="billing"||section==="members"?"Contas da minha rede":tab==="resellers"?"Minhas revendas":"Meus parceiros"}</h3><input aria-label="Buscar contas nesta rede" placeholder="Buscar nesta rede" value={q} onChange={e=>setQ(e.target.value)}/></div>
        {visibleAccounts.length?<div className="network-partner-table-scroll"><table className="table network-partner-table"><thead><tr><th>Empresa</th><th>Mensalidade</th><th>Vencimento</th><th>Status</th><th>Ações</th></tr></thead><tbody>{visibleAccounts.map(p=><tr key={p.id}><td>{p.name}</td><td>{p.monthlyFeeCents == null ? "—" : currency(p.monthlyFeeCents)}</td><td>{p.endsAt ? new Date(p.endsAt).toLocaleDateString("pt-BR") : "—"}</td><td>{p.status}</td><td><button className="btn sm" onClick={()=>openPartner(p)}>Gerenciar</button></td></tr>)}</tbody></table></div>:<p className="muted">Nenhuma conta corresponde à pesquisa nesta rede.</p>}
        {pageMeta&&<nav className="row" aria-label="Páginas de contas" style={{justifyContent:"space-between",marginTop:12,flexWrap:"wrap"}}>
@@ -330,7 +331,7 @@ export default function NetworkWorkspace({section="workspace", onNavigate}){
          <button className="btn sm" disabled={page>=pageMeta.totalPages||busy} onClick={()=>setPage(x=>x+1)}>Próxima</button></div>
        </nav>}
      </div>}
-     {selected&&<div className="card" style={{padding:20,display:"grid",gap:12}}>
+     {section!=="devices"&&selected&&<div className="card" style={{padding:20,display:"grid",gap:12}}>
        <h3>{selected.partner.name}</h3>
        {(selected.plan || selected.contract) && <p>Plano: {plans.find(p=>p.key===selected.plan?.tier)?.name||selected.plan?.tier||"Não informado"} · Ativações: {selected.contract?.activationLimit ?? "Sem limite"}</p>}
        <div className="actions"><button className="btn" onClick={()=>setSelected(null)}>Fechar</button>
@@ -367,6 +368,74 @@ export default function NetworkWorkspace({section="workspace", onNavigate}){
    </>}
   </>}
  </div>;
+}
+
+
+// Lista operacional de TVs: nunca confundir contas comerciais com dispositivos físicos.
+// A API exige ownership da conta e filtra as ativações pelo partnerId real.
+function NetworkDevices({accounts,request,permits,accountPage,accountMeta,setAccountPage,accountQuery,setAccountQuery}){
+ const [accountId,setAccountId]=useState("");
+ const [devices,setDevices]=useState([]),[meta,setMeta]=useState(null);
+ const [q,setQ]=useState(""),[status,setStatus]=useState(""),[page,setPage]=useState(1);
+ const [loading,setLoading]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
+ const [pending,setPending]=useState(null),[reason,setReason]=useState("");
+ const generation=useRef(0);
+ useEffect(()=>{if(accountId&&!accounts.some(item=>item.id===accountId))setAccountId("");},[accounts,accountId]);
+ useEffect(()=>{setPage(1);setDevices([]);setMeta(null);setPending(null);},[accountId,q,status]);
+ const load=useCallback(async()=>{
+  const n=++generation.current;
+  if(!accountId){setDevices([]);setMeta(null);setLoading(false);return;}
+  setLoading(true);setError("");
+  try{
+   const response=await request(`partners/${accountId}/devices`,{query:{page,pageSize:20,q:q||undefined,status:status||undefined}});
+   if(n!==generation.current)return;
+   const items=response.data||[];
+   setDevices(items);setMeta(response.meta||null);
+  }catch(e){if(n===generation.current){setError(e.message||"Falha ao consultar TVs.");setDevices([]);setMeta(null);}}
+  finally{if(n===generation.current)setLoading(false);}
+ },[accountId,page,q,status,request]);
+ useEffect(()=>{void load();return()=>{generation.current++;};},[load]);
+ const shown=devices;
+ const change=async()=>{
+  if(!pending||reason.trim().length<3)return;
+  setLoading(true);setError("");setNotice("");
+  try{
+   await request(`partners/${accountId}/devices/${pending.id}/${pending.action}`,{method:"POST",body:{reason:reason.trim()}});
+   setNotice("Operação registrada no histórico do dispositivo.");setPending(null);setReason("");await load();
+  }catch(e){setError(e.message||"Não foi possível atualizar o dispositivo.");}
+  finally{setLoading(false);}
+ };
+ return <section className="card" style={{padding:20,display:"grid",gap:16}} aria-label="Gestão de TVs e dispositivos">
+  <div><h3>TVs e dispositivos da rede</h3><p className="muted">Selecione a conta que possui os aparelhos. A lista mostra ativações reais, não cadastros de parceiros.</p></div>
+  <div className="row" style={{flexWrap:"wrap",gap:10}}>
+   {field("Buscar conta da rede",<input value={accountQuery} onChange={e=>setAccountQuery(e.target.value)} placeholder="Nome da conta"/>)}
+   {field("Conta",<select value={accountId} onChange={e=>setAccountId(e.target.value)}><option value="">Selecione o parceiro ou revenda</option>{accounts.map(a=><option value={a.id} key={a.id}>{a.name}</option>)}</select>)}
+   {field("Buscar MAC",<input value={q} onChange={e=>setQ(e.target.value)} placeholder="MAC do aparelho" disabled={!accountId}/>)}
+   {field("Status",<select value={status} onChange={e=>setStatus(e.target.value)} disabled={!accountId}><option value="">Todos</option><option value="active">Ativo</option><option value="blocked">Bloqueado</option><option value="revoked">Removido</option></select>)}
+   <button type="button" className="btn" disabled={!accountId||loading} onClick={()=>void load()}>Atualizar TVs</button>
+  </div>
+  {accountMeta?.totalPages>1&&<div className="row" style={{justifyContent:"space-between"}}><span className="muted">Contas: página {accountMeta.page} de {accountMeta.totalPages}</span><div className="actions"><button className="btn sm" disabled={accountPage<=1} onClick={()=>setAccountPage(p=>Math.max(1,p-1))}>Contas anteriores</button><button className="btn sm" disabled={accountPage>=accountMeta.totalPages} onClick={()=>setAccountPage(p=>p+1)}>Próximas contas</button></div></div>}
+  {error&&<ErrorMessage message={error}/>} {notice&&<StatusMessage message={notice}/>}
+  {!accountId?<p className="muted">Selecione uma conta para consultar seus dispositivos.</p>:<>
+   {loading&&<p role="status">Atualizando dispositivos...</p>}
+   <div className="network-partner-table-scroll"><table className="table network-partner-table"><thead><tr><th>MAC / Dispositivo</th><th>Plataforma</th><th>Estado</th><th>Ações</th></tr></thead><tbody>
+    {shown.map(d=><tr key={d.id}><td>{d.mac||d.deviceId||"Sem identificador"}</td><td>{d.platform||d.device?.platform||"—"}</td><td>{({active:"Ativo",blocked:"Bloqueado",revoked:"Removido"})[d.status]||d.status||"—"}</td><td><div className="actions" style={{flexWrap:"wrap"}}>
+     {permits("network:devices:write")&&d.status==="active"&&<button className="btn sm" type="button" onClick={()=>{setPending({id:d.id,action:"block",mac:d.mac});setReason("");}}>Bloquear</button>}
+     {permits("network:devices:write")&&d.status==="blocked"&&<button className="btn sm" type="button" onClick={()=>{setPending({id:d.id,action:"unblock",mac:d.mac});setReason("");}}>Desbloquear</button>}
+     {permits("network:devices:write")&&d.status!=="revoked"&&<button className="btn sm" type="button" onClick={()=>{setPending({id:d.id,action:"revoke",mac:d.mac});setReason("");}}>Remover acesso</button>}
+    </div></td></tr>)}
+   </tbody></table></div>
+   {!loading&&shown.length===0&&<p className="muted">{devices.length?"Nenhum aparelho corresponde aos filtros.":"Nenhuma ativação encontrada para esta conta."}</p>}
+   {meta&&<div className="row" style={{justifyContent:"space-between",flexWrap:"wrap"}}><span className="muted">{meta.total??0} ativação(ões) · página {meta.page||page} de {Math.max(1,meta.totalPages||1)}</span><div className="actions"><button className="btn sm" disabled={loading||page<=1} onClick={()=>setPage(p=>Math.max(1,p-1))}>Anterior</button><button className="btn sm" disabled={loading||page>=meta.totalPages} onClick={()=>setPage(p=>p+1)}>Próxima</button></div></div>}
+   {pending&&<div className="card" style={{padding:16,display:"grid",gap:10}} role="group" aria-label="Confirmar ação no dispositivo">
+    <h4>Confirmar {({block:"bloqueio",unblock:"desbloqueio",revoke:"remoção de acesso"})[pending.action]} · {pending.mac||"Dispositivo"}</h4>
+    <p className="muted">{pending.action==="revoke"?"A remoção revoga o acesso e pode apagar credenciais de configuração. Não é a exclusão permanente do registro.":"A ação modifica o acesso da TV e fica registrada na auditoria."}</p>
+    {field("Motivo obrigatório",<textarea rows={2} value={reason} onChange={e=>setReason(e.target.value)} placeholder="Descreva o motivo da alteração"/>)}
+    <div className="actions"><button className="btn" onClick={()=>setPending(null)}>Cancelar</button><button className="btn primary" disabled={loading||reason.trim().length<3} onClick={()=>void change()}>Confirmar ação</button></div>
+   </div>}
+  </>}
+  <p className="muted">O cadastro/ativação inicial da TV usa o fluxo de licenças apropriado. Exclusão física definitiva continua exclusiva do Superadmin.</p>
+ </section>;
 }
 
 // Recursos operacionais sempre associados à conta selecionada e ao Admin titular.
