@@ -23,9 +23,6 @@ const when = (v) => (v ? new Date(v).toLocaleString("pt-BR") : "Sem registro");
 export default function ConnectionAudit({ path, onClose, api }) {
   const [data, setData] = useState(null),
     [error, setError] = useState(""),
-    [older, setOlder] = useState([]),
-    [cursor, setCursor] = useState(null),
-    [loading, setLoading] = useState(false),
     [tick, setTick] = useState(0);
   const [remote, setRemote] = useState(null),
     [remoteError, setRemoteError] = useState(""),
@@ -58,7 +55,6 @@ export default function ConnectionAudit({ path, onClose, api }) {
         if (active) {
           setData(r);
           setError("");
-          if (!older.length) setCursor(r.nextBefore);
         }
       } catch (e) {
         if (active) setError(e.message);
@@ -74,7 +70,7 @@ export default function ConnectionAudit({ path, onClose, api }) {
       active = false;
       clearInterval(timer);
     };
-  }, [path, tick, older.length]);
+  }, [path, tick]);
   useEffect(() => {
     let alive = true;
     let busy = false;
@@ -202,7 +198,7 @@ export default function ConnectionAudit({ path, onClose, api }) {
       });
       if (type === "show-message" || type === "test-expiry-notice")
         setSentNotice(
-          "Comando enviado à fila desta TV. Confira o ACK no histórico: enviado não significa exibido.",
+          "Comando enviado à fila desta TV. Enviado não significa exibido; consulte o estado atual do controle remoto.",
         );
       setTick((v) => v + 1);
     } catch (e) {
@@ -211,28 +207,7 @@ export default function ConnectionAudit({ path, onClose, api }) {
       setCommandBusy("");
     }
   }
-  async function more() {
-    setLoading(true);
-    try {
-      const r = await api(path, { query: cursor });
-      if (alive.current) {
-        setOlder((v) => [...v, ...r.events]);
-        setCursor(r.nextBefore);
-      }
-    } catch (e) {
-      if (alive.current) setError(e.message);
-    } finally {
-      if (alive.current) setLoading(false);
-    }
-  }
-  const tv = data?.latest?.find((e) => e.source === "tv"),
-    server = data?.latest?.find((e) => e.source === "server"),
-    selected = data?.latest?.find((e) => e.source === "selection");
-  const rows = [
-    ...new Map(
-      [...(data?.events || []), ...older].map((e) => [e.id, e]),
-    ).values(),
-  ];
+  const tv = data?.latest?.find((e) => e.source === "tv");
   return (
     <div
       className="connection-audit-overlay"
@@ -268,7 +243,7 @@ export default function ConnectionAudit({ path, onClose, api }) {
         <header>
           <div>
             <h2>Conexão do dispositivo</h2>
-            <p>Atualização a cada 15 segundos · histórico dos últimos 7 dias</p>
+            <p>Atualização a cada 15 segundos · somente estado atual em memória</p>
           </div>
           <button
             ref={close}
@@ -305,29 +280,6 @@ export default function ConnectionAudit({ path, onClose, api }) {
                 <span>
                   {tv?.error_code ? `Código do player: ${tv.error_code}` : ""}
                 </span>
-              </article>
-              <article>
-                <small>Última URL escolhida para a configuração</small>
-                <strong>{selected?.origin || "Sem registro"}</strong>
-                <span>
-                  {when(selected?.created_at)} · {selected?.transport || "—"}
-                </span>
-              </article>
-              <article>
-                <small>Última origem observada no proxy</small>
-                <strong>{server?.origin || "Sem registro"}</strong>
-                <span>
-                  {states[server?.state] || "Nenhuma conexão observada"}
-                  {server?.status_code ? ` · HTTP ${server.status_code}` : ""}
-                </span>
-                <span>
-                  {when(server?.created_at)} · {server?.transport || "—"}
-                </span>
-                {server?.selected_origin && (
-                  <span>
-                    Base usada nesta conexão: {server.selected_origin}
-                  </span>
-                )}
               </article>
               <article>
                 <small>Endereço solicitado pela TV</small>
@@ -797,59 +749,8 @@ export default function ConnectionAudit({ path, onClose, api }) {
               depende do proxy confiável configurado na API. Uma queda total de
               rede impede a TV de enviar o erro naquele momento.
             </p>
-            <div className="connection-audit-table" tabIndex="0">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Horário</th>
-                    <th>Evidência</th>
-                    <th>Resultado</th>
-                    <th>Origem</th>
-                    <th>Detalhes</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((e) => (
-                    <tr key={e.id}>
-                      <td>{when(e.created_at)}</td>
-                      <td>{sources[e.source]}</td>
-                      <td>{states[e.state] || e.state}</td>
-                      <td>{e.origin || "—"}</td>
-                      <td>
-                        {[
-                          e.transport,
-                          e.client_family
-                            ? `Cliente/API: IPv${e.client_family}`
-                            : null,
-                          e.upstream_family
-                            ? `Origem: IPv${e.upstream_family}`
-                            : null,
-                          e.latency_ms != null
-                            ? `${e.latency_ms}ms até resposta`
-                            : null,
-                          e.status_code ? `HTTP ${e.status_code}` : null,
-                          e.error_code ? `Erro ${e.error_code}` : null,
-                          e.position != null ? `${e.position}s` : null,
-                        ]
-                          .filter(Boolean)
-                          .join(" · ") || "—"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {!rows.length && (
-              <p>
-                Nenhum evento registrado. Instale a nova build na TV e abra um
-                conteúdo para começar a coletar o diagnóstico.
-              </p>
-            )}
-            {cursor && (
-              <button type="button" disabled={loading} onClick={more}>
-                {loading ? "Carregando…" : "Ver eventos anteriores"}
-              </button>
-            )}
+            <p>Informações temporárias da conexão, sem histórico gravado no PostgreSQL.
+              Um reinício do backend ou a expiração do estado remove esses dados.</p>
           </>
         )}
       </section>
