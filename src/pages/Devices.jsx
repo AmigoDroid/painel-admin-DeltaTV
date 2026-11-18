@@ -1,3 +1,5 @@
+import { useBulkRemoval } from "../../shared/useBulkRemoval.jsx";
+import { Modal } from "../ui.jsx";
 import { useEffect, useState } from "react";
 import { api, getAuth } from "../api.js";
 import { Badge, OnlineBadge, PlatformBadge, Empty, Pager, Table, useDebounced, useList, useUi, RowMenu } from "../ui.jsx";
@@ -18,6 +20,21 @@ export default function Devices({ onChanged }) {
   const [registering, setRegistering] = useState(false);
   const [viewing, setViewing] = useState(null); // linha do MAC cujas listas estão abertas (sem precisar da chave da TV)
   const isSuper = getAuth()?.user?.role === "superadmin";
+  const bulk = useBulkRemoval({
+    Modal, rows: list.data, scope: JSON.stringify(list.params), loading: list.loading,
+    id: d => d.deviceId, label: d => d.mac, eligible: () => isSuper,
+    description: "A exclusão definitiva remove o aparelho, suas ativações, sessões e acessos Web de todos os parceiros.",
+    preview: async d => {
+      const info = await api(`/admin/devices/registrations/${d.deviceId}/deletion-preview`);
+      if (info.mac !== d.mac) throw new Error("O MAC mudou. Atualize a lista.");
+      return `${info.activations} ativação(ões) · ${info.webAccesses} acesso(s) Web`;
+    },
+    remove: async d => {
+      const result = await api(`/admin/devices/registrations/${d.deviceId}`, { method: "DELETE", body: { confirmMac: d.mac } });
+      if (!result?.deleted) throw new Error("Exclusão sem confirmação do servidor.");
+    },
+    refresh: async () => { await list.reload(); onChanged?.(); },
+  });
   const [adding, setAdding] = useState(null); // linha do MAC que vai receber outro parceiro (ou ter o acesso do parceiro atualizado)
   useEffect(() => { list.filter({ q: dq }); /* eslint-disable-next-line */ }, [dq]);
 
@@ -43,9 +60,10 @@ export default function Devices({ onChanged }) {
           <option value="">Online e offline</option><option value="true">Só online</option><option value="false">Só offline</option>
         </select>
       </div>
+      {isSuper && bulk.toolbar}
       <div className="device-list"><Table><thead><tr><th>MAC / aparelho</th><th>Tipo</th><th>Conexão</th><th>Assistindo / IP</th><th>Listas atuais</th><th>Parceiros</th><th>Situação dos vínculos</th><th /><th className="mobile-details-header">Informações</th></tr></thead>
         <tbody>{list.data.map(device => <tr key={device.deviceId}>
-          <td><button type="button" className="device-mac-link mono" onClick={() => setRecord({ device, tab: "summary" })}>{device.mac}</button></td>
+          <td>{isSuper && bulk.checkbox(device)}<button type="button" className="device-mac-link mono" onClick={() => setRecord({ device, tab: "summary" })}>{device.mac}</button></td>
           <td><PlatformBadge platform={device.platform} /></td><td><OnlineBadge online={device.online} lastSeenAt={device.lastSeenAt} /></td>
           <td><strong>{device.live?.playback?.title || '—'}</strong><div className="muted">{device.live?.online ? `IP: ${device.live.ip || 'indisponível'}` : 'Sem telemetria atual'}</div></td>
           <td><strong>{device.currentCount}</strong><div className="muted">{device.activeCount} ativa(s){device.removedCount > 0 ? ` · ${device.removedCount} removida(s)` : ""}</div></td>

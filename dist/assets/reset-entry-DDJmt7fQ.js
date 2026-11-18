@@ -1,0 +1,1 @@
+import{j as o,c as t}from"./react-Dk8-RHi1.js";import{R as s}from"./workspace-Dg2C_Tfo.js";import{c as r}from"./operations-g-PzPMPM.js";/* empty css              */const _=e=>o.jsx(s,{...e,completeReset:r}),m=window.__DELTA_PASSWORD_RESET_TOKEN__||"";window.__DELTA_PASSWORD_RESET_TOKEN__=void 0;t.createRoot(document.getElementById("root")).render(o.jsx(_,{token:m}));

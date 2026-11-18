@@ -1,0 +1,6 @@
+.bulk-tools { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:12px 0; }
+input.bulk-pick[type=checkbox] { display:inline-block; width:21px; height:21px; min-height:0; flex:none; margin:4px 10px 4px 0; vertical-align:middle; accent-color:var(--brand); }
+.bulk-review { max-height:40vh; overflow:auto; padding:0 0 0 1.4em; }
+.bulk-review li { margin:.55em 0; overflow-wrap:anywhere; }
+.bulk-review span { display:block; color:var(--muted); }
+.bulk-report { margin:10px 0; padding:12px; border:1px solid var(--line); border-radius:10px; overflow-wrap:anywhere; }
