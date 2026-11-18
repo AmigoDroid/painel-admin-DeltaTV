@@ -4,3 +4,15 @@ input.bulk-pick[type=checkbox] { display:inline-block; width:21px; height:21px; 
 .bulk-review li { margin:.55em 0; overflow-wrap:anywhere; }
 .bulk-review span { display:block; color:var(--muted); }
 .bulk-report { margin:10px 0; padding:12px; border:1px solid var(--line); border-radius:10px; overflow-wrap:anywhere; }
+.bulk-tools { padding:10px 12px; border:1px solid var(--line,#38435b); border-radius:12px; background:var(--panel,#151e34); }
+.bulk-tools button { min-height:40px; padding:6px 14px; border-radius:9px; }
+.bulk-tools button:first-child { border:1px solid var(--brand,#9b7bfa); color:var(--brand-hi,#cab9ff); background:var(--panel,#151e34); }
+.bulk-tools .danger { color:#fff; background:#843446; }
+.delta-tv-list .device-row:has(.bulk-pick:checked),
+.delta-tv-list tbody tr:has(.bulk-pick:checked) { outline:2px solid var(--brand,#9b7bfa); outline-offset:-2px; }
+@media (max-width:700px) {
+  .delta-tv-list tbody tr, .delta-tv-list .device-row { border:1px solid var(--line,#394560); border-radius:15px; background:var(--panel,#151e34); }
+  .delta-tv-list .device-top { gap:12px; }
+  .delta-tv-list :is(.mono,.device-mac-link) { font-variant-numeric:tabular-nums; }
+  .bulk-tools { gap:7px; }
+}

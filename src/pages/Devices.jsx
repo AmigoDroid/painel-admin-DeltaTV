@@ -61,7 +61,7 @@ export default function Devices({ onChanged }) {
         </select>
       </div>
       {isSuper && bulk.toolbar}
-      <div className="device-list"><Table><thead><tr><th>MAC / aparelho</th><th>Tipo</th><th>Conexão</th><th>Assistindo / IP</th><th>Listas atuais</th><th>Parceiros</th><th>Situação dos vínculos</th><th /><th className="mobile-details-header">Informações</th></tr></thead>
+      <div className="device-list delta-tv-list"><Table><thead><tr><th>MAC / aparelho</th><th>Tipo</th><th>Conexão</th><th>Assistindo / IP</th><th>Listas atuais</th><th>Parceiros</th><th>Situação dos vínculos</th><th /><th className="mobile-details-header">Informações</th></tr></thead>
         <tbody>{list.data.map(device => <tr key={device.deviceId}>
           <td>{isSuper && bulk.checkbox(device)}<button type="button" className="device-mac-link mono" onClick={() => setRecord({ device, tab: "summary" })}>{device.mac}</button></td>
           <td><PlatformBadge platform={device.platform} /></td><td><OnlineBadge online={device.online} lastSeenAt={device.lastSeenAt} /></td>

@@ -3,9 +3,10 @@ import "./bulk-removal.css";
 
 // Selection belongs to the current result page. A confirmed batch uses a fixed snapshot.
 export function useBulkRemoval({ rows, scope, loading, id, label, eligible = () => true,
-  description, preview, remove, refresh, Modal }) {
+  description, requireReason = false, preview, remove, refresh, Modal }) {
   const [active, setActive] = useState(false);
   const [ids, setIds] = useState([]);
+  const [reason, setReason] = useState("");
   const [review, setReview] = useState(null);
   const [processing, setProcessing] = useState(false);
   const [report, setReport] = useState(null);
@@ -35,13 +36,14 @@ export function useBulkRemoval({ rows, scope, loading, id, label, eligible = () 
       }
     }
     if (!alive.current) return;
+    setReason("");
     setReview(items);
     setProcessing(false);
     lock.current = false;
   }
 
   async function execute() {
-    if (lock.current || !review) return;
+    if (lock.current || !review || (requireReason && reason.trim().length < 3)) return;
     lock.current = true;
     setProcessing(true);
     const failures = [];
@@ -50,7 +52,7 @@ export function useBulkRemoval({ rows, scope, loading, id, label, eligible = () 
       if (!alive.current) return;
       try {
         if (item.error) throw new Error(item.error);
-        await remove(item.row);
+        await remove(item.row, reason.trim());
         done++;
       } catch (error) {
         failures.push({ row: item.row, message: error.message || "Falha na remoção." });
@@ -90,8 +92,9 @@ export function useBulkRemoval({ rows, scope, loading, id, label, eligible = () 
       <p>{description}</p><ul className="bulk-review">{review.map(item => <li key={id(item.row)}>
         <strong>{label(item.row)}</strong>{(item.detail || item.error) && <span>{item.error || item.detail}</span>}
       </li>)}</ul>
+      {requireReason && <label>Motivo do desvínculo<input required minLength={3} maxLength={500} value={reason} disabled={processing} onChange={e => setReason(e.target.value)}/></label>}
       <div className="actions"><button type="button" className="btn" disabled={processing} onClick={() => setReview(null)}>Cancelar</button>
-        <button type="button" className="btn danger" disabled={processing || review.every(item => item.error)} onClick={execute}>
+        <button type="button" className="btn danger" disabled={processing || (requireReason && reason.trim().length < 3) || review.every(item => item.error)} onClick={execute}>
           {processing ? "Removendo…" : `Confirmar remoção (${review.filter(item => !item.error).length})`}</button></div>
     </Modal>}
   </>;
