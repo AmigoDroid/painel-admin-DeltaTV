@@ -1,15 +1,27 @@
 import { useEffect, useState } from "react";
 import { api } from "../api.js";
-import { Badge, Empty, Field, LoadError, Modal, Pager, Table, useAction, useList, useUi, RowMenu } from "../ui.jsx";
+import { Badge, Empty, Field, LoadError, Modal, Pager, Table, useAction, useList, useDebounced, useUi, RowMenu } from "../ui.jsx";
 
 export default function Sources() {
-  const list = useList("/admin/sources", {});
+  const [q,setQ] = useState("");
+  const dq = useDebounced(q);
+  const list = useList("/admin/sources", { q: "", scope: "", status: "" });
+  useEffect(() => { list.filter({ q: dq }); /* eslint-disable-next-line */ }, [dq]);
   const [creating, setCreating] = useState(false);
   const [openId, setOpenId] = useState(null);
   return (
     <>
       <div className="page-head"><h2>Fontes de conteúdo</h2><button className="btn primary" onClick={() => setCreating(true)}>Nova fonte</button></div>
       <p className="muted">Somente cadastre fontes que você tem autorização para distribuir. As URLs ficam cifradas e nunca são enviadas ao cliente final.</p>
+      <div className="toolbar">
+        <input type="search" aria-label="Pesquisar fontes" placeholder="Buscar fonte por nome" value={q} onChange={e=>setQ(e.target.value)} />
+        <select aria-label="Filtrar escopo" value={list.params.scope} onChange={e=>list.filter({ scope: e.target.value })}>
+          <option value="">Todos os escopos</option><option value="global">Globais</option><option value="partner">Parceiros</option>
+        </select>
+        <select aria-label="Filtrar status" value={list.params.status} onChange={e=>list.filter({ status: e.target.value })}>
+          <option value="">Ativas e desativadas</option><option value="active">Ativas</option><option value="disabled">Desativadas</option>
+        </select>
+      </div>
       <Table><thead><tr><th>Nome</th><th>Tipo</th><th>Escopo</th><th>Entrega</th><th>Host</th><th>Parceiros</th><th>Status</th></tr></thead>
         <tbody>{list.data.map((s) => (
           <tr key={s.id} className="click" onClick={() => setOpenId(s.id)}><td>{s.name}</td><td>{s.kind === "playlist" ? "Playlist M3U" : "Catálogo"}</td>

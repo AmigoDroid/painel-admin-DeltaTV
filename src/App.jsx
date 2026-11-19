@@ -18,9 +18,10 @@ import VpsMonitor from "./pages/VpsMonitor.jsx";
 import VpsFiles from "./pages/VpsFiles.jsx";
 import Licenses from "./pages/Licenses.jsx";
 import Partners, { Resellers } from "./pages/Partners.jsx";
+import PlansAndPricing from "./pages/PlansAndPricing.jsx";
+import ServicePackages from "./pages/ServicePackages.jsx";
 import PartnerTrash from "./pages/PartnerTrash.jsx";
 import Devices from "./pages/Devices.jsx";
-import LegacyMigration from "./pages/LegacyMigration.jsx";
 import LicenseActivation from "./pages/LicenseActivation.jsx";
 import Unlinked from "./pages/Unlinked.jsx";
 import Sources from "./pages/Sources.jsx";
@@ -54,25 +55,24 @@ const PAGES = {
   conta: ["Minha conta", ProfilePage],
   dashboard: ["Visão geral", Dashboard], vpsmonitor: ["Servidor / VPS", VpsMonitor], vpsfiles: ["Arquivos da VPS", VpsFiles],
   webaccess: ["Player Web", WebAccess], whiteLabel: ["Aplicativos white-label", WhiteLabel],
-  legados: ["Migração de legados", LegacyMigration],
   "ativar-tv": ["Ativar TV", LicenseActivation], licenses: ["Licenças das TVs", Licenses], devices: ["TVs e dispositivos", Devices], unlinked: ["TVs sem configuração", Unlinked],
   partners: ["Gerenciar parceiros", Partners], servermonitor: ["Qualidade dos servidores", ServerMonitor], sources: ["Fontes globais de conteúdo", Sources],
   resellers: ["Revendas", Resellers], network: ["Rede de distribuição", DistributionNetwork], "portal-sales": ["Gerenciar parceiros", Partners], support: ["Resolver problema da TV", () => <SupportCenter base="/admin" />], trash: ["Lixeira", PartnerTrash], clients: ["Clientes", Clients], credits: ["Créditos", Credits], downloads: ["Downloads e links", Downloads],
-  billing: ["Financeiro", Billing], gateways: ["Gateways de pagamento", PaymentGateways], pix: ["Pix (legado)", Pix], pricing: ["Planos e recursos", Partners], "service-packages": ["Gerenciar parceiros", Partners], "global-config": ["Configurações Globais", GlobalSettings], commerce3: ["Planos SaaS e comissões", Commerce3],
+  billing: ["Financeiro", Billing], gateways: ["Gateways de pagamento", PaymentGateways], pix: ["Pix (legado)", Pix], pricing: ["Planos e recursos", PlansAndPricing], "service-packages": ["Pacotes de serviço", ServicePackages], "global-config": ["Configurações Globais", GlobalSettings], commerce3: ["Planos SaaS e comissões", Commerce3],
   help: ["Central de Ajuda", HelpManagement], users: ["Usuários", Users], loginhistory: ["Histórico de login", LoginHistory], notifications: ["Notificações", Notifications], mail: ["E-mails", Mail], audit: ["Auditoria", Audit],
 };
 
 // Menu único e direto (como no painel do parceiro): cada função abre a própria página,
 // sem passar por sub-dashboards. A mesma lista alimenta o menu lateral e a tela inicial.
 const GROUPS = [
- {label:null,items:['dashboard','workspace','partners','resellers','pricing','invitations','devices']},
+ {label:null,items:['dashboard','workspace','partners','resellers','pricing','service-packages','invitations','devices']},
  {label:'Operação',items:['licenses','billing','sources','support']},
  {label:'Administração',items:['users','global-config']},
 ];
 // Ferramentas avançadas continuam acessíveis sem poluir a navegação principal.
 // As permissões e as rotas permanecem iguais às da versão anterior.
 const EXTRA_GROUPS = [
- {label:'Operações avançadas',items:['control','ativar-tv','clients','legados','unlinked','credits','network']},
+ {label:'Operações avançadas',items:['control','ativar-tv','clients','unlinked','credits','network']},
  {label:'Aplicativos e DNS',items:['whiteLabel','webaccess','downloads','servermonitor']},
  {label:'Infraestrutura e auditoria',items:['gateways','vpsmonitor','vpsfiles','trash','loginhistory','audit','notifications','mail','help','conta']},
 ];
@@ -104,6 +104,7 @@ const ICONS = {
   sources: <><ellipse cx="12" cy="6" rx="8" ry="3" /><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6" /></>,
   billing: <><rect x="3" y="6" width="18" height="13" rx="2" /><path d="M3 10.5h18M7 15h3" /></>,
   pricing: <><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M7 9h10M7 13h7M7 17h5"/></>,
+  "service-packages": <><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M7 8h10M7 12h10M7 16h6"/></>,
   gateways: <><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18M7 15h6"/></>,
   pix: <><path d="M12 2.8l9.2 9.2-9.2 9.2L2.8 12z" /><path d="M12 8l4 4-4 4-4-4z" /></>,
   credits: <><circle cx="12" cy="12" r="9" /><path d="M14.8 9.3c-.5-.9-1.5-1.3-2.8-1.3-1.7 0-2.8.8-2.8 2 0 3 5.6 1.2 5.6 4.2 0 1.2-1.1 2-2.8 2-1.3 0-2.4-.5-2.9-1.4M12 6.5V8m0 8v1.5" /></>,
