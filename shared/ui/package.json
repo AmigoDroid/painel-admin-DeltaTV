@@ -30,7 +30,8 @@
     "./LoginHistory": "./src/LoginHistory.jsx",
     "./realtime": "./src/realtime.js",
     "./StudioWorkspace": "./src/StudioWorkspace.jsx",
-    "./ConfigureForm": "./src/ConfigureForm.jsx"
+    "./ConfigureForm": "./src/ConfigureForm.jsx",
+    "./AppInstallGuide": "./src/AppInstallGuide.jsx"
   },
   "peerDependencies": {
     "react": "^18.3.1"

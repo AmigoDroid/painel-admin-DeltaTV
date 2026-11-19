@@ -51,6 +51,8 @@ export function adminPageAllowed(page, user) {
   // O menu é espelhado, mas TODA página de Admin usa somente /admin/workspace.
   // Não confundir permissão com liberação de rotas globais da DeltaTV.
   if (user?.role === "admin") {
+    // Catálogo global de downloads: leitura via endpoint autenticado, sem escrita administrativa.
+    if (page === "downloads") return true;
     if (page === "conta") return true;
     if (page === "invitations") return Boolean(user.delegatedPermissions?.includes('network:partners:write')||user.delegatedPermissions?.includes('network:resellers:write'));
     const entry = ADMIN_SCOPED_PAGES[page];

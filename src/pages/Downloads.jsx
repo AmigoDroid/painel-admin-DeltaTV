@@ -1,3 +1,4 @@
+import AppInstallGuide from "@deltatv/ui/AppInstallGuide";
 import { useEffect, useRef, useState } from "react";
 import { api, getAuth, uploadFile } from "../api.js";
 import { Empty, Field, Modal, Pager, RowMenu, Table, fmtDateTime, useAction, useDebounced, useList, useUi } from "../ui.jsx";
@@ -12,7 +13,14 @@ const fmtSize = (n) => (n == null ? "" : n >= 1048576 ? `${(n / 1048576).toFixed
 // Só abre links http(s): o endereço vem de um cadastro e nunca deve virar "javascript:" no href.
 const safeHref = (u) => { try { return ["http:", "https:"].includes(new URL(u).protocol) ? u : undefined; } catch { return undefined; } };
 
+const loadPublishedDownloads = ({ page, pageSize }) => api("/app-installation/downloads", { query: { page, pageSize } });
+
 export default function Downloads() {
+  const delegated = getAuth()?.user?.role === "admin";
+  return <><AppInstallGuide loadDownloads={loadPublishedDownloads}/>{!delegated && <DownloadManagement/>}</>;
+}
+
+function DownloadManagement() {
   const me = getAuth()?.user;
   const canWrite = me?.role === "superadmin" || me?.role === "admin";
   const { confirm } = useUi();
@@ -30,8 +38,8 @@ export default function Downloads() {
 
   return (
     <>
-      <div className="page-head"><h2>Downloads e links</h2></div>
-      <p className="muted">O que você cadastrar aqui aparece para os revendedores em <strong>Downloads e links</strong>, só para consulta. Use <strong>Aplicativo</strong> para apps (com versão e código do Downloader) e <strong>Link</strong> para qualquer outro endereço.</p>
+      <div className="page-head"><h2>Gerenciar downloads e links</h2></div>
+      <p className="muted">O que você cadastrar aqui aparece para Parceiros e Revendas na seção <strong>Aplicativos</strong>, só para consulta. Use <strong>Aplicativo</strong> para apps (com versão e código do Downloader) e <strong>Link</strong> para qualquer outro endereço.</p>
       <div className="toolbar">
         <input placeholder="Buscar por nome ou versão" value={q} onChange={(e) => setQ(e.target.value)} />
         <select value={list.params.kind} onChange={(e) => list.filter({ kind: e.target.value })}><option value="">Todos os tipos</option><option value="app">Aplicativos</option><option value="link">Links</option></select>

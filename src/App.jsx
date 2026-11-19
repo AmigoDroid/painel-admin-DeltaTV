@@ -57,7 +57,7 @@ const PAGES = {
   webaccess: ["Player Web", WebAccess], whiteLabel: ["Aplicativos white-label", WhiteLabel],
   "ativar-tv": ["Ativar TV", LicenseActivation], licenses: ["Licenças das TVs", Licenses], devices: ["TVs e dispositivos", Devices], unlinked: ["TVs sem configuração", Unlinked],
   partners: ["Gerenciar parceiros", Partners], servermonitor: ["Qualidade dos servidores", ServerMonitor], sources: ["Fontes globais de conteúdo", Sources],
-  resellers: ["Revendas", Resellers], network: ["Rede de distribuição", DistributionNetwork], "portal-sales": ["Gerenciar parceiros", Partners], support: ["Resolver problema da TV", () => <SupportCenter base="/admin" />], trash: ["Lixeira", PartnerTrash], clients: ["Clientes", Clients], credits: ["Créditos", Credits], downloads: ["Downloads e links", Downloads],
+  resellers: ["Revendas", Resellers], network: ["Rede de distribuição", DistributionNetwork], "portal-sales": ["Gerenciar parceiros", Partners], support: ["Resolver problema da TV", () => <SupportCenter base="/admin" />], trash: ["Lixeira", PartnerTrash], clients: ["Clientes", Clients], credits: ["Créditos", Credits], downloads: ["Aplicativos", Downloads],
   billing: ["Financeiro", Billing], gateways: ["Gateways de pagamento", PaymentGateways], pix: ["Pix (legado)", Pix], pricing: ["Planos e recursos", PlansAndPricing], "service-packages": ["Pacotes de serviço", ServicePackages], "global-config": ["Configurações Globais", GlobalSettings], commerce3: ["Planos SaaS e comissões", Commerce3],
   help: ["Central de Ajuda", HelpManagement], users: ["Usuários", Users], loginhistory: ["Histórico de login", LoginHistory], notifications: ["Notificações", Notifications], mail: ["E-mails", Mail], audit: ["Auditoria", Audit],
 };
@@ -66,14 +66,14 @@ const PAGES = {
 // sem passar por sub-dashboards. A mesma lista alimenta o menu lateral e a tela inicial.
 const GROUPS = [
  {label:null,items:['dashboard','workspace','partners','resellers','pricing','service-packages','invitations','devices']},
- {label:'Operação',items:['licenses','billing','sources','support']},
+ {label:'Operação',items:['licenses','billing','sources','support','downloads']},
  {label:'Administração',items:['users','global-config']},
 ];
 // Ferramentas avançadas continuam acessíveis sem poluir a navegação principal.
 // As permissões e as rotas permanecem iguais às da versão anterior.
 const EXTRA_GROUPS = [
  {label:'Operações avançadas',items:['control','ativar-tv','clients','unlinked','credits','network']},
- {label:'Aplicativos e DNS',items:['whiteLabel','webaccess','downloads','servermonitor']},
+ {label:'Aplicativos e DNS',items:['whiteLabel','webaccess','servermonitor']},
  {label:'Infraestrutura e auditoria',items:['gateways','vpsmonitor','vpsfiles','trash','loginhistory','audit','notifications','mail','help','conta']},
 ];
 
@@ -288,7 +288,7 @@ function Shell({ user }) {
         <main className="content"><Breadcrumb panel="admin" current={PAGES[page][0]} onHome={()=>go(canOpenPage('dashboard')?'dashboard':'workspace')}/>
           <TaskFinder tasks={TASKS.filter(task => allowed(task.route))} onNavigate={go} />
           {simpleMode && page !== "dashboard" && <EasyPageGuide role="admin" page={page} onBack={() => go("dashboard")} />}
-          {user.role === "admin" ?
+          {user.role === "admin" && page !== "downloads" ?
             <NetworkWorkspace key={page} section={adminView || "workspace"} onNavigate={go} /> :
             <Current onChanged={refreshCounts} menu={homeGroups} onNavigate={go} />}
         </main>
