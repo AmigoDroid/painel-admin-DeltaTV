@@ -44,11 +44,27 @@ export default function DeviceListsModal({ device, onClose, onChanged }) {
     if (r) { await load(); onChanged?.(); }
   };
 
+  const revoke = async list => {
+    const c = await confirm({title:"Desvincular ativação",danger:true,reason:"optional",confirmLabel:"Desvincular",
+      message:`O MAC ${device.mac} continuará cadastrado. A ativação selecionada ficará revogada.`});
+    if (!c) return;
+    const r = await run(() => api(`/admin/devices/activations/${list.activationId}/revoke`,{method:"POST",body:{reason:c.reason}}),"Ativação desvinculada.");
+    if (r) { await load(); onChanged?.(); }
+  };
+  const deleteLink = async list => {
+    const typed=window.prompt(`Para excluir apenas esta ativação do MAC ${device.mac}, digite o MAC:`);
+    if (typed !== device.mac) return;
+    const reason=window.prompt("Motivo obrigatório (mínimo 3 caracteres):");
+    if (!reason || reason.trim().length < 3) return;
+    const r=await run(() => api(`/admin/devices/activations/${list.activationId}`,{method:"DELETE",body:{confirmMac:typed,reason}}),"Vínculo excluído.");
+    if (r) { await load(); onChanged?.(); }
+  };
+
   return (
     <Modal title={`Listas de ${device.mac}`} onClose={onClose} wide>
       {!state ? <p className="muted">Carregando…</p> : (
         <>
-          <DeviceLists device={state} onRemove={remove} />
+          <DeviceLists device={state} onRemove={remove} onRevoke={revoke} onDelete={deleteLink} />
           <h4>Quem ativou e configurou</h4>
           {attribution?.activations?.map(item => (
             <section className="card" key={item.activationId} style={{padding:14, marginBottom:12, overflowWrap:"anywhere"}}>

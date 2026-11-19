@@ -13,6 +13,7 @@ export default function AdminDeleteModal({ type, id, onClose, onDone }) {
   const [submitError, setSubmitError] = useState("");
   const [confirmed, setConfirmed] = useState("");
   const [reason, setReason] = useState("");
+  const [force, setForce] = useState(false);
   const [deleteClients, setDeleteClients] = useState(false);
   const [deleteDevices, setDeleteDevices] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -26,7 +27,7 @@ export default function AdminDeleteModal({ type, id, onClose, onDone }) {
   const matchesConfirmation = type === "partner"
     ? [info?.name, info?.slug].some((value) => value && normalizeConfirmation(confirmed) === normalizeConfirmation(value))
     : Boolean(key && confirmed.trim() === key);
-  const missingReason = type === "partner" && reason.trim().length < 8;
+  const missingReason = type === "partner" ? reason.trim().length < 8 : reason.trim().length < 3;
   const canDelete = Boolean(info && matchesConfirmation && !missingReason && !busy);
   const submit = async () => {
     if (!canDelete) return;
@@ -34,7 +35,7 @@ export default function AdminDeleteModal({ type, id, onClose, onDone }) {
     setSubmitError("");
     try {
       const body = type === "partner" ? { confirmation: confirmed.trim(), deleteClients, deleteDevices, reason: reason.trim() }
-        : { confirmMac: confirmed.trim(), reason: reason.trim() };
+        : { confirmMac: confirmed.trim(), reason: reason.trim(), force };
       const result = await api(root, { method: "DELETE", body });
       if (result?.deleted) {
         toast(type === "partner" ? "Cadastro arquivado. Encontre-o em Sistema → Lixeira." : "Exclusão administrativa concluída.");
@@ -77,15 +78,16 @@ export default function AdminDeleteModal({ type, id, onClose, onDone }) {
             : "Só esta ativação será apagada. As demais ativações do mesmo aparelho serão mantidas."}
           {" "}Registros financeiros e de auditoria serão preservados.
         </p>}
-        <label className="field"><span>Motivo da exclusão {type === "partner" ? "(obrigatório)" : "(opcional)"}</span>
+        <label className="field"><span>Motivo da exclusão (obrigatório)</span>
           <textarea rows={2} maxLength={400} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Explique o motivo para o histórico de auditoria" />
         </label>
+        {type !== "partner" && <label className="field" style={{display:"flex",gap:8,alignItems:"center"}}><input type="checkbox" checked={force} onChange={e=>setForce(e.target.checked)}/><span>Forçar exclusão mesmo com licença vigente (somente Superadmin; operação irreversível)</span></label>}
         <label className="field"><span>{type === "partner" ? <>Para confirmar, digite o <strong>nome completo</strong> ou o <strong>identificador</strong> abaixo:</> : <>Digite o MAC abaixo para confirmar:</>}</span>
           <strong style={{ userSelect: "all", overflowWrap: "anywhere" }}>{key}</strong>
           {type === "partner" && <small className="muted">Identificador alternativo: <strong style={{ userSelect: "all" }}>{info.slug}</strong></small>}
           <input value={confirmed} onChange={(e) => { setConfirmed(e.target.value); setSubmitError(""); }} autoComplete="off" placeholder={type === "partner" ? "Nome completo ou identificador" : key} aria-invalid={Boolean(confirmed && !matchesConfirmation)} />
           {confirmed && !matchesConfirmation && <small className="muted">O texto não corresponde ao cadastro. Use o nome completo ou o identificador exibido acima.</small>}
-          {missingReason && type === "partner" && <small className="muted">O motivo deve ter pelo menos 8 caracteres.</small>}
+          {missingReason && <small className="muted">O motivo deve ter pelo menos {type === "partner" ? 8 : 3} caracteres.</small>}
         </label>
         {submitError && <p role="alert" className="error" style={{ overflowWrap: "anywhere" }}>{submitError}</p>}
         <div className="actions" style={{ justifyContent: "flex-end", flexWrap: "wrap" }}>

@@ -14,7 +14,7 @@ export default function Devices({ onChanged }) {
   const { toast } = useUi();
   const [q, setQ] = useState("");
   const dq = useDebounced(q);
-  const list = useList("/admin/devices/by-mac", { q: "", status: "", online: "" });
+  const list = useList("/admin/devices/by-mac", { q: "", status: "", online: "", showRemoved: "false" });
   const [record, setRecord] = useState(null);
   const [deleting, setDeleting] = useState(null);
   const [registering, setRegistering] = useState(false);
@@ -23,7 +23,9 @@ export default function Devices({ onChanged }) {
   const bulk = useBulkRemoval({
     Modal, rows: list.data, scope: JSON.stringify(list.params), loading: list.loading,
     id: d => d.deviceId, label: d => d.mac, eligible: () => isSuper,
-    description: "A exclusão definitiva remove o aparelho, suas ativações, sessões e acessos Web de todos os parceiros.",
+    description: "Exclusão global exclusiva do Superadmin: remove o aparelho, suas ativações, sessões e acessos Web de todos os parceiros.",
+    requireReason: true, confirmationWord: "EXCLUIR", allowForce: true,
+    bulkRemove: (items, reason, force) => api("/admin/devices/registrations/bulk-delete", {method:"POST",body:{ids:items.map(d=>d.deviceId),reason,force,confirmation:"EXCLUIR"}}),
     preview: async d => {
       const info = await api(`/admin/devices/registrations/${d.deviceId}/deletion-preview`);
       if (info.mac !== d.mac) throw new Error("O MAC mudou. Atualize a lista.");
@@ -54,8 +56,9 @@ export default function Devices({ onChanged }) {
       <div className="toolbar">
         <input aria-label="Pesquisar dispositivo por MAC" placeholder="Pesquisar por MAC" value={q} onChange={(e) => setQ(e.target.value)} />
         <select value={list.params.status} onChange={(e) => list.filter({ status: e.target.value })}>
-          <option value="">Todos</option><option value="active">Com vínculo ativo</option><option value="blocked">Somente bloqueados</option><option value="revoked">Somente removidos</option><option value="unlinked">Sem vínculo</option>
+          <option value="">Vínculos atuais</option><option value="active">Com vínculo ativo</option><option value="blocked">Somente bloqueados</option><option value="revoked">Somente removidos</option><option value="unlinked">Sem vínculo</option>
         </select>
+        <label><input type="checkbox" checked={list.params.showRemoved === "true"} onChange={e => list.filter({ showRemoved: String(e.target.checked) })} /> Mostrar removidos</label>
         <select value={list.params.online} onChange={(e) => list.filter({ online: e.target.value })} aria-label="Conexão">
           <option value="">Online e offline</option><option value="true">Só online</option><option value="false">Só offline</option>
         </select>

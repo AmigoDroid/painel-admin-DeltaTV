@@ -26,7 +26,7 @@ export const livesOf = (device) => device?.activations ?? [];
 /** Há ativação por licença (lista própria) neste MAC? Sem ela, a lista própria precisa do código da licença. */
 export const hasLicenseList = (device) => livesOf(device).some((l) => l.kind === "license");
 
-export default function DeviceLists({ device, onRemove }) {
+export default function DeviceLists({ device, onRemove, onRevoke, onDelete }) {
   const lists = livesOf(device);
   if (!lists.length) return <p className="muted">Nenhuma lista vinculada a este MAC.</p>;
   return (
@@ -45,9 +45,11 @@ export default function DeviceLists({ device, onRemove }) {
               </td>
               <td>{l.expiresAt ? fmtDateTime(l.expiresAt) : "—"}</td>
               <td className="actions">
-              <RowMenu items={onRemove ? [
-                { label: "Remover", danger: true, onClick: () => onRemove(l) },
-              ] : []} />
+              <RowMenu items={[
+                ...(onRemove ? [{ label: "Remover configuração da lista", danger: true, onClick: () => onRemove(l) }] : []),
+                ...(onRevoke ? [{ label: "Desvincular ativação", danger: true, onClick: () => onRevoke(l) }] : []),
+                ...(onDelete ? [{ label: "Excluir vínculo definitivamente", danger: true, onClick: () => onDelete(l) }] : []),
+              ]} />
             </td>
             </tr>
           ))}

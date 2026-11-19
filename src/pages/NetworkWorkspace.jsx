@@ -1,3 +1,5 @@
+import { useDeviceBulkActions } from "../../shared/useDeviceBulkActions.jsx";
+import { Modal } from "../ui.jsx";
 import {useCallback,useEffect,useMemo,useRef,useState} from "react";
 import {api,getAuth} from "../api.js";
 import {addMonthsClamped} from "../workspace-dates.js";
@@ -409,31 +411,42 @@ function NetworkDevices({accounts,request,permits,accountPage,accountMeta,setAcc
  const [accountId,setAccountId]=useState("");
  const [devices,setDevices]=useState([]),[meta,setMeta]=useState(null);
  const [q,setQ]=useState(""),[status,setStatus]=useState(""),[page,setPage]=useState(1);
+ const [showRemoved,setShowRemoved]=useState(false),[hiddenIds,setHiddenIds]=useState([]);
  const [loading,setLoading]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
- const [pending,setPending]=useState(null),[reason,setReason]=useState("");
+ const [pending,setPending]=useState(null),[reason,setReason]=useState(""),[confirmMac,setConfirmMac]=useState("");
  const generation=useRef(0);
  useEffect(()=>{if(accountId&&!accounts.some(item=>item.id===accountId))setAccountId("");},[accounts,accountId]);
- useEffect(()=>{setPage(1);setDevices([]);setMeta(null);setPending(null);},[accountId,q,status]);
+ useEffect(()=>{setPage(1);setDevices([]);setMeta(null);setPending(null);setHiddenIds([]);},[accountId,q,status,showRemoved]);
  const load=useCallback(async()=>{
   const n=++generation.current;
   if(!accountId){setDevices([]);setMeta(null);setLoading(false);return;}
   setLoading(true);setError("");
   try{
-   const response=await request(`partners/${accountId}/devices`,{query:{page,pageSize:20,q:q||undefined,status:status||undefined}});
+   const response=await request(`partners/${accountId}/devices`,{query:{page,pageSize:20,q:q||undefined,status:status||undefined,showRemoved:String(showRemoved)}});
    if(n!==generation.current)return;
    const items=response.data||[];
    setDevices(items);setMeta(response.meta||null);
   }catch(e){if(n===generation.current){setError(e.message||"Falha ao consultar TVs.");setDevices([]);setMeta(null);}}
   finally{if(n===generation.current)setLoading(false);}
- },[accountId,page,q,status,request]);
+ },[accountId,page,q,status,showRemoved,request]);
  useEffect(()=>{void load();return()=>{generation.current++;};},[load]);
- const shown=devices;
+ const shown=devices.filter(d=>!hiddenIds.includes(d.id));
+ const bulk=useDeviceBulkActions({
+  Modal, rows:shown,scope:JSON.stringify([accountId,q,page,status,showRemoved]),loading:loading||!accountId,
+  request:(action,body)=>request(`partners/${accountId}/devices/bulk-${action}`,{method:"POST",body}),
+  refresh:load,onOptimistic:ids=>setHiddenIds(old=>[...old,...ids]),
+ });
  const change=async()=>{
   if(!pending)return;
   setLoading(true);setError("");setNotice("");
   try{
-   await request(`partners/${accountId}/devices/${pending.id}/${pending.action}`,{method:"POST",body:{reason:reason.trim()}});
-   setNotice("Operação registrada no histórico do dispositivo.");setPending(null);setReason("");await load();
+   if(pending.action==="delete"){
+     await request(`partners/${accountId}/devices/${pending.id}`,{method:"DELETE",body:{confirmMac,reason:reason.trim()}});
+   } else {
+     await request(`partners/${accountId}/devices/${pending.id}/${pending.action}`,{method:"POST",body:{reason:reason.trim()}});
+   }
+   if(pending.action==="delete"||pending.action==="revoke")setHiddenIds(old=>[...old,pending.id]);
+   setNotice("Operação registrada no histórico do dispositivo.");setPending(null);setReason("");setConfirmMac("");await load();
   }catch(e){setError(e.message||"Não foi possível atualizar o dispositivo.");}
   finally{setLoading(false);}
  };
@@ -443,27 +456,32 @@ function NetworkDevices({accounts,request,permits,accountPage,accountMeta,setAcc
    {field("Buscar conta da rede",<input value={accountQuery} onChange={e=>setAccountQuery(e.target.value)} placeholder="Nome da conta"/>)}
    {field("Conta",<select value={accountId} onChange={e=>setAccountId(e.target.value)}><option value="">Selecione o parceiro ou revenda</option>{accounts.map(a=><option value={a.id} key={a.id}>{a.name}</option>)}</select>)}
    {field("Buscar MAC",<input value={q} onChange={e=>setQ(e.target.value)} placeholder="MAC do aparelho" disabled={!accountId}/>)}
-   {field("Status",<select value={status} onChange={e=>setStatus(e.target.value)} disabled={!accountId}><option value="">Todos</option><option value="active">Ativo</option><option value="blocked">Bloqueado</option><option value="revoked">Removido</option></select>)}
+   {field("Status",<select value={status} onChange={e=>setStatus(e.target.value)} disabled={!accountId}><option value="">Vínculos atuais</option><option value="active">Ativo</option><option value="blocked">Bloqueado</option><option value="revoked">Removido</option></select>)}
+   <label><input type="checkbox" checked={showRemoved} disabled={!accountId} onChange={e=>setShowRemoved(e.target.checked)}/> Mostrar removidos</label>
    <button type="button" className="btn" disabled={!accountId||loading} onClick={()=>void load()}>Atualizar TVs</button>
   </div>
   {accountMeta?.totalPages>1&&<div className="row" style={{justifyContent:"space-between"}}><span className="muted">Contas: página {accountMeta.page} de {accountMeta.totalPages}</span><div className="actions"><button className="btn sm" disabled={accountPage<=1} onClick={()=>setAccountPage(p=>Math.max(1,p-1))}>Contas anteriores</button><button className="btn sm" disabled={accountPage>=accountMeta.totalPages} onClick={()=>setAccountPage(p=>p+1)}>Próximas contas</button></div></div>}
   {error&&<ErrorMessage message={error}/>} {notice&&<StatusMessage message={notice}/>}
   {!accountId?<p className="muted">Selecione uma conta para consultar seus dispositivos.</p>:<>
    {loading&&<p role="status">Atualizando dispositivos...</p>}
+   <p className="muted">Desvincular mantém o dispositivo cadastrado. Excluir remove somente o vínculo da conta selecionada.</p>
+   {permits("network:devices:write")&&bulk.toolbar}
    <div className="network-partner-table-scroll"><table className="table network-partner-table"><thead><tr><th>MAC / Dispositivo</th><th>Plataforma</th><th>Estado</th><th>Ações</th></tr></thead><tbody>
-    {shown.map(d=><tr key={d.id}><td>{d.mac||d.deviceId||"Sem identificador"}</td><td>{d.platform||d.device?.platform||"—"}</td><td>{({active:"Ativo",blocked:"Bloqueado",revoked:"Removido"})[d.status]||d.status||"—"}</td><td><div className="actions" style={{flexWrap:"wrap"}}>
+    {shown.map(d=><tr key={d.id}><td>{permits("network:devices:write")&&bulk.pick(d)}{d.mac||d.deviceId||"Sem identificador"}</td><td>{d.platform||d.device?.platform||"—"}</td><td>{({active:"Ativo",blocked:"Bloqueado",revoked:"Removido"})[d.status]||d.status||"—"}</td><td><div className="actions" style={{flexWrap:"wrap"}}>
      {permits("network:devices:write")&&d.status==="active"&&<button className="btn sm" type="button" onClick={()=>{setPending({id:d.id,action:"block",mac:d.mac});setReason("");}}>Bloquear</button>}
      {permits("network:devices:write")&&d.status==="blocked"&&<button className="btn sm" type="button" onClick={()=>{setPending({id:d.id,action:"unblock",mac:d.mac});setReason("");}}>Desbloquear</button>}
-     {permits("network:devices:write")&&d.status!=="revoked"&&<button className="btn sm" type="button" onClick={()=>{setPending({id:d.id,action:"revoke",mac:d.mac});setReason("");}}>Remover acesso</button>}
+     {permits("network:devices:write")&&d.status!=="revoked"&&<button className="btn sm" type="button" onClick={()=>{setPending({id:d.id,action:"revoke",mac:d.mac});setReason("");}}>Desvincular</button>}
+     {permits("network:devices:write")&&<button className="btn danger sm" type="button" onClick={()=>{setPending({id:d.id,action:"delete",mac:d.mac});setReason("");setConfirmMac("");}}>Excluir vínculo</button>}
     </div></td></tr>)}
    </tbody></table></div>
    {!loading&&shown.length===0&&<p className="muted">{devices.length?"Nenhum aparelho corresponde aos filtros.":"Nenhuma ativação encontrada para esta conta."}</p>}
    {meta&&<div className="row" style={{justifyContent:"space-between",flexWrap:"wrap"}}><span className="muted">{meta.total??0} ativação(ões) · página {meta.page||page} de {Math.max(1,meta.totalPages||1)}</span><div className="actions"><button className="btn sm" disabled={loading||page<=1} onClick={()=>setPage(p=>Math.max(1,p-1))}>Anterior</button><button className="btn sm" disabled={loading||page>=meta.totalPages} onClick={()=>setPage(p=>p+1)}>Próxima</button></div></div>}
    {pending&&<div className="card" style={{padding:16,display:"grid",gap:10}} role="group" aria-label="Confirmar ação no dispositivo">
-    <h4>Confirmar {({block:"bloqueio",unblock:"desbloqueio",revoke:"remoção de acesso"})[pending.action]} · {pending.mac||"Dispositivo"}</h4>
+    <h4>Confirmar {({block:"bloqueio",unblock:"desbloqueio",revoke:"desvinculação",delete:"exclusão definitiva"})[pending.action]} · {pending.mac||"Dispositivo"}</h4>
     <p className="muted">{pending.action==="revoke"?"A remoção revoga o acesso e pode apagar credenciais de configuração. Não é a exclusão permanente do registro.":"A ação modifica o acesso da TV e fica registrada na auditoria."}</p>
-    {field("Motivo (opcional)",<textarea rows={2} value={reason} onChange={e=>setReason(e.target.value)} placeholder="Descreva o motivo da alteração"/>)}
-    <div className="actions"><button className="btn" onClick={()=>setPending(null)}>Cancelar</button><button className="btn primary" disabled={loading} onClick={()=>void change()}>Confirmar ação</button></div>
+    {field(pending.action==="delete"?"Motivo obrigatório (mínimo 3 caracteres)":"Motivo da alteração",<textarea rows={2} value={reason} onChange={e=>setReason(e.target.value)} placeholder="Descreva o motivo da alteração"/>)}
+    {pending.action==="delete"&&field("Digite o MAC para confirmar",<input value={confirmMac} onChange={e=>setConfirmMac(e.target.value)} placeholder={pending.mac}/>)}
+    <div className="actions"><button className="btn" onClick={()=>setPending(null)}>Cancelar</button><button className="btn primary" disabled={loading||(pending.action==="delete"&&(confirmMac!==pending.mac||reason.trim().length<3))} onClick={()=>void change()}>Confirmar ação</button></div>
    </div>}
   </>}
   <p className="muted">O cadastro/ativação inicial da TV usa o fluxo de licenças apropriado. Exclusão física definitiva continua exclusiva do Superadmin.</p>

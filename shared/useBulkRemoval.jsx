@@ -3,10 +3,12 @@ import "./bulk-removal.css";
 
 // Selection belongs to the current result page. A confirmed batch uses a fixed snapshot.
 export function useBulkRemoval({ rows, scope, loading, id, label, eligible = () => true,
-  description, requireReason = false, preview, remove, refresh, Modal }) {
+  description, requireReason = false, preview, remove, bulkRemove, confirmationWord = null, allowForce = false, refresh, Modal }) {
   const [active, setActive] = useState(false);
   const [ids, setIds] = useState([]);
   const [reason, setReason] = useState("");
+  const [confirmation, setConfirmation] = useState("");
+  const [force, setForce] = useState(false);
   const [review, setReview] = useState(null);
   const [processing, setProcessing] = useState(false);
   const [report, setReport] = useState(null);
@@ -37,25 +39,42 @@ export function useBulkRemoval({ rows, scope, loading, id, label, eligible = () 
     }
     if (!alive.current) return;
     setReason("");
+    setConfirmation("");
+    setForce(false);
     setReview(items);
     setProcessing(false);
     lock.current = false;
   }
 
   async function execute() {
-    if (lock.current || !review || (requireReason && reason.trim().length < 3)) return;
+    if (lock.current || !review || (requireReason && reason.trim().length < 3) || (confirmationWord && confirmation !== confirmationWord)) return;
     lock.current = true;
     setProcessing(true);
     const failures = [];
     let done = 0;
-    for (const item of review) {
-      if (!alive.current) return;
+    if (bulkRemove) {
+      const ready = review.filter(item => !item.error);
+      for (const item of review.filter(item => item.error)) failures.push({ row: item.row, message: item.error });
       try {
-        if (item.error) throw new Error(item.error);
-        await remove(item.row, reason.trim());
-        done++;
-      } catch (error) {
-        failures.push({ row: item.row, message: error.message || "Falha na remoção." });
+        const result = await bulkRemove(ready.map(item => item.row), reason.trim(), force);
+        for (const row of ready) {
+          const entry = result.results?.find(r => r.id === id(row));
+          if (entry?.ok) done++;
+          else failures.push({ row, message: entry?.message || "Servidor não confirmou a exclusão." });
+        }
+      } catch(error) {
+        for (const item of ready) failures.push({ row: item.row, message: error.message || "Falha no lote." });
+      }
+    } else {
+      for (const item of review) {
+        if (!alive.current) return;
+        try {
+          if (item.error) throw new Error(item.error);
+          await remove(item.row, reason.trim());
+          done++;
+        } catch (error) {
+          failures.push({ row: item.row, message: error.message || "Falha na remoção." });
+        }
       }
     }
     if (!alive.current) return;
@@ -93,8 +112,10 @@ export function useBulkRemoval({ rows, scope, loading, id, label, eligible = () 
         <strong>{label(item.row)}</strong>{(item.detail || item.error) && <span>{item.error || item.detail}</span>}
       </li>)}</ul>
       {requireReason && <label>Motivo do desvínculo<input required minLength={3} maxLength={500} value={reason} disabled={processing} onChange={e => setReason(e.target.value)}/></label>}
+      {allowForce && <label><input type="checkbox" checked={force} disabled={processing} onChange={e=>setForce(e.target.checked)}/> Forçar exclusão de licenças vigentes (Superadmin, irreversível)</label>}
+      {confirmationWord && <label>Digite {confirmationWord} para confirmar<input value={confirmation} disabled={processing} onChange={e => setConfirmation(e.target.value)}/></label>}
       <div className="actions"><button type="button" className="btn" disabled={processing} onClick={() => setReview(null)}>Cancelar</button>
-        <button type="button" className="btn danger" disabled={processing || (requireReason && reason.trim().length < 3) || review.every(item => item.error)} onClick={execute}>
+        <button type="button" className="btn danger" disabled={processing || (requireReason && reason.trim().length < 3) || (confirmationWord && confirmation !== confirmationWord) || review.every(item => item.error)} onClick={execute}>
           {processing ? "Removendo…" : `Confirmar remoção (${review.filter(item => !item.error).length})`}</button></div>
     </Modal>}
   </>;
