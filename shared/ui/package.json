@@ -31,7 +31,8 @@
     "./realtime": "./src/realtime.js",
     "./StudioWorkspace": "./src/StudioWorkspace.jsx",
     "./ConfigureForm": "./src/ConfigureForm.jsx",
-    "./AppInstallGuide": "./src/AppInstallGuide.jsx"
+    "./AppInstallGuide": "./src/AppInstallGuide.jsx",
+    "./AppInstallSpotlight": "./src/AppInstallSpotlight.jsx"
   },
   "peerDependencies": {
     "react": "^18.3.1"

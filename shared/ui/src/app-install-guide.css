@@ -10,3 +10,10 @@
 @media(max-width:360px){.dt-guide-devices{grid-template-columns:1fr}.dt-guide-device{min-height:115px}.dt-guide-actions>*{width:100%;text-align:center}}
 
 .dt-guide-store{display:inline-flex;justify-content:center;align-items:center;justify-self:start;background:#784ce4;color:#fff!important;border:1px solid #784ce4;border-radius:10px;font-size:13px;font-weight:750;min-height:40px;padding:10px 15px;text-decoration:none}.dt-guide-store:hover{background:#8e65f5}
+
+/* Imagem oficial fornecida para reconhecer o canal DeltaTV na loja Roku. */
+.dt-guide-symbol .dt-guide-roku-thumbnail{width:100%;height:100%;object-fit:contain;border-radius:7px}
+.dt-guide-roku-identify{display:flex;align-items:center;gap:13px;flex-wrap:wrap;padding:12px;background:rgba(139,98,231,.08);border:1px solid rgba(171,139,247,.24);border-radius:12px}
+.dt-guide-roku-identify img{width:118px;max-width:36vw;aspect-ratio:290/218;object-fit:cover;border-radius:9px;flex:none}
+.dt-guide-roku-identify span{display:grid;gap:6px;min-width:0;flex:1 1 170px}
+.dt-guide-roku-identify small{opacity:.74}

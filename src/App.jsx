@@ -2,6 +2,7 @@ import {Breadcrumb,PlatformBrand} from "../shared/PanelExperience.jsx";
 import Superadmin from "./pages/Superadmin.jsx";
 import { panelAllows, adminPageAllowed, adminScopedView } from "../shared/permissions.js";
 import TaskFinder from "@deltatv/ui/TaskFinder";
+import AppInstallSpotlight from "@deltatv/ui/AppInstallSpotlight";
 import { TASKS } from "./task-directory.js";
 import { connectRealtime } from "./realtime.js";
 import { useEffect, useRef, useState } from "react";
@@ -286,6 +287,7 @@ function Shell({ user }) {
           <UserMenu user={user} onAccount={() => go("conta")} />
         </div>
         <main className="content"><Breadcrumb panel="admin" current={PAGES[page][0]} onHome={()=>go(canOpenPage('dashboard')?'dashboard':'workspace')}/>
+          {(page === "dashboard" || page === "workspace") && <AppInstallSpotlight onOpen={() => go("downloads")} />}
           <TaskFinder tasks={TASKS.filter(task => allowed(task.route))} onNavigate={go} />
           {simpleMode && page !== "dashboard" && <EasyPageGuide role="admin" page={page} onBack={() => go("dashboard")} />}
           {user.role === "admin" && page !== "downloads" ?

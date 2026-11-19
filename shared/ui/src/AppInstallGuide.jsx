@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import logo from "./deltatv-brand-logo.png";
+import rokuStoreArtwork from "./deltatv-roku-store.png";
 import { clientInstructions, safeHttpLink, selectAndroidApp, selectRokuStore, isSamsungItem, isLgItem } from "./app-install-data.js";
 import "./app-install-guide.css";
 
@@ -99,7 +100,7 @@ export default function AppInstallGuide({ loadDownloads }) {
     <div className="dt-guide-section-title"><div><h3>Escolha sua plataforma</h3><p>Toque no dispositivo para ver as instruções específicas.</p></div></div>
     <div className="dt-guide-devices" role="group" aria-label="Plataformas">
       {DEVICES.map(device => <button type="button" key={device.id} onClick={() => { setPlatform(device.id); setFeedback(""); }} aria-pressed={platform === device.id} className={`dt-guide-device ${platform === device.id ? "selected" : ""}`}>
-        <span className="dt-guide-symbol"><DeviceSymbol kind={device.icon}/></span><strong>{device.title}</strong><small>{device.subtitle}</small><span className={`dt-guide-tag ${device.status === "Em breve" ? "soon" : ""}`}>{device.status}</span>
+        <span className="dt-guide-symbol">{device.id === "roku" ? <img className="dt-guide-roku-thumbnail" src={rokuStoreArtwork} alt="Ícone oficial do DeltaTV na Loja Roku" /> : <DeviceSymbol kind={device.icon}/>}</span><strong>{device.title}</strong><small>{device.subtitle}</small><span className={`dt-guide-tag ${device.status === "Em breve" ? "soon" : ""}`}>{device.status}</span>
       </button>)}
     </div>
     <div className="dt-guide-tutorial">
@@ -112,7 +113,7 @@ export default function AppInstallGuide({ loadDownloads }) {
           {mainHref ? <div className="dt-guide-actions"><a className="dt-guide-primary" href={mainHref} target="_blank" rel="noopener noreferrer">Baixar APK / Abrir link</a><button type="button" onClick={() => onCopy(mainHref, "Link copiado!")}>{android?.hosted ? "Copiar link da VPS" : "Copiar link de download"}</button></div> : <p className="dt-guide-muted">O link direto ainda não foi cadastrado. Peça ao responsável pelo painel para publicá-lo em Aplicativos.</p>}
           {mainHref && <p className="dt-guide-link">{mainHref}</p>}
           {android && <button type="button" className="dt-guide-share" onClick={() => onCopy(clientInstructions(android), "Instruções copiadas para enviar ao cliente!")}>Copiar instruções para o cliente</button>}
-        </div> : <div className="dt-guide-download-info"><strong>DeltaTV na loja oficial Roku</strong><p>Para instalar, pesquise o aplicativo diretamente na Loja de Canais da sua TV Roku. Não instale APK na Roku.</p>{mainHref && <div className="dt-guide-actions"><a className="dt-guide-primary" href={mainHref} target="_blank" rel="noopener noreferrer">Abrir link da Roku cadastrado</a><button type="button" onClick={() => onCopy(mainHref)}>Copiar link</button></div>}{!mainHref && <a className="dt-guide-primary dt-guide-store" href="https://channelstore.roku.com/pt-br/browse?locale=pt-br" target="_blank" rel="noopener noreferrer">Abrir Loja de Canais Roku</a>}</div>}
+        </div> : <div className="dt-guide-download-info"><div className="dt-guide-roku-identify"><img src={rokuStoreArtwork} alt="Ícone oficial do DeltaTV na Loja Roku" /><span><strong>Reconheça o DeltaTV na Loja Roku</strong><small>Este é o ícone do aplicativo publicado na loja.</small></span></div><strong>DeltaTV na loja oficial Roku</strong><p>Para instalar, pesquise o aplicativo diretamente na Loja de Canais da sua TV Roku. Não instale APK na Roku.</p>{mainHref && <div className="dt-guide-actions"><a className="dt-guide-primary" href={mainHref} target="_blank" rel="noopener noreferrer">Abrir link da Roku cadastrado</a><button type="button" onClick={() => onCopy(mainHref)}>Copiar link</button></div>}{!mainHref && <a className="dt-guide-primary dt-guide-store" href="https://channelstore.roku.com/pt-br/browse?locale=pt-br" target="_blank" rel="noopener noreferrer">Abrir Loja de Canais Roku</a>}</div>}
       </>}
     </div>
     {feedback && <p className="dt-guide-feedback" role="status">{feedback}</p>}
