@@ -199,6 +199,7 @@ function Shell({ user }) {
   // APIs globais não são expostas: módulos delegáveis abrem sua versão isolada por rede.
   const hidden = (k) => (user.role === "admin" && k === "service-packages") ||
     !adminPageAllowed(k,user) || (user.role === "support" && k === "audit");
+  const pageLabel = id => user.role === "admin" && id === "pricing" ? "Planos que ofereço" : PAGES[id][0];
   const canOpenPage = id => Boolean(PAGES[id]) && !hidden(id);
   const allowed = id => canOpenPage(id);
   // Endereços antigos de sub-dashboards (#area/..., #pagamentos) abrem direto a função correspondente.
@@ -257,7 +258,7 @@ function Shell({ user }) {
         className={`nav ${page === k ? 'active' : ''}`}
         aria-current={page === k ? 'page' : undefined}
         onClick={() => go(k)}>
-        <span className="nav__label"><NavIcon k={k}/>{PAGES[k][0]}</span>
+        <span className="nav__label"><NavIcon k={k}/>{pageLabel(k)}</span>
         {badges[k] > 0 && <span className="count">{badges[k] > 99 ? '99+' : badges[k]}</span>}
       </button>)}
     </div>;
@@ -265,7 +266,7 @@ function Shell({ user }) {
   // Mesmas funções do menu lateral, em cartões na tela inicial (o painel inicial já é a primeira entrada).
   const homeGroups = [...GROUPS,...EXTRA_GROUPS].map(g => ({
     label: g.label || "Geral",
-    items: g.items.filter(k => k !== "dashboard" && allowed(k)).map(k => ({ id: k, label: PAGES[k][0], icon: <NavIcon k={k} />, badge: badges[k] })),
+    items: g.items.filter(k => k !== "dashboard" && allowed(k)).map(k => ({ id: k, label: pageLabel(k), icon: <NavIcon k={k} />, badge: badges[k] })),
   }));
   return (
     <div className="layout">
@@ -287,12 +288,12 @@ function Shell({ user }) {
           <button type="button" className="icon menu-btn" aria-label="Abrir menu" aria-controls="menu-principal" aria-expanded={open} onClick={() => setOpen(true)}>
             <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
           </button>
-          <strong className="topbar-title">{PAGES[page][0]}</strong>
+          <strong className="topbar-title">{pageLabel(page)}</strong>
           {badges.unlinked > 0 || badges.resellers > 0 ? <span className="count" aria-label="Itens aguardando">{(badges.unlinked || 0) + (badges.resellers || 0)}</span> : null}
           <button type="button" className="easy-mode-button" aria-pressed={!simpleMode} onClick={() => setSimpleMode((s) => !s)}>{simpleMode ? "Guia das telas: ligado" : "Guia das telas: desligado"}</button>
           <UserMenu user={user} onAccount={() => go("conta")} />
         </div>
-        <main className="content"><Breadcrumb panel="admin" current={PAGES[page][0]} onHome={()=>go(canOpenPage('dashboard')?'dashboard':'workspace')}/>
+        <main className="content"><Breadcrumb panel="admin" current={pageLabel(page)} onHome={()=>go(canOpenPage('dashboard')?'dashboard':'workspace')}/>
           {(page === "dashboard" || page === "workspace") && <AppInstallSpotlight onOpen={() => go("downloads")} />}
           <TaskFinder tasks={TASKS.filter(task => allowed(task.route))} onNavigate={go} />
           {simpleMode && page !== "dashboard" && <EasyPageGuide role="admin" page={page} onBack={() => go("dashboard")} />}

@@ -196,7 +196,7 @@ export default function NetworkWorkspace({section="workspace", onNavigate}){
    </section>;
  };
  return <div className="workspace-admin-page" style={{display:"grid",gap:18}}>
-  <div className="page-head"><h2>{central?"Administração das redes":SECTION_NAMES[section]||"Minha rede"}</h2>
+  <div className="page-head"><h2>{central?"Administração das redes":section==="plans"?"Planos que ofereço":SECTION_NAMES[section]||"Minha rede"}</h2>
     <p className="muted">{section==="dashboard"?"Acompanhe os números e acesse as ferramentas liberadas para sua rede.":
        section==="devices"||section==="resources"||section==="billing"||section==="members"?
          "Selecione uma conta da sua rede para acessar os dados e ações autorizados.":
@@ -276,7 +276,7 @@ export default function NetworkWorkspace({section="workspace", onNavigate}){
        <PlanVisibilityOption hidden={planForm.hiddenFromNetwork} onChange={value=>setPlanForm({...planForm,hiddenFromNetwork:value})}/>
        <div className="actions"><button className="btn" onClick={()=>setPlanForm(null)}>Cancelar</button><button className="btn primary" disabled={busy||!planForm.name} onClick={savePlan}>Salvar plano</button></div>
      </div>}
-     <div className="card" style={{padding:16}}><h3>Planos desta rede</h3>
+     <div className="card" style={{padding:16}}><h3>Planos que você oferece aos parceiros e revendas</h3><p className="muted">Este catálogo é da sua rede. O plano contratado por uma conta aparece no portal dela e não deve ser confundido com os planos de oferta.</p>
        {plans.length?<table className="table"><thead><tr><th>Plano</th><th>Preço mensal</th><th>DNS</th><th>Ativações</th><th>Validade</th><th>Gerenciar</th></tr></thead><tbody>{plans.map(p=><tr key={p.key}><td>{p.name} {p.hiddenFromNetwork&&<span className="pill">Oculto</span>}</td><td>{currency(p.monthlyPriceCents)}</td><td>{p.maxServers??"Sem limite"}</td><td>{p.activationLimit??"Sem limite"}</td><td>{p.validityDays??30} dias · {p.active?"Ativo":"Inativo"}</td><td>{permits("network:plans:write")&&<div className="actions"><button className="btn sm" onClick={()=>setPlanForm({key:p.key,name:p.name,description:p.description,audience:"both",monthlyPrice:(p.monthlyPriceCents/100).toFixed(2),maxServers:String(p.maxServers??""),noDnsLimit:p.maxServers==null,activationLimit:String(p.activationLimit??''),noActivationLimit:p.activationLimit==null,validityDays:String(p.validityDays??30),autoFailover:p.autoFailover,autoPriority:p.autoPriority,emailAlerts:p.emailAlerts,detailedHistory:p.detailedHistory,hiddenFromNetwork:!!p.hiddenFromNetwork})}>Editar</button><button className="btn sm" disabled={busy} onClick={()=>void act(()=>request(`plans/${p.key}`,{method:"PUT",body:{active:!p.active}}),p.active?"Plano desativado.":"Plano reativado.")}>{p.active?"Desativar":"Reativar"}</button><button className="btn sm" disabled={busy} onClick={()=>void previewPlanDeletion(p)}>Excluir</button></div>}</td></tr>)}</tbody></table>:<p className="muted">Nenhum plano criado nesta rede.</p>}
      </div>
    </>}
