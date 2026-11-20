@@ -1,9 +1,8 @@
 import {useCallback,useEffect,useState} from 'react';
 import {api} from '../api.js';
-import {formatBRL} from '@deltatv/ui/money';
+import {formatBRL,toCents} from '@deltatv/ui/money';
 import PortalUsageAdmin from './PortalUsage.jsx';
 const money=formatBRL;
-const toCents=s=>Math.round(Number(String(s).replace(',','.'))*100);
 const date=s=>s?new Date(s).toLocaleDateString('pt-BR'):'—';
 const Panel=({title,sub,children})=><section className="panel" style={{padding:20,display:'grid',gap:14,minWidth:0}}><header><h2>{title}</h2>{sub&&<p className="muted">{sub}</p>}</header>{children}</section>;
 const Line=({label,children})=><label style={{display:'grid',gap:6,fontSize:14}}>{label}{children}</label>;
@@ -39,7 +38,7 @@ export default function PortalSales(){
   {tab==='masters'&&<>
    {!packages.some(p=>p.active&&p.service_tier)&&<div className="notice" role="status">Para começar, cadastre um Pacote de Serviço. <button type="button" className="outline" onClick={()=>{window.location.hash='service-packages';}}>Criar pacote</button></div>}
    <Panel title="Cadastrar Master" sub="Escolha o pacote, ajuste as ativações e as permissões. Sem precisar criar a conta em outra tela.">
-    <form style={{display:'grid',gap:16}} onSubmit={async e=>{e.preventDefault();const result=await act('/admin/portal-sales/masters/quick','POST',{
+    <form style={{display:'grid',gap:16}} onSubmit={async e=>{e.preventDefault();if(!newMaster.free&&toCents(newMaster.price)==null){setErr('Informe um preço válido em reais.');return;}const result=await act('/admin/portal-sales/masters/quick','POST',{
      account:newMaster.accountMode==='existing'?{mode:'existing',partnerId:newMaster.partnerId}:{mode:'new',companyName:newMaster.companyName,
        name:newMaster.name,email:newMaster.email,password:newMaster.password},
      planCode:newMaster.planCode,activationLimit:newMaster.activationUnlimited?null:Number(newMaster.activations),
@@ -124,7 +123,7 @@ export default function PortalSales(){
    <Layout><div className="stat"><small>Recebimentos confirmados neste mês</small><strong>{money(overview?.finance?.received_this_month_cents)}</strong></div><div className="stat"><small>Pendente de recebimento</small><strong>{money(overview?.finance?.pending_cents)}</strong></div><div className="stat"><small>Masters de primeiro nível</small><strong>{roots.length}</strong></div></Layout>
    <details><summary style={{cursor:'pointer',fontWeight:600,padding:12}}>Preços individuais negociados</summary>
    <Panel title="Preços negociados com Masters" sub="Cada Master de primeiro nível pode ter seu próprio preço de compra. A alteração valerá somente para pedidos futuros.">
-    <form style={{display:'grid',gap:12}} onSubmit={e=>{e.preventDefault();void act('/admin/portal-sales/negotiated-prices','PUT',{
+    <form style={{display:'grid',gap:12}} onSubmit={e=>{e.preventDefault();if(toCents(priceEdit.unitPrice)==null){setErr('Informe um preço válido em reais.');return;}void act('/admin/portal-sales/negotiated-prices','PUT',{
       sellerId:priceEdit.sellerId,planCode:priceEdit.planCode,unitPriceCents:toCents(priceEdit.unitPrice),reason:priceEdit.reason});}}>
      <Layout><Line label="Master"><select required value={priceEdit.sellerId} onChange={e=>setPriceEdit({...priceEdit,sellerId:e.target.value})}><option value="">Selecionar</option>{roots.map(r=><option value={r.partner_id} key={r.partner_id}>{r.name}</option>)}</select></Line>
       <Line label="Pacote de Serviço"><select required value={priceEdit.planCode} onChange={e=>setPriceEdit({...priceEdit,planCode:e.target.value})}><option value="">Selecionar</option>{packages.filter(p=>p.service_tier).map(p=><option key={p.code} value={p.code}>{p.name}</option>)}</select></Line>

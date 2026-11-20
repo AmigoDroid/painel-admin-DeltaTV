@@ -4,6 +4,8 @@ import Devices from "./Devices.jsx";
 import {useCallback,useEffect,useMemo,useRef,useState} from "react";
 import {api,getAuth} from "../api.js";
 import {addMonthsClamped} from "../workspace-dates.js";
+import {toCents,formatBRL} from "@deltatv/ui/money";
+import {PlanTechnicalOptions,PlanVisibilityOption} from "./PlanCommonFields.jsx";
 
 // Administração de rede isolada: nenhum componente desta tela usa APIs globais
 // como /admin/partners, /admin/dashboard ou /admin/service-plans.
@@ -17,10 +19,9 @@ const LABELS={
  "network:devices:read":"Ver dispositivos", "network:devices:write":"Gerenciar ativações de TVs", "network:billing:read":"Ver faturas", "network:billing:write":"Emitir faturas",
  "network:audit:read":"Consultar auditoria da rede",
 };
-const currency=cents=>new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format((Number(cents)||0)/100);
-const toCents=value=>Math.round(Number(String(value).replace(",","."))*100);
+const currency=formatBRL;
 const nextMonth=()=>addMonthsClamped();
-const blankPlan=()=>({name:"",description:"",audience:"content",monthlyPrice:"0.00",maxServers:"5",noDnsLimit:false,activationLimit:"100",noActivationLimit:false,validityDays:"30",
+const blankPlan=()=>({name:"",description:"",audience:"both",monthlyPrice:"0.00",maxServers:"5",noDnsLimit:false,activationLimit:"100",noActivationLimit:false,validityDays:"30",
   autoFailover:true,autoPriority:false,emailAlerts:false,detailedHistory:false,hiddenFromNetwork:false});
 const blankAccount=kind=>({name:'',email:'',password:'',kind,planKey:''});
 const blankInvite=(kind='content')=>({mode:'link',kind,email:'',planKey:'',label:'',sendEmail:false,maxUses:10,validityDays:7});
@@ -130,7 +131,7 @@ export default function NetworkWorkspace({section="workspace", onNavigate}){
  const savePlan=async()=>{
    const f=planForm;const parsed=toCents(f.monthlyPrice);
    if(!Number.isInteger(parsed)||parsed<0)return setError("Informe um preço válido.");
-   const body={name:f.name,description:f.description,audience:f.audience,monthlyPriceCents:parsed,
+   const body={name:f.name,description:f.description,audience:"both",monthlyPriceCents:parsed,
     maxServers:f.noDnsLimit?null:Number(f.maxServers),
     activationLimit:f.noActivationLimit?null:Number(f.activationLimit),
     validityDays:Number(f.validityDays),autoFailover:f.autoFailover,autoPriority:f.autoPriority,
@@ -160,7 +161,7 @@ export default function NetworkWorkspace({section="workspace", onNavigate}){
      edit?'Conta atualizada conforme o plano.':'Conta criada nesta rede, com os recursos definidos pelo plano.');
    if(ok){setAccountForm(null);setEditingAccount(null);setSelected(null);}
  };
- const planOptions=kind=>plans.filter(p=>p.active&&(p.audience===kind||p.audience==='both'));
+ const planOptions=()=>plans.filter(p=>p.active);
  const formatLimit=value=>value==null?'Sem limite':String(value);
  const renderAccountForm=(f,set,edit=false)=>{
    const plan=plans.find(p=>p.key===f.planKey);
@@ -266,19 +267,17 @@ export default function NetworkWorkspace({section="workspace", onNavigate}){
      {planForm&&<div className="card" style={{display:"grid",gap:12,padding:20}}>
        <h3>{planForm.key?"Editar plano":"Novo plano"}</h3>
        <div className="row">{field("Nome",<input value={planForm.name} onChange={e=>setPlanForm({...planForm,name:e.target.value})}/>)}
-       {field("Tipo",<select value={planForm.audience} onChange={e=>setPlanForm({...planForm,audience:e.target.value})}><option value="content">Parceiro</option><option value="reseller">Revenda</option><option value="both">Ambos</option></select>)}
        {field("Mensalidade (R$)",<input type="number" min="0" step="0.01" value={planForm.monthlyPrice} onChange={e=>setPlanForm({...planForm,monthlyPrice:e.target.value})}/>)}</div>
        {field("Descrição",<input value={planForm.description} onChange={e=>setPlanForm({...planForm,description:e.target.value})}/>)}
        <div className="row">{field("DNS por código",<><input type="number" min="1" disabled={planForm.noDnsLimit} value={planForm.maxServers} onChange={e=>setPlanForm({...planForm,maxServers:e.target.value})}/><label><input type="checkbox" checked={planForm.noDnsLimit} onChange={e=>setPlanForm({...planForm,noDnsLimit:e.target.checked})}/> Sem limite</label></>)}</div>
        <div className="row">{field('Ativações',<><input type="number" min="0" disabled={planForm.noActivationLimit} value={planForm.activationLimit} onChange={e=>setPlanForm({...planForm,activationLimit:e.target.value})}/><label><input type="checkbox" checked={planForm.noActivationLimit} onChange={e=>setPlanForm({...planForm,noActivationLimit:e.target.checked})}/> Sem limite</label></>)}
          {field('Validade inicial do acesso (dias)',<input type="number" min="1" max="3660" value={planForm.validityDays} onChange={e=>setPlanForm({...planForm,validityDays:e.target.value})}/>)}</div>
-       <div className="row">{[["autoFailover","Failover automático"],["autoPriority","Prioridade automática"],["emailAlerts","Alertas por e-mail"],["detailedHistory","Histórico detalhado"]].map(([key,label])=><label key={key}><input type="checkbox" checked={planForm[key]} onChange={e=>setPlanForm({...planForm,[key]:e.target.checked})}/> {label}</label>)}</div>
-       <label><input type="checkbox" checked={!!planForm.hiddenFromNetwork} onChange={e=>setPlanForm({...planForm,hiddenFromNetwork:e.target.checked})}/> Ocultar da minha rede (o parceiro não vê nem contrata este plano)</label>
-       <p className="muted">Você e a DeltaTV ainda poderão atribuí-lo manualmente. Contas existentes permanecem ativas.</p>
+       <PlanTechnicalOptions className="row" plan={planForm} onChange={(key,value)=>setPlanForm({...planForm,[key]:value,...(key==="autoFailover"&&!value?{autoPriority:false}:{})})}/>
+       <PlanVisibilityOption hidden={planForm.hiddenFromNetwork} onChange={value=>setPlanForm({...planForm,hiddenFromNetwork:value})}/>
        <div className="actions"><button className="btn" onClick={()=>setPlanForm(null)}>Cancelar</button><button className="btn primary" disabled={busy||!planForm.name} onClick={savePlan}>Salvar plano</button></div>
      </div>}
      <div className="card" style={{padding:16}}><h3>Planos desta rede</h3>
-       {plans.length?<table className="table"><thead><tr><th>Plano</th><th>Tipo</th><th>Preço mensal</th><th>DNS</th><th>Ativações</th><th>Validade</th><th>Gerenciar</th></tr></thead><tbody>{plans.map(p=><tr key={p.key}><td>{p.name} {p.hiddenFromNetwork&&<span className="pill">Oculto</span>}</td><td>{p.audience}</td><td>{currency(p.monthlyPriceCents)}</td><td>{p.maxServers??"Sem limite"}</td><td>{p.activationLimit??"Sem limite"}</td><td>{p.validityDays??30} dias · {p.active?"Ativo":"Inativo"}</td><td>{permits("network:plans:write")&&<div className="actions"><button className="btn sm" onClick={()=>setPlanForm({key:p.key,name:p.name,description:p.description,audience:p.audience,monthlyPrice:(p.monthlyPriceCents/100).toFixed(2),maxServers:String(p.maxServers??""),noDnsLimit:p.maxServers==null,activationLimit:String(p.activationLimit??''),noActivationLimit:p.activationLimit==null,validityDays:String(p.validityDays??30),autoFailover:p.autoFailover,autoPriority:p.autoPriority,emailAlerts:p.emailAlerts,detailedHistory:p.detailedHistory,hiddenFromNetwork:!!p.hiddenFromNetwork})}>Editar</button><button className="btn sm" disabled={busy} onClick={()=>void act(()=>request(`plans/${p.key}`,{method:"PUT",body:{active:!p.active}}),p.active?"Plano desativado.":"Plano reativado.")}>{p.active?"Desativar":"Reativar"}</button><button className="btn sm" disabled={busy} onClick={()=>void previewPlanDeletion(p)}>Excluir</button></div>}</td></tr>)}</tbody></table>:<p className="muted">Nenhum plano criado nesta rede.</p>}
+       {plans.length?<table className="table"><thead><tr><th>Plano</th><th>Preço mensal</th><th>DNS</th><th>Ativações</th><th>Validade</th><th>Gerenciar</th></tr></thead><tbody>{plans.map(p=><tr key={p.key}><td>{p.name} {p.hiddenFromNetwork&&<span className="pill">Oculto</span>}</td><td>{currency(p.monthlyPriceCents)}</td><td>{p.maxServers??"Sem limite"}</td><td>{p.activationLimit??"Sem limite"}</td><td>{p.validityDays??30} dias · {p.active?"Ativo":"Inativo"}</td><td>{permits("network:plans:write")&&<div className="actions"><button className="btn sm" onClick={()=>setPlanForm({key:p.key,name:p.name,description:p.description,audience:"both",monthlyPrice:(p.monthlyPriceCents/100).toFixed(2),maxServers:String(p.maxServers??""),noDnsLimit:p.maxServers==null,activationLimit:String(p.activationLimit??''),noActivationLimit:p.activationLimit==null,validityDays:String(p.validityDays??30),autoFailover:p.autoFailover,autoPriority:p.autoPriority,emailAlerts:p.emailAlerts,detailedHistory:p.detailedHistory,hiddenFromNetwork:!!p.hiddenFromNetwork})}>Editar</button><button className="btn sm" disabled={busy} onClick={()=>void act(()=>request(`plans/${p.key}`,{method:"PUT",body:{active:!p.active}}),p.active?"Plano desativado.":"Plano reativado.")}>{p.active?"Desativar":"Reativar"}</button><button className="btn sm" disabled={busy} onClick={()=>void previewPlanDeletion(p)}>Excluir</button></div>}</td></tr>)}</tbody></table>:<p className="muted">Nenhum plano criado nesta rede.</p>}
      </div>
    </>}
    {deletingPlan&&<Modal title="Excluir plano" onClose={()=>setDeletingPlan(null)}>
@@ -305,7 +304,7 @@ export default function NetworkWorkspace({section="workspace", onNavigate}){
            {permits('network:resellers:write')&&<option value="reseller">Revenda</option>}
          </select>)}
          {field('Plano do link',<select value={inviteForm.planKey} onChange={e=>setInviteForm({...inviteForm,planKey:e.target.value})}>
-           <option value="">Escolha o plano</option>{invitePlans.filter(p=>p.audience==='both'||p.audience===inviteForm.kind).map(p=><option key={p.key} value={p.key}>{p.name} · {currency(p.monthlyPriceCents)}</option>)}
+           <option value="">Escolha o plano</option>{invitePlans.map(p=><option key={p.key} value={p.key}>{p.name} · {currency(p.monthlyPriceCents)}</option>)}
          </select>)}
          {field('Identificação (opcional)',<input maxLength={120} placeholder="Ex.: Divulgação em grupos" value={inviteForm.label} onChange={e=>setInviteForm({...inviteForm,label:e.target.value})}/>)}
          {inviteForm.mode==='email'&&<>{field('E-mail da pessoa',<input type="email" value={inviteForm.email} onChange={e=>setInviteForm({...inviteForm,email:e.target.value})}/>)}

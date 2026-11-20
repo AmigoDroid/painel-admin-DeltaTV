@@ -7,5 +7,8 @@ test('Planos e Recursos apresenta catálogo, Pacotes de Serviço mostra editor p
   assert.match(app,/import ServicePackages from "\.\/pages\/ServicePackages\.jsx"/);
   assert.match(app,/pricing: \["Planos e recursos", PlansAndPricing\]/);
   assert.match(app,/"service-packages": \["Pacotes de serviço", ServicePackages\]/);
-  assert.match(app,/items:\['dashboard','workspace','partners','resellers','pricing','service-packages'/);
+  assert.match(app,/items:\['dashboard','workspace','partners','resellers','pricing','invitations'/);
+  assert.match(app,/items:\['control','ativar-tv','clients','unlinked','credits','network','service-packages'\]/);
+  assert.match(app,/user.role === \"admin\" && k === \"service-packages\"/);
+  assert.match(app,/oldId === \"service-packages\" \? \"pricing\"/);
 });

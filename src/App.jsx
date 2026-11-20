@@ -69,14 +69,14 @@ const PAGES = {
 // Menu único e direto (como no painel do parceiro): cada função abre a própria página,
 // sem passar por sub-dashboards. A mesma lista alimenta o menu lateral e a tela inicial.
 const GROUPS = [
- {label:null,items:['dashboard','workspace','partners','resellers','pricing','service-packages','invitations','devices']},
+ {label:null,items:['dashboard','workspace','partners','resellers','pricing','invitations','devices']},
  {label:'Operação',items:['licenses','billing','network-finance','sources','support','downloads']},
  {label:'Administração',items:['users','global-config']},
 ];
 // Ferramentas avançadas continuam acessíveis sem poluir a navegação principal.
 // As permissões e as rotas permanecem iguais às da versão anterior.
 const EXTRA_GROUPS = [
- {label:'Operações avançadas',items:['control','ativar-tv','clients','unlinked','credits','network']},
+ {label:'Operações avançadas',items:['control','ativar-tv','clients','unlinked','credits','network','service-packages']},
  {label:'Aplicativos e DNS',items:['whiteLabel','webaccess','servermonitor']},
  {label:'Infraestrutura e auditoria',items:['finance-networks','gateways','vpsmonitor','vpsfiles','trash','loginhistory','audit','notifications','mail','help','conta']},
 ];
@@ -197,13 +197,14 @@ function Shell({ user }) {
   // Itens do menu são conveniência: cada rota é protegida por permissão no backend.
   // As opções dos Admins são permitidas pelo mesmo catálogo e aparecem na mesma navegação.
   // APIs globais não são expostas: módulos delegáveis abrem sua versão isolada por rede.
-  const hidden = (k) => !adminPageAllowed(k,user) ||
-    (user.role === "support" && k === "audit");
+  const hidden = (k) => (user.role === "admin" && k === "service-packages") ||
+    !adminPageAllowed(k,user) || (user.role === "support" && k === "audit");
   const canOpenPage = id => Boolean(PAGES[id]) && !hidden(id);
   const allowed = id => canOpenPage(id);
   // Endereços antigos de sub-dashboards (#area/..., #pagamentos) abrem direto a função correspondente.
   const fromHash = () => {
-    const id = resolveLegacyRoute(location.hash.slice(1));
+    const oldId = resolveLegacyRoute(location.hash.slice(1));
+    const id = user.role === "admin" && oldId === "service-packages" ? "pricing" : oldId;
     return allowed(id) ? id : (canOpenPage('dashboard') ? 'dashboard' : canOpenPage('workspace') ? 'workspace' : 'conta');
   };
   const [page, setPage] = useState(fromHash);
