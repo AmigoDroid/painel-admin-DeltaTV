@@ -200,10 +200,15 @@ function Shell({ user }) {
   const hidden = (k) => !adminPageAllowed(k,user) ||
     (user.role === "support" && k === "audit");
   const canOpenPage = id => Boolean(PAGES[id]) && !hidden(id);
-  const allowed = id => canOpenPage(id);
+  // Para o Admin delegado, "Pacotes de serviço" abre a mesma tela de "Planos e recursos":
+  // mantém uma única entrada no menu e leva links antigos (#service-packages) para ela.
+  const ADMIN_ALIAS = { "service-packages": "pricing" };
+  const isAlias = id => user.role === "admin" && Boolean(ADMIN_ALIAS[id]);
+  const allowed = id => canOpenPage(id) && !isAlias(id);
   // Endereços antigos de sub-dashboards (#area/..., #pagamentos) abrem direto a função correspondente.
   const fromHash = () => {
-    const id = resolveLegacyRoute(location.hash.slice(1));
+    const raw = resolveLegacyRoute(location.hash.slice(1));
+    const id = user.role === "admin" && ADMIN_ALIAS[raw] ? ADMIN_ALIAS[raw] : raw;
     return allowed(id) ? id : (canOpenPage('dashboard') ? 'dashboard' : canOpenPage('workspace') ? 'workspace' : 'conta');
   };
   const [page, setPage] = useState(fromHash);
@@ -225,7 +230,7 @@ function Shell({ user }) {
   }, [user.role, permissionsFingerprint]);
   const Current = PAGES[page]?.[1] || Dashboard;
   const adminView = user.role === "admin" ? adminScopedView(page) : null;
-  const go = (k) => { if (!allowed(k)) return; setPage(k); setOpen(false); window.scrollTo(0, 0); };
+  const go = (k0) => { const k = user.role === "admin" && ADMIN_ALIAS[k0] ? ADMIN_ALIAS[k0] : k0; if (!allowed(k)) return; setPage(k); setOpen(false); window.scrollTo(0, 0); };
   // Esc fecha a gaveta; ao voltar para tela grande ela não fica "aberta" escondida.
   useEffect(() => {
     if (!open) return undefined;

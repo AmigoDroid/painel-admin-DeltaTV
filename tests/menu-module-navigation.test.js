@@ -9,3 +9,9 @@ test('Planos e Recursos apresenta catálogo, Pacotes de Serviço mostra editor p
   assert.match(app,/"service-packages": \["Pacotes de serviço", ServicePackages\]/);
   assert.match(app,/items:\['dashboard','workspace','partners','resellers','pricing','service-packages'/);
 });
+
+test('Admin delegado não vê Pacotes de serviço duplicado: alias para Planos e recursos',()=>{
+  assert.match(app,/ADMIN_ALIAS = \{ "service-packages": "pricing" \}/);
+  assert.match(app,/const allowed = id => canOpenPage\(id\) && !isAlias\(id\)/);
+  assert.match(app,/ADMIN_ALIAS\[raw\]/);
+});
