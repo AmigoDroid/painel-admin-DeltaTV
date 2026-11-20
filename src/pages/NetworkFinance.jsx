@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api, getAuth } from '../api.js';
 import { Modal } from '../ui.jsx';
+import OneOffChargeModal from './OneOffChargeModal.jsx';
 
 const labels={mercadopago:'Mercado Pago',infinitepay:'InfinitePay'};
 const money=n=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(n||0)/100);
@@ -18,8 +19,8 @@ const quoteBody=v=>({partnerId:v.partnerId,kind:v.kind,planTo:v.planTo,
  ...(v.waive?{waiver:{full:Boolean(v.waiveAll),lateFeeCents:Math.round(Number(v.waiveFee||0)*100),
    interestCents:Math.round(Number(v.waiveInterest||0)*100),reason:v.waiveReason||''}}:{})});
 const instructions={
- mercadopago: <ol><li>Entre em <a href="https://www.mercadopago.com.br/developers/pt" target="_blank" rel="noreferrer">Mercado Pago Developers</a> e abra <b>Suas integrações</b>.</li><li>Selecione sua aplicação, abra <b>Credenciais de produção</b> e copie o <b>Access Token</b>.</li><li>Em <b>Webhooks</b>, configure o endereço informado pelo suporte técnico para cobranças da rede e gere a <b>assinatura secreta</b>. Guarde-a apenas aqui.</li></ol>,
- infinitepay: <ol><li>Entre na sua conta <a href="https://www.infinitepay.io/checkout-documentacao" target="_blank" rel="noreferrer">InfinitePay — Checkout Integrado</a>.</li><li>Copie sua <b>InfiniteTag</b> (sem o símbolo $) e obtenha a <b>API Key</b> do Checkout Integrado, que começa com <code>inchk_</code>.</li><li>O teste cria um link de R$ 1,00, sem cobrar ninguém. Não efetue o pagamento desse link.</li></ol>,
+ mercadopago: <ol><li>Entre em <a href="https://www.mercadopago.com.br/developers/pt" target="_blank" rel="noreferrer">Mercado Pago Developers</a> e abra <b>Suas integrações</b>.</li><li>Selecione sua aplicação, abra <b>Credenciais de produção</b> e copie o <b>Access Token</b>.</li><li>Em <b>Webhooks</b> na integração de produção, gere a <b>assinatura secreta</b> e salve-a aqui. O backend envia automaticamente a <code>notification_url</code> específica de cada cobrança, em HTTPS. Não cadastre um URL genérico sem o identificador do pagamento.</li><li>Quando houver notificação, o sistema verifica a assinatura <code>x-signature</code>, reconsulta o pagamento e confere valor, Pix, recebedor e referência. Uma URL acessível, sozinha, não confirma o pagamento.</li></ol>,
+ infinitepay: <ol><li>Entre na sua conta <a href="https://www.infinitepay.io/checkout-documentacao" target="_blank" rel="noreferrer">InfinitePay — Checkout Integrado</a>.</li><li>Copie sua <b>InfiniteTag</b> (sem o símbolo $) e obtenha a <b>API Key</b> do Checkout Integrado, que começa com <code>inchk_</code>.</li><li>A cada cobrança, o servidor envia <code>webhook_url</code> no pedido do link. A InfinitePay não exige cadastrar a URL separadamente. O aviso não é assinado; a confirmação sempre exige consulta <code>payment_check</code> com os identificadores corretos.</li><li>O teste cria um link real de R$ 1,00, sem cobrar ninguém até que seja pago. Não efetue esse pagamento.</li></ol>,
 };
 export default function NetworkFinance(){
  const viewer=getAuth()?.user;
@@ -31,8 +32,8 @@ export default function NetworkFinance(){
  const [gateways,setGateways]=useState([]),[charges,setCharges]=useState([]),[totals,setTotals]=useState({}),[meta,setMeta]=useState({}),[page,setPage]=useState(1);
  const [status,setStatus]=useState(''),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[error,setError]=useState('');
  const [editing,setEditing]=useState(null),[form,setForm]=useState({}),[partners,setPartners]=useState([]),[plans,setPlans]=useState([]);
- const [newCharge,setNewCharge]=useState(null),[manual,setManual]=useState(null),[cancel,setCancel]=useState(null);
- const [billingSettings,setBillingSettings]=useState(null),[editSettings,setEditSettings]=useState(false),[preview,setPreview]=useState(null);
+ const [newCharge,setNewCharge]=useState(null),[manual,setManual]=useState(null),[cancel,setCancel]=useState(null),[oneOff,setOneOff]=useState(false);
+ const [billingSettings,setBillingSettings]=useState(null),[editSettings,setEditSettings]=useState(false),[preview,setPreview]=useState(null),[webhookInfo,setWebhookInfo]=useState(null);
  const load=async()=>{
   const [gs,cs,bs]=await Promise.all([canGateways?api('/admin/workspace/finance/gateways'):Promise.resolve({data:[]}),
    canRead?api('/admin/workspace/finance/charges',{query:{page,pageSize:20,status:status||undefined}}):Promise.resolve({data:[]}),
@@ -65,6 +66,10 @@ export default function NetworkFinance(){
      earlyStartsAt:v.earlyStartsAt?new Date(`${localInput(v.earlyStartsAt)}:00-03:00`).toISOString():null,
      earlyEndsAt:v.earlyEndsAt?new Date(`${localInput(v.earlyEndsAt)}:00-03:00`).toISOString():null};
    void action(()=>api('/admin/workspace/finance/pricing/settings',{method:'PUT',body:normalize}),'Regras de cobrança atualizadas.').then(ok=>ok&&setEditSettings(false));};
+ useEffect(()=>{if(!canGateways)return;let active=true;
+  api('/admin/workspace/finance/gateways/webhook-info').then(info=>{if(active)setWebhookInfo(info)}).catch(()=>{});
+  return()=>{active=false};
+ },[canGateways]);
  const providerList=useMemo(()=>['mercadopago','infinitepay'].map(p=>gateways.find(g=>g.provider===p)||{provider:p,configured:false,active:false,tested:false}),[gateways]);
  return <div style={{display:'grid',gap:18}}>
   <header><h1>Recebimentos da minha rede</h1><p className="muted">Os valores vão diretamente para o provedor configurado na sua conta. Não há transferência para a carteira DeltaTV.</p></header>
@@ -72,6 +77,10 @@ export default function NetworkFinance(){
   {!canGateways&&<div className="notice" role="status">Para visualizar e configurar Mercado Pago ou InfinitePay, solicite à DeltaTV a permissão de gateways desta rede.</div>}
   {canGateways&&<section className="card" style={{padding:20}}><h2>Provedor ativo — selecione apenas um</h2>
    <p className="muted">Trocar de provedor não invalida as cobranças em aberto. As credenciais antigas ficam preservadas enquanto houver pagamento pendente.</p>
+   <div className="notice"><strong>Webhooks</strong><p>Mercado Pago: em <b>Suas integrações → Webhooks → Produção</b>, cadastre a URL abaixo no evento <b>Pagamentos</b>. Depois copie a assinatura secreta para Configurar Mercado Pago. A plataforma também informa automaticamente a URL específica em cada Pix.</p>
+    {webhookInfo?.mercadopagoUrl&&<label>URL pública do Mercado Pago<input readOnly value={webhookInfo.mercadopagoUrl} onFocus={e=>e.target.select()}/></label>}
+    <p>InfinitePay: nenhuma URL fixa precisa ser cadastrada. O backend informa o webhook na criação de cada checkout e confirma o recebimento por <code>payment_check</code>.</p>
+    <small>O teste de conexão do gateway NÃO testa entrega de webhook. Confirme também uma cobrança controlada e o registro de pagamento.</small></div>
    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(250px,1fr))',gap:16}}>{providerList.map(g=><div key={g.provider} className="card" style={{padding:16}}>
     <h3>{labels[g.provider]}</h3><p>{g.active?'Ativo':g.configured?'Cadastrado, inativo':'Não cadastrado'}</p><p className="muted">Conta: {g.accountRefMasked||'Não informada'}<br/>Conexão: {g.tested?'Testada':'Teste necessário'}</p>
     <div className="row" style={{flexWrap:'wrap',gap:8}}>{canConfigure&&<><button className="btn" onClick={()=>edit(g.provider)}>Configurar</button>
@@ -85,13 +94,14 @@ export default function NetworkFinance(){
     <p className="muted">Teto DeltaTV: multa {billingSettings.caps.lateFeePct}% e juros {billingSettings.caps.interestMonthlyPct}% ao mês. Desconto antecipado: {billingSettings.settings.earlyDiscountEnabled?'Ativo':'Desativado'}.</p>
    </section>}
   {canRead&&<section className="card" style={{padding:20}}><div className="row" style={{justifyContent:'space-between',gap:10,flexWrap:'wrap'}}><h2>Cobranças e movimentações</h2>
-   {canWrite&&granted.has('network:plans:read')&&<button className="btn primary" onClick={startCharge}>Nova cobrança</button>}</div>
+   {canWrite&&<div className="row" style={{gap:8}}>{granted.has('network:plans:read')&&<button className="btn" onClick={startCharge}>Renovar / Upgrade</button>}<button className="btn primary" onClick={()=>setOneOff(true)}>Cobrança avulsa</button></div>}</div>
    <div className="row" style={{flexWrap:'wrap',gap:12}}><label>Status <select value={status} onChange={e=>{setPage(1);setStatus(e.target.value)}}><option value="">Todos</option>{['creating','pending','paid','expired','cancelled','failed','review','needs_review'].map(s=><option key={s} value={s}>{s}</option>)}</select></label>
    <span>Pago: <strong>{money(totals.paid)}</strong></span><span>Pendente: <strong>{money(totals.pending)}</strong></span><span>Expirado: <strong>{money(totals.expired)}</strong></span></div>
-   <div style={{overflowX:'auto'}}><table className="table"><thead><tr><th>Parceiro</th><th>Tipo / plano</th><th>Valor</th><th>Status</th><th>Recebimento</th><th>Criado / pago</th><th>Ações</th></tr></thead><tbody>{charges.map(c=><tr key={c.id}><td>{c.partnerName}</td><td>{c.kind==='renewal'?'Renovação':'Upgrade'}: {c.planFrom||'—'} → {c.planTo}</td><td>{money(c.amountCents)}{snapshotLines(c.breakdown)}</td><td>{c.status==='needs_review'?'Precisa de revisão':c.status}</td><td>{c.method==='manual'?'Manual (sem comprovação do provedor)':labels[c.provider]||'—'}<br/><small>{c.reference||'—'}</small></td><td>{day(c.createdAt)}<br/>{day(c.paidAt)}</td><td>{c.status==='pending'&&canWrite&&<div className="row" style={{gap:6}}>{c.method==='manual'&&<button className="btn sm" onClick={()=>setManual({id:c.id,reference:''})}>Confirmar manual</button>}<button className="btn sm" onClick={()=>setCancel({id:c.id,reason:''})}>Cancelar</button></div>}</td></tr>)}
+   <div style={{overflowX:'auto'}}><table className="table"><thead><tr><th>Parceiro</th><th>Tipo / plano</th><th>Valor</th><th>Status</th><th>Recebimento</th><th>Criado / pago</th><th>Ações</th></tr></thead><tbody>{charges.map(c=><tr key={c.id}><td>{c.partnerName}</td><td>{c.kind==='one_off'?`Avulsa: ${c.description||'Serviço adicional'}`:`${c.kind==='renewal'?'Renovação':'Upgrade'}: ${c.planFrom||'—'} → ${c.planTo}`}</td><td>{money(c.amountCents)}{snapshotLines(c.breakdown)}</td><td>{c.status==='needs_review'?'Precisa de revisão':c.status}</td><td>{c.method==='manual'?'Manual (sem comprovação do provedor)':labels[c.provider]||'—'}<br/><small>{c.reference||'—'}</small></td><td>{day(c.createdAt)}<br/>{day(c.paidAt)}</td><td>{c.status==='pending'&&canWrite&&<div className="row" style={{gap:6}}>{c.method==='manual'&&<button className="btn sm" onClick={()=>setManual({id:c.id,reference:''})}>Confirmar manual</button>}<button className="btn sm" onClick={()=>setCancel({id:c.id,reason:''})}>Cancelar</button></div>}</td></tr>)}
    {!charges.length&&<tr><td colSpan={7}>Nenhuma cobrança encontrada.</td></tr>}</tbody></table></div>
    <div className="row"><button className="btn" disabled={page<=1} onClick={()=>setPage(v=>v-1)}>Anterior</button><span>Página {page} · {meta.total||0} registros</span><button className="btn" disabled={page*20>=(meta.total||0)} onClick={()=>setPage(v=>v+1)}>Próxima</button></div>
   </section>}
+  {oneOff&&<OneOffChargeModal onClose={()=>setOneOff(false)} onCreated={()=>{setOneOff(false);void load();setMessage('Cobrança avulsa emitida.')}}/>}
   {editing&&<Modal title={`Configurar ${labels[editing]}`} onClose={()=>setEditing(null)} wide><form onSubmit={save}><p>Os segredos são armazenados criptografados e nunca são exibidos novamente. Salvar desativa esse provedor até o próximo teste.</p>
    {instructions[editing]}
    {editing==='mercadopago'?<><label className="label">Access Token de produção<input required type="password" autoComplete="off" value={form.accessToken} onChange={e=>setForm(v=>({...v,accessToken:e.target.value}))}/></label><label className="label">Segredo de assinatura do webhook<input required type="password" autoComplete="off" value={form.webhookSecret} onChange={e=>setForm(v=>({...v,webhookSecret:e.target.value}))}/></label></>:
