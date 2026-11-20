@@ -19,6 +19,6 @@ test('Minha rede do Admin é resumo e não duplica abas nem formulários de cada
   assert.match(workspace,/const showWorkspaceManager=central \|\| section!=="workspace"/);
   assert.match(workspace,/section === "workspace" && !central/);
   assert.match(workspace,/section === "workspace" && central &&/);
-  assert.match(workspace,/section !== "dashboard" && section!=="audit" && showWorkspaceManager && tab==="plans"/);
-  assert.match(workspace,/section !== "dashboard" && section!=="audit" && showWorkspaceManager && tab!=="plans"/);
+  assert.match(workspace,/section !== "dashboard" && section!=="audit" && section!=="trash" && showWorkspaceManager && tab==="plans"/);
+  assert.match(workspace,/section !== "dashboard" && section!=="audit" && section!=="trash" && showWorkspaceManager && tab!=="plans"/);
 });

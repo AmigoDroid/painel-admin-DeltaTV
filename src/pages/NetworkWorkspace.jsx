@@ -1,5 +1,5 @@
 import { useDeviceBulkActions } from "../../shared/useDeviceBulkActions.jsx";
-import { Modal } from "../ui.jsx";
+import { Modal, Badge } from "../ui.jsx";
 import {useCallback,useEffect,useMemo,useRef,useState} from "react";
 import {api,getAuth} from "../api.js";
 import {addMonthsClamped} from "../workspace-dates.js";
@@ -25,7 +25,8 @@ const blankAccount=kind=>({name:'',email:'',password:'',kind,planKey:''});
 const blankInvite=(kind='content')=>({mode:'link',kind,email:'',planKey:'',label:'',sendEmail:false,maxUses:10,validityDays:7});
 const permsOf=user=>new Set(user?.permissions||[]);
 const field=(name,child)=><label className="field" style={{display:"grid",gap:5}}><span>{name}</span>{child}</label>;
-function ErrorMessage({message}){return message?<div className="notice error" role="alert">{message}</div>:null;}
+function ErrorMessage({message}){return message?<div className="notice error" role="alert" style={{position:"fixed",top:16,right:16,zIndex:2147483647,maxWidth:"min(560px,calc(100vw - 32px))",boxShadow:"0 12px 36px #0008"}}>{message}</div>:null;}
+function PartnerBadge({partner}) {return partner.pending ? <Badge status="pending" label="Novo cadastro"/> : <Badge status={partner.effectiveStatus}/>;}
 function StatusMessage({message}){return message?<div className="notice" role="status">{message}</div>:null;}
 const between=(min,max)=>value=>Number.isInteger(Number(value))&&Number(value)>=min&&Number(value)<=max;
 
@@ -36,7 +37,7 @@ const SECTION_TABS = Object.freeze({
 const SECTION_NAMES = Object.freeze({
   dashboard:"Visão geral",workspace:"Minha rede",partners:"Parceiros",resellers:"Revendas",
   plans:"Planos e recursos",invitations:"Links de convite",resources:"DNS e códigos",devices:"TVs e dispositivos",
-  billing:"Financeiro da rede",members:"Usuários dos portais",audit:"Auditoria da rede",
+  billing:"Financeiro da rede",members:"Usuários dos portais",audit:"Auditoria da rede",trash:"Lixeira da minha rede",
 });
 export default function NetworkWorkspace({section="workspace", onNavigate}){
  const viewer=useMemo(()=>getAuth()?.user,[]);
@@ -57,6 +58,8 @@ export default function NetworkWorkspace({section="workspace", onNavigate}){
  const scopedSection=section !== "workspace" && section !== "dashboard";
  const selectedArea=section === "devices" ? "devices" : section === "billing" ? "billing" : "resources";
  const [selected,setSelected]=useState(null);
+ const [trashRows,setTrashRows]=useState([]),[trashMeta,setTrashMeta]=useState(null),[restoring,setRestoring]=useState(null),[restoreReason,setRestoreReason]=useState("");
+ const [statusAction,setStatusAction]=useState(null),[statusReason,setStatusReason]=useState("");
  const [deletingPlan,setDeletingPlan]=useState(null),[planDeletePreview,setPlanDeletePreview]=useState(null),[planDeleteReason,setPlanDeleteReason]=useState(""),
  [planForm,setPlanForm]=useState(null),[accountForm,setAccountForm]=useState(null),[editingAccount,setEditingAccount]=useState(null);
  const [newUser,setNewUser]=useState(null),[editUser,setEditUser]=useState(null),[deleteUser,setDeleteUser]=useState(null),[userDeleteReason,setUserDeleteReason]=useState("");
@@ -65,7 +68,7 @@ export default function NetworkWorkspace({section="workspace", onNavigate}){
  const [inviteForm,setInviteForm]=useState(null),[inviteResult,setInviteResult]=useState(null),
   [invitations,setInvitations]=useState([]),[invitePage,setInvitePage]=useState(1),[inviteMeta,setInviteMeta]=useState(null),
   [registrations,setRegistrations]=useState(null),[editingInvite,setEditingInvite]=useState(null);
- const [q,setQ]=useState(""),[search,setSearch]=useState(""),[page,setPage]=useState(1),[pageMeta,setPageMeta]=useState(null),
+ const [q,setQ]=useState(""),[search,setSearch]=useState(""),[partnerStatus,setPartnerStatus]=useState(""),[page,setPage]=useState(1),[pageMeta,setPageMeta]=useState(null),
    [busy,setBusy]=useState(false),[error,setError]=useState(""),[success,setSuccess]=useState("");
  const requestGeneration=useRef(0);
  const request=useCallback((path,params={})=>api(`/admin/workspace/${path}`,{
@@ -81,20 +84,22 @@ export default function NetworkWorkspace({section="workspace", onNavigate}){
    setError("");
    const jobs=[];
    if(permits("network:dashboard:read"))jobs.push(request("summary").then(v=>{if(requestGeneration.current===generation)setOverview(v);}));
+   if(section==="trash"&&(permits("network:partners:delete")||permits("network:resellers:delete")))
+     jobs.push(request("trash",{query:{page,pageSize:20,q:search}}).then(v=>{if(requestGeneration.current===generation){setTrashRows(v.data||[]);setTrashMeta(v.meta);}}));
    if(section==="audit"&&permits("network:audit:read"))jobs.push(request("audit").then(v=>{if(requestGeneration.current===generation)setAuditRows(v.data||[]);}));
-   if(showWorkspaceManager&&permits("network:plans:read"))jobs.push(request("plans").then(v=>{if(requestGeneration.current===generation)setPlans(v.data||[]);}));
-   if(showWorkspaceManager&&(permits('network:partners:write')||permits('network:resellers:write'))){
+   if(section!=="trash"&&showWorkspaceManager&&permits("network:plans:read"))jobs.push(request("plans").then(v=>{if(requestGeneration.current===generation)setPlans(v.data||[]);}));
+   if(section!=="trash"&&showWorkspaceManager&&(permits('network:partners:write')||permits('network:resellers:write'))){
      jobs.push(request('invitations',{query:{page:invitePage,pageSize:20}}).then(v=>{if(requestGeneration.current===generation){setInvitations(v.data||[]);setInviteMeta(v.meta||null);}}));
      jobs.push(request('invitations/plans').then(v=>{if(requestGeneration.current===generation)setInvitePlans(v.data||[]);}));
    }
-   if(showWorkspaceManager&&(permits("network:partners:read")||permits("network:resellers:read")||
+   if(section!=="trash"&&showWorkspaceManager&&(permits("network:partners:read")||permits("network:resellers:read")||
       permits("network:devices:read")||permits("network:resources:read")||
       permits("network:billing:read")||permits("network:members:read")))
-     jobs.push(request("partners",{query:{pageSize:20,page,q:search,kind:tab==="plans"?undefined:tab==="resellers"?"reseller":scopedSection&&tab==="partners"&&section!=="partners"?undefined:"content"}})
+     jobs.push(request("partners",{query:{pageSize:20,page,q:search,status:partnerStatus||undefined,kind:tab==="plans"?undefined:tab==="resellers"?"reseller":scopedSection&&tab==="partners"&&section!=="partners"?undefined:"content"}})
        .then(v=>{if(requestGeneration.current===generation){setPartners(v.data||[]);setPageMeta(v.meta||null);}}));
    const failures=await Promise.allSettled(jobs);
    const first=failures.find(x=>x.status==="rejected");if(first&&requestGeneration.current===generation)setError(first.reason?.message||"Falha ao carregar a rede.");
- },[available,request,page,search,tab,section,showWorkspaceManager,invitePage,viewer?.id,viewer?.role,viewer?.permissions]);
+ },[available,request,page,search,partnerStatus,tab,section,showWorkspaceManager,invitePage,viewer?.id,viewer?.role,viewer?.permissions]);
  useEffect(()=>{void reload();return()=>{requestGeneration.current++;};},[reload]);
  const act=async(action,notice)=>{
    setBusy(true);setError("");setSuccess("");
@@ -110,7 +115,7 @@ export default function NetworkWorkspace({section="workspace", onNavigate}){
    (section==="devices"||section==="resources"||section==="billing"||section==="members") ? true : ["content","both"].includes(p.kind)));
  const openPartner=async p=>{
    const generation=requestGeneration.current;
-   setDeletePreview(null);setDeleteReason('');
+   setDeletePreview(null);setDeleteReason('');setStatusAction(null);
    setError("");try{const d=await request(`partners/${p.id}`);if(requestGeneration.current===generation)setSelected(d);}
    catch(e){if(requestGeneration.current===generation)setError(e.message);}
  };
@@ -208,13 +213,35 @@ export default function NetworkWorkspace({section="workspace", onNavigate}){
        section==="devices"||section==="resources"||section==="billing"||section==="members"?
          "Selecione uma conta da sua rede para acessar os dados e ações autorizados.":
          "Todos os registros nesta página pertencem à sua rede. Os dados da DeltaTV e de outros Admins ficam separados."}</p></div>
-  {central&&<div className="card" style={{padding:16}}>{field("Admin responsável pela rede",<select value={adminId} onChange={e=>{requestGeneration.current++;setAdminId(e.target.value);setPage(1);setQ("");setPartners([]);setPlans([]);setInvitations([]);setInvitePage(1);setInviteMeta(null);setInvitePlans([]);setRegistrations(null);setInviteResult(null);setInviteForm(null);setPageMeta(null);setOverview(null);setSelected(null);}}><option value="">Selecione uma rede</option><option value="deltatv">DeltaTV — rede principal</option>{admins.map(a=><option key={a.id} value={a.id}>{a.name} — {a.email}</option>)}</select>)}</div>}
+  {central&&<div className="card" style={{padding:16}}>{field("Admin responsável pela rede",<select value={adminId} onChange={e=>{requestGeneration.current++;setAdminId(e.target.value);setPage(1);setQ("");setPartners([]);setPlans([]);setInvitations([]);setInvitePage(1);setInviteMeta(null);setInvitePlans([]);setRegistrations(null);setInviteResult(null);setInviteForm(null);setPageMeta(null);setOverview(null);setSelected(null);setPartnerStatus("");}}><option value="">Selecione uma rede</option><option value="deltatv">DeltaTV — rede principal</option>{admins.map(a=><option key={a.id} value={a.id}>{a.name} — {a.email}</option>)}</select>)}</div>}
   {!central && permissions.size === 0 && <div className="card" role="status" style={{padding:20,display:"grid",gap:8}}>
     <h3>Permissões de administração ainda não configuradas</h3>
     <p>Seu usuário é Admin, mas a DeltaTV ainda não liberou funções para sua rede. Solicite que a DeltaTV acesse Usuários, edite sua conta e selecione as permissões necessárias.</p>
     <p className="muted">A sua conta operacional de Parceiro/Revenda pode continuar ativa separadamente. Nenhum dado foi excluído por esta mensagem.</p>
   </div>}
   {!available?<p className="muted">Selecione um Admin para abrir os cadastros de sua rede.</p>:<>
+   {section==="trash"&&<section className="card" style={{padding:20,display:"grid",gap:12}}>
+     <h3>Contas arquivadas desta rede</h3>
+     <input aria-label="Pesquisar contas arquivadas" placeholder="Pesquisar na lixeira" value={q} onChange={e=>setQ(e.target.value)}/>
+     {trashRows.length?trashRows.map(item=><div className="row" key={item.id} style={{justifyContent:"space-between",flexWrap:"wrap",gap:10,borderBottom:"1px solid var(--border,#334155)",paddingBottom:12}}>
+       <span><strong>{item.name}</strong> · {item.kind==="reseller"?"Revenda":"Parceiro"} · {item.statusReason||"Arquivada"}</span>
+       <button className="btn sm" onClick={()=>{setRestoring(item);setRestoreReason("");}}>Restaurar</button>
+     </div>):<p className="muted">Nenhuma conta arquivada nesta rede.</p>}
+     {trashMeta&&trashMeta.totalPages>1&&<div className="actions">
+       <button className="btn sm" disabled={page===1} onClick={()=>setPage(v=>v-1)}>Anterior</button>
+       <span>Página {trashMeta.page} de {trashMeta.totalPages}</span>
+       <button className="btn sm" disabled={page===trashMeta.totalPages} onClick={()=>setPage(v=>v+1)}>Próxima</button>
+     </div>}
+     {restoring&&<div className="card" style={{padding:14,display:"grid",gap:10}}>
+       <h4>Restaurar {restoring.name}</h4><p>O estado anterior será restaurado quando houver fotografia de exclusão. O acesso pode precisar de revisão.</p>
+       {field("Motivo da restauração",<textarea minLength={8} maxLength={400} value={restoreReason} onChange={e=>setRestoreReason(e.target.value)}/>)}
+       <div className="actions"><button className="btn" onClick={()=>setRestoring(null)}>Cancelar</button>
+        <button className="btn primary" disabled={busy||restoreReason.trim().length<8} onClick={async()=>{
+          const ok=await act(()=>request(`trash/${restoring.id}/restore`,{method:"POST",body:{reason:restoreReason.trim()}}),"Conta restaurada na própria rede.");
+          if(ok){setRestoring(null);setRestoreReason("");}
+        }}>Confirmar restauração</button></div>
+     </div>}
+   </section>}
    {section==="audit"&&permits("network:audit:read")&&<section className="card" style={{padding:20}}><h3>Histórico de ações na rede</h3>
      <p className="muted">Eventos relacionados às contas da sua rede. Auditoria global da plataforma permanece exclusiva da DeltaTV.</p>
      {auditRows.length?<div style={{display:"grid",gap:8}}>{auditRows.map(row=><div key={row.id} className="row" style={{justifyContent:"space-between",borderBottom:"1px solid var(--border,#334155)",paddingBottom:8}}>
@@ -222,7 +249,10 @@ export default function NetworkWorkspace({section="workspace", onNavigate}){
      </div>)}</div>:<p className="muted">Nenhum evento recente na sua rede.</p>}
    </section>}
    {overview&&<div className="grid cards" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10}}>
-     {[{label:"Parceiros",value:overview.partners},{label:"Revendas",value:overview.resellers},{label:"Planos",value:overview.plans}].map(x=><div className="card" key={x.label} style={{padding:16}}><small>{x.label}</small><h2>{x.value}</h2></div>)}
+     {[{label:"Parceiros",value:overview.partners},{label:"Revendas",value:overview.resellers},
+       {label:"Parceiros ativos",value:overview.activePartners},{label:"Revendas ativas",value:overview.activeResellers},
+       {label:"Expirados",value:overview.expired},{label:"Novos cadastros",value:overview.pending},
+       {label:"Planos",value:overview.plans}].map(x=><div className="card" key={x.label} style={{padding:16}}><small>{x.label}</small><h2>{x.value}</h2></div>)}
    </div>}
    <ErrorMessage message={error}/><StatusMessage message={success}/>
    {section === "workspace" && !central && <div className="card" style={{padding:20,display:"grid",gap:8}}>
@@ -239,12 +269,12 @@ export default function NetworkWorkspace({section="workspace", onNavigate}){
        ["users","Usuários","network:members:read"],
      ].filter(x=>permits(x[2])).map(([page,label])=><button type="button" className="btn" key={page} onClick={()=>onNavigate?.(page)}>{label}</button>)}</div>
    </div>}
-   {section !== "dashboard" && section!=="audit" && showWorkspaceManager && <div className="toolbar" style={{display:"flex",flexWrap:"wrap",gap:8}}>
+   {section !== "dashboard" && section!=="audit" && section!=="trash" && showWorkspaceManager && <div className="toolbar" style={{display:"flex",flexWrap:"wrap",gap:8}}>
      {section === "workspace" && central && [["partners","Parceiros","network:partners:read"],["resellers","Revendas","network:resellers:read"],["plans","Planos e recursos","network:plans:read"]]
        .filter(x=>permits(x[2])).map(([key,name])=><button key={key} className={`btn ${tab===key?"primary":""}`} onClick={()=>{setTab(key);setPage(1);setSelected(null);setEditingAccount(null);setPlanForm(null);}}>{name}</button>)}
      <button className="btn" onClick={()=>void reload()}>Atualizar</button>
    </div>}
-   {section !== "dashboard" && section!=="audit" && showWorkspaceManager && tab==="plans"&&permits("network:plans:read")&&<>
+   {section !== "dashboard" && section!=="audit" && section!=="trash" && showWorkspaceManager && tab==="plans"&&permits("network:plans:read")&&<>
      {permits("network:plans:write")&&<div><button className="btn primary" onClick={()=>setPlanForm(blankPlan())}>Novo plano</button></div>}
      {planForm&&<div className="card" style={{display:"grid",gap:12,padding:20}}>
        <h3>{planForm.key?"Editar plano":"Novo plano"}</h3>
@@ -269,7 +299,7 @@ export default function NetworkWorkspace({section="workspace", onNavigate}){
      <div className="actions"><button className="btn" onClick={()=>{setDeletingPlan(null);setPlanDeletePreview(null);}}>Cancelar</button>
        <button className="btn danger" disabled={busy||!planDeletePreview} onClick={()=>void confirmPlanDeletion()}>Confirmar exclusão</button></div>
    </div>}
-   {section !== "dashboard" && section!=="audit" && showWorkspaceManager && tab!=="plans"&&canBrowse&&<>
+   {section !== "dashboard" && section!=="audit" && section!=="trash" && showWorkspaceManager && tab!=="plans"&&canBrowse&&<>
      {(section==="workspace"||section==="partners"||section==="resellers")&&!editingAccount&&!accountForm&&permits(tab==="resellers"?"network:resellers:write":"network:partners:write")&&<div className="actions">
        <button className="btn primary" onClick={()=>{setAccountForm(blankAccount(tab==="resellers"?"reseller":"content"));setInviteForm(null);setSelected(null);}}>Novo {tab==="resellers"?"revendedor":"parceiro"}</button>
        {tab==='partners'&&<button className="btn" onClick={()=>{onNavigate?.('invitations');setInviteForm(blankInvite());setAccountForm(null);setEditingAccount(null);setInviteResult(null);}}>Gerar link de convite</button>}
@@ -342,17 +372,25 @@ export default function NetworkWorkspace({section="workspace", onNavigate}){
      {accountForm&&renderAccountForm(accountForm,setAccountForm)}
      {editingAccount&&renderAccountForm(editingAccount,setEditingAccount,true)}
      {section==="devices"&&permits("network:devices:read")&&<NetworkDevices accounts={visibleAccounts} request={request} permits={permits} accountPage={page} accountMeta={pageMeta} setAccountPage={setPage} accountQuery={q} setAccountQuery={setQ}/>}
-     {section!=="invitations"&&section!=="devices"&&<div className="card network-partner-panel" style={{padding:16}}>
-       <div className="row" style={{justifyContent:"space-between",alignItems:"center"}}><h3>{section==="devices"||section==="resources"||section==="billing"||section==="members"?"Contas da minha rede":tab==="resellers"?"Minhas revendas":"Meus parceiros"}</h3><input aria-label="Buscar contas nesta rede" placeholder="Buscar nesta rede" value={q} onChange={e=>setQ(e.target.value)}/></div>
-       {visibleAccounts.length?<div className="network-partner-table-scroll"><table className="table network-partner-table"><thead><tr><th>Empresa</th><th>Mensalidade</th><th>Vencimento</th><th>Status</th><th>Ações</th></tr></thead><tbody>{visibleAccounts.map(p=><tr key={p.id}><td>{p.name}</td><td>{p.monthlyFeeCents == null ? "—" : currency(p.monthlyFeeCents)}</td><td>{p.endsAt ? new Date(p.endsAt).toLocaleDateString("pt-BR") : "—"}</td><td>{p.status}</td><td><button className="btn sm" onClick={()=>openPartner(p)}>Gerenciar</button></td></tr>)}</tbody></table></div>:<p className="muted">Nenhuma conta corresponde à pesquisa nesta rede.</p>}
+     {section!=="invitations"&&section!=="devices"&&section!=="trash"&&<div className="card network-partner-panel" style={{padding:16}}>
+       <div className="row" style={{justifyContent:"space-between",alignItems:"center"}}><h3>{section==="devices"||section==="resources"||section==="billing"||section==="members"?"Contas da minha rede":tab==="resellers"?"Minhas revendas":"Meus parceiros"}</h3>
+        <div className="actions" style={{flexWrap:"wrap"}}>
+         <input aria-label="Buscar contas nesta rede" placeholder="Buscar nesta rede" value={q} onChange={e=>setQ(e.target.value)}/>
+         <select aria-label="Filtrar status das contas" value={partnerStatus} onChange={e=>{setPartnerStatus(e.target.value);setPage(1);setSelected(null);}}>
+          <option value="">Todos os status</option><option value="pending">Aguardando aprovação</option>
+          <option value="active">Ativos</option><option value="expired">Expirados</option>
+          <option value="suspended">Suspensos</option><option value="blocked">Bloqueados</option><option value="cancelled">Cancelados</option>
+         </select>
+        </div></div>
+       {visibleAccounts.length?<div className="network-partner-table-scroll"><table className="table network-partner-table"><thead><tr><th>Empresa</th><th>Mensalidade</th><th>Vencimento</th><th>Status</th><th>Ações</th></tr></thead><tbody>{visibleAccounts.map(p=><tr key={p.id}><td>{p.name}</td><td>{p.monthlyFeeCents == null ? "—" : currency(p.monthlyFeeCents)}</td><td>{p.endsAt ? new Date(p.endsAt).toLocaleDateString("pt-BR") : "—"}</td><td><PartnerBadge partner={p}/></td><td><button className="btn sm" onClick={()=>openPartner(p)}>Gerenciar</button></td></tr>)}</tbody></table></div>:<p className="muted">Nenhuma conta corresponde à pesquisa nesta rede.</p>}
        {pageMeta&&<nav className="row" aria-label="Páginas de contas" style={{justifyContent:"space-between",marginTop:12,flexWrap:"wrap"}}>
          <span className="muted">{pageMeta.total} conta(s) · página {pageMeta.page} de {Math.max(1,pageMeta.totalPages)}</span>
          <div className="actions"><button className="btn sm" disabled={page<=1||busy} onClick={()=>setPage(x=>Math.max(1,x-1))}>Anterior</button>
          <button className="btn sm" disabled={page>=pageMeta.totalPages||busy} onClick={()=>setPage(x=>x+1)}>Próxima</button></div>
        </nav>}
      </div>}
-     {section!=="devices"&&selected&&<div className="card" style={{padding:20,display:"grid",gap:12}}>
-       <h3>{selected.partner.name}</h3>
+     {section!=="devices"&&section!=="trash"&&selected&&<div className="card" style={{padding:20,display:"grid",gap:12}}>
+       <h3>{selected.partner.name} <PartnerBadge partner={selected.partner}/></h3>
        {(selected.plan || selected.contract) && <p>Plano: {plans.find(p=>p.key===selected.plan?.tier)?.name||selected.plan?.tier||"Não informado"} · Ativações: {selected.contract?.activationLimit ?? "Sem limite"}</p>}
        <div className="actions"><button className="btn" onClick={()=>setSelected(null)}>Fechar</button>
          {permits(selected.partner.kind==="reseller"?"network:resellers:write":"network:partners:write")&&<button className="btn primary" onClick={editPartner}>Editar contrato</button>}
@@ -361,6 +399,23 @@ export default function NetworkWorkspace({section="workspace", onNavigate}){
          {permits(selected.partner.kind==='reseller'?'network:resellers:delete':'network:partners:delete')&&<button type="button" className="btn" onClick={async()=>{try{setDeletePreview(await request(`partners/${selected.partner.id}/delete-preview`));setDeleteReason('');}catch(e){setError(e.message);}}}>Excluir parceiro ou revenda</button>}
          {permits("network:members:write")&&<button className="btn" onClick={()=>setNewUser({name:"",email:"",password:""})}>Adicionar usuário</button>}
        </div>
+       {permits(selected.partner.kind==="reseller"?"network:resellers:write":"network:partners:write")&&
+         <div className="actions" style={{flexWrap:"wrap"}}>
+          {selected.partner.status==="active"&&<button className="btn" onClick={()=>setStatusAction("suspend")}>Suspender</button>}
+          {["active","suspended"].includes(selected.partner.status)&&<button className="btn danger" onClick={()=>setStatusAction("block")}>Bloquear</button>}
+          {["blocked","suspended"].includes(selected.partner.status)&&selected.partner.statusReason!=="awaiting_payment"&&<button className="btn primary" onClick={()=>setStatusAction("reactivate")}>Reativar</button>}
+          {["active","blocked","suspended"].includes(selected.partner.status)&&<button className="btn danger" onClick={()=>setStatusAction("cancel")}>Cancelar</button>}
+         </div>}
+       {statusAction&&<section className="card" style={{padding:14,display:"grid",gap:10,maxWidth:600}}>
+         <h4>{({suspend:"Suspender",block:"Bloquear",reactivate:"Reativar",cancel:"Cancelar"})[statusAction]} {selected.partner.name}</h4>
+         {statusAction!=="reactivate"&&field("Motivo (obrigatório)",<textarea value={statusReason} maxLength={500} onChange={e=>setStatusReason(e.target.value)}/>)}
+         <div className="actions"><button className="btn" onClick={()=>{setStatusAction(null);setStatusReason("");}}>Voltar</button>
+          <button className="btn primary" disabled={busy||(statusAction!=="reactivate"&&statusReason.trim().length<3)} onClick={async()=>{
+            const id=selected.partner.id, action=statusAction;
+            const ok=await act(()=>request(`partners/${id}/${action}`,{method:"POST",body:statusAction==="reactivate"?{}:{reason:statusReason.trim()}}),"Situação atualizada.");
+            if(ok){setStatusAction(null);setStatusReason("");await openPartner(selected.partner);}
+          }}>Confirmar</button></div>
+       </section>}
        {deletePreview&&<section className="card" role="group" aria-label="Confirmar exclusão" style={{padding:18,border:'1px solid var(--danger,#c2414e)',display:'grid',gap:10,maxWidth:650}}>
          <h4>Excluir {selected.partner.name} desta rede</h4>
          <p>Esta operação revoga logins, códigos e acessos, e move a conta para a lixeira. Não remove recibos ou registros financeiros obrigatórios, nem dados de outras redes.</p>

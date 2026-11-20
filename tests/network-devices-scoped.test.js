@@ -7,7 +7,7 @@ const routes=read('../../backend/src/modules/admin-workspaces/workspace.routes.j
 const perms=read('../../backend/src/modules/admin-workspaces/permissions.js');
 test('a seção de TVs lista dispositivos reais, e não contas comerciais',()=>{
  assert.match(ui,/section==="devices"&&permits\("network:devices:read"\)&&<NetworkDevices/);
- assert.match(ui,/section!=="invitations"&&section!=="devices"&&<div/);
+ assert.match(ui,/section!=="invitations"&&section!=="devices"&&section!=="trash"&&<div/);
  assert.match(ui,/request\(`partners\/\$\{accountId\}\/devices`/);
  assert.match(ui,/MAC \/ Dispositivo/);
 });

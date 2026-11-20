@@ -7,10 +7,14 @@ const routes = readFileSync(new URL("../../backend/src/modules/partners/partner.
 const archive = readFileSync(new URL("../../backend/src/modules/admin-deletion.service.js", import.meta.url), "utf8");
 const guard = readFileSync(new URL("../../backend/src/db/schema-preflight.js", import.meta.url), "utf8");
 
-test("Lixeira aparece no menu só para o superadmin", () => {
+test("Lixeira do superadmin permanece global e Admin usa apenas sua rede", () => {
   assert.match(app, /trash: \["Lixeira", PartnerTrash\]/);
   const permissions=readFileSync(new URL("../shared/permissions.js",import.meta.url),"utf8");
-  assert.doesNotMatch(permissions, /trash:\s*\{permission:/);
+  assert.match(permissions, /trash:\s*\{permission:null, view:"trash"\}/);
+  assert.match(permissions,/network:partners:delete/);
+  const workspace=readFileSync(new URL("../../backend/src/modules/admin-workspaces/workspace.routes.js",import.meta.url),"utf8");
+  assert.match(workspace,/ownerAdminId:tenant\(req\),status:'deleted'/);
+  assert.doesNotMatch(workspace,/router\.delete\('\/trash\/.*permanent/);
   assert.match(permissions, /if \(user\?\.role === "superadmin"\) return true/);
   assert.match(app, /EXTRA_GROUPS/);
   assert.match(app, /items:\s*\[[^\]]*['"]vpsmonitor['"][^\]]*['"]vpsfiles['"][^\]]*['"]trash['"]/);

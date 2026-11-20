@@ -43,6 +43,7 @@ export const ADMIN_SCOPED_PAGES = Object.freeze({
   devices: {permission:"network:devices:read", view:"devices"},
   billing: {permission:"network:billing:read", view:"billing"},
   audit: {permission:"network:audit:read", view:"audit"},
+  trash: {permission:null, view:"trash"},
 });
 export const adminScopedView = page => ADMIN_SCOPED_PAGES[page]?.view ?? null;
 
@@ -52,6 +53,7 @@ export function adminPageAllowed(page, user) {
   // Não confundir permissão com liberação de rotas globais da DeltaTV.
   if (user?.role === "admin") {
     // Catálogo global de downloads: leitura via endpoint autenticado, sem escrita administrativa.
+    if (page === "trash") return Boolean(user.delegatedPermissions?.includes("network:partners:delete") || user.delegatedPermissions?.includes("network:resellers:delete"));
     if (page === "downloads") return true;
     if (page === "conta") return true;
     if (page === "invitations") return Boolean(user.delegatedPermissions?.includes('network:partners:write')||user.delegatedPermissions?.includes('network:resellers:write'));
