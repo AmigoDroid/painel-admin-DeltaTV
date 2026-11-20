@@ -129,7 +129,7 @@ function ContractList() {
 const blankPlan = () => ({key:"",name:"",description:"",audience:"content",monthlyPriceCents:0,
   canResellPanel:false,canCreateSubmasters:false,canViewFinance:false,canManageGateways:false,
   maxServers:1,autoFailover:false,autoPriority:false,emailAlerts:false,detailedHistory:false,
-  sortOrder:100,active:true});
+  sortOrder:100,active:true,hiddenFromNetwork:false});
 function CatalogEditor({plan,onClose,onSaved}) {
   const isNew = !plan?.key;
   const [data,setData]=useState(plan||blankPlan());
@@ -147,7 +147,7 @@ function CatalogEditor({plan,onClose,onSaved}) {
         canResellPanel:!!data.canResellPanel,canCreateSubmasters:!!data.canResellPanel&&!!data.canCreateSubmasters,
         canViewFinance:!!data.canResellPanel&&!!data.canViewFinance,
         canManageGateways:!!data.canResellPanel&&!!data.canManageGateways,
-        sortOrder:Number(data.sortOrder)};
+        sortOrder:Number(data.sortOrder),hiddenFromNetwork:!!data.hiddenFromNetwork};
       if(isNew) await api("/admin/service-plans",{method:"POST",body:{key:data.key.trim(),...payload}});
       else await api(`/admin/service-plans/${encodeURIComponent(plan.key)}`,{method:"PUT",body:{...payload,active:!!data.active}});
       onSaved();onClose();
@@ -179,6 +179,8 @@ function CatalogEditor({plan,onClose,onSaved}) {
           <label className="pricing-check"><input type="checkbox" checked={!!data.canViewFinance} onChange={e=>set('canViewFinance',e.target.checked)}/> Consultar financeiro da rede</label>
           <label className="pricing-check"><input type="checkbox" checked={!!data.canManageGateways} onChange={e=>set('canManageGateways',e.target.checked)}/> Configurar Mercado Pago / InfinitePay</label></>}
         </div>
+        <label className="pricing-check"><input type="checkbox" checked={!!data.hiddenFromNetwork} onChange={e=>set("hiddenFromNetwork",e.target.checked)}/> Ocultar da minha rede (o parceiro não vê nem contrata este plano)</label>
+        <p className="muted">O administrador pode atribuir manualmente planos ocultos; contratos existentes permanecem válidos.</p>
         {!isNew&&!plan.system&&<label className="pricing-check"><input type="checkbox" checked={!!data.active} onChange={e=>set("active",e.target.checked)}/> Plano disponível para novas atribuições</label>}
       </div>
       {error&&<p className="error" role="alert">{error}</p>}
@@ -205,7 +207,7 @@ function CatalogPlans(){
     {loading&&<p className="muted">Carregando planos…</p>}
     <div className="pricing-tier-grid">{plans.map(p=><article key={p.key} className="pricing-tier card">
       <div className="pricing-tier-label">{p.system?"Plano padrão":p.active?"Personalizado":"Desativado"}</div>
-      <h3>{p.name}</h3>
+      <h3>{p.name} {p.hiddenFromNetwork&&<span className="pill">Oculto</span>}</h3>
       <p className="muted">{p.description||"Sem descrição"}</p>
       <div className="pricing-tier-big">{p.maxServers == null ? "Ilimitadas" : `${p.maxServers} ${p.maxServers===1?"URL":"URLs"}`}</div>
       <dl>

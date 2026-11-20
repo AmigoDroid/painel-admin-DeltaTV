@@ -38,6 +38,7 @@ function GlobalUsersPanel({ partnerId: fixedPartnerId }) {
   const list = useList("/admin/users", { q: "", role: "", status: "", partnerId: fixedPartnerId || "" });
   const [form, setForm] = useState(null);
   const [impersonating,setImpersonating]=useState(null),[roleUser,setRoleUser]=useState(null),[deleting,setDeleting]=useState(null);
+  const [sessionsUser,setSessionsUser]=useState(null);
   const sendResetAction = useAction();
   useEffect(() => { list.filter({ q: dq }); /* eslint-disable-next-line */ }, [dq]);
   const full = me?.role === "superadmin";
@@ -61,6 +62,8 @@ function GlobalUsersPanel({ partnerId: fixedPartnerId }) {
             <td className="actions">
               <RowMenu items={[
                 { label: "Editar", onClick: () => setForm({ user: u }) },
+                ...(full ? [{label:"Sessões abertas",onClick:()=>setSessionsUser(u)}] : []),
+                ...(full && (u.lockedUntil && new Date(u.lockedUntil)>new Date()) ? [{label:"Desbloquear login",onClick:async()=>{await sendResetAction(()=>api(`/admin/users/${u.id}/unlock`,{method:"POST"}),"Login desbloqueado.");list.reload();}}] : []),
                 ...(full && u.role === "partner" && u.status === "active" ? [{label:"Entrar como",onClick:()=>setImpersonating(u)}] : []),
                 ...(full && u.role === "admin" ? [{label:"Abrir rede do Admin",onClick:()=>{sessionStorage.setItem("deltatv-selected-admin",u.id);location.hash="workspace";}}] : []),
                 ...(full && u.role !== "superadmin" && u.role !== "admin" ? [{label:"Papel e permissões",onClick:()=>setRoleUser(u)}] : []),
@@ -76,12 +79,31 @@ function GlobalUsersPanel({ partnerId: fixedPartnerId }) {
       </Table>
       <Empty loading={list.loading} error={list.error} count={list.data.length} />
       <Pager meta={list.meta} onPage={list.setPage} />
+      {sessionsUser&&<UserSessionsModal user={sessionsUser} onClose={()=>setSessionsUser(null)}/>}
       {impersonating&&<ImpersonateDialog user={impersonating} onClose={()=>setImpersonating(null)}/>}
       {roleUser&&<UserRoleDialog user={roleUser} onClose={()=>setRoleUser(null)} onSaved={()=>{setRoleUser(null);list.reload()}}/>}
       {deleting&&<DeleteUserDialog user={deleting} onClose={()=>setDeleting(null)} onSaved={()=>{setDeleting(null);list.reload()}}/>}
       {form && <UserForm {...form} me={me} full={full} fixedPartnerId={fixedPartnerId} onClose={() => setForm(null)} onSaved={() => { setForm(null); list.reload(); }} />}
     </>
   );
+}
+
+function UserSessionsModal({user,onClose}) {
+ const [items,setItems]=useState([]),[meta,setMeta]=useState(null),[page,setPage]=useState(1),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ const reload=async()=>{try{const r=await api(`/admin/users/${user.id}/sessions`,{query:{page,pageSize:20}});setItems(r.data||[]);setMeta(r.meta);setError('');}catch(e){setError(e.message)}};
+ useEffect(()=>{void reload()},[user.id,page]);
+ const action=async(path)=>{setBusy(true);try{await api(path,{method:'DELETE'});await reload()}catch(e){setError(e.message)}finally{setBusy(false)}};
+ return <Modal title={`Sessões abertas · ${user.name}`} onClose={onClose} wide>
+   {error&&<div role="alert" className="notice error">{error}</div>}
+   <p className="muted">Revogar sessões encerra imediatamente o acesso correspondente.</p>
+   <Table><thead><tr><th>Contexto</th><th>Endereço IP</th><th>Dispositivo</th><th>Início</th><th>Validade</th><th>Ações</th></tr></thead><tbody>{items.map(s=><tr key={s.id}>
+    <td>{s.audience}</td><td>{s.ip||'—'}</td><td>{s.userAgent||'—'}</td><td>{fmtDateTime(s.createdAt)}</td><td>{fmtDateTime(s.expiresAt)}</td>
+    <td><button type="button" className="btn sm" disabled={busy} onClick={()=>action(`/admin/users/${user.id}/sessions/${s.id}`)}>Encerrar</button></td></tr>)}</tbody></Table>
+   {!items.length&&<p>Nenhuma sessão ativa.</p>}
+   {meta?.totalPages>1&&<Pager meta={meta} onPage={setPage}/>}
+   <div className="actions"><button type="button" className="btn" onClick={onClose}>Fechar</button>
+     <button type="button" className="btn danger" disabled={busy||!items.length} onClick={()=>action(`/admin/users/${user.id}/sessions`)}>Encerrar todas</button></div>
+ </Modal>;
 }
 
 function UserForm({ user, me, full, fixedPartnerId, onClose, onSaved }) {

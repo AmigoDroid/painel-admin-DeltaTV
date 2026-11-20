@@ -21,7 +21,7 @@ const currency=cents=>new Intl.NumberFormat("pt-BR",{style:"currency",currency:"
 const toCents=value=>Math.round(Number(String(value).replace(",","."))*100);
 const nextMonth=()=>addMonthsClamped();
 const blankPlan=()=>({name:"",description:"",audience:"content",monthlyPrice:"0.00",maxServers:"5",noDnsLimit:false,activationLimit:"100",noActivationLimit:false,validityDays:"30",
-  autoFailover:true,autoPriority:false,emailAlerts:false,detailedHistory:false});
+  autoFailover:true,autoPriority:false,emailAlerts:false,detailedHistory:false,hiddenFromNetwork:false});
 const blankAccount=kind=>({name:'',email:'',password:'',kind,planKey:''});
 const blankInvite=(kind='content')=>({mode:'link',kind,email:'',planKey:'',label:'',sendEmail:false,maxUses:10,validityDays:7});
 const permsOf=user=>new Set(user?.permissions||[]);
@@ -134,7 +134,7 @@ export default function NetworkWorkspace({section="workspace", onNavigate}){
     maxServers:f.noDnsLimit?null:Number(f.maxServers),
     activationLimit:f.noActivationLimit?null:Number(f.activationLimit),
     validityDays:Number(f.validityDays),autoFailover:f.autoFailover,autoPriority:f.autoPriority,
-    emailAlerts:f.emailAlerts,detailedHistory:f.detailedHistory};
+    emailAlerts:f.emailAlerts,detailedHistory:f.detailedHistory,hiddenFromNetwork:!!f.hiddenFromNetwork};
    const ok=await act(()=>request(f.key?`plans/${f.key}`:"plans",{method:f.key?"PUT":"POST",body}),"Plano salvo para esta rede.");
    if(ok)setPlanForm(null);
  };
@@ -273,10 +273,12 @@ export default function NetworkWorkspace({section="workspace", onNavigate}){
        <div className="row">{field('Ativações',<><input type="number" min="0" disabled={planForm.noActivationLimit} value={planForm.activationLimit} onChange={e=>setPlanForm({...planForm,activationLimit:e.target.value})}/><label><input type="checkbox" checked={planForm.noActivationLimit} onChange={e=>setPlanForm({...planForm,noActivationLimit:e.target.checked})}/> Sem limite</label></>)}
          {field('Validade inicial do acesso (dias)',<input type="number" min="1" max="3660" value={planForm.validityDays} onChange={e=>setPlanForm({...planForm,validityDays:e.target.value})}/>)}</div>
        <div className="row">{[["autoFailover","Failover automático"],["autoPriority","Prioridade automática"],["emailAlerts","Alertas por e-mail"],["detailedHistory","Histórico detalhado"]].map(([key,label])=><label key={key}><input type="checkbox" checked={planForm[key]} onChange={e=>setPlanForm({...planForm,[key]:e.target.checked})}/> {label}</label>)}</div>
+       <label><input type="checkbox" checked={!!planForm.hiddenFromNetwork} onChange={e=>setPlanForm({...planForm,hiddenFromNetwork:e.target.checked})}/> Ocultar da minha rede (o parceiro não vê nem contrata este plano)</label>
+       <p className="muted">Você e a DeltaTV ainda poderão atribuí-lo manualmente. Contas existentes permanecem ativas.</p>
        <div className="actions"><button className="btn" onClick={()=>setPlanForm(null)}>Cancelar</button><button className="btn primary" disabled={busy||!planForm.name} onClick={savePlan}>Salvar plano</button></div>
      </div>}
      <div className="card" style={{padding:16}}><h3>Planos desta rede</h3>
-       {plans.length?<table className="table"><thead><tr><th>Plano</th><th>Tipo</th><th>Preço mensal</th><th>DNS</th><th>Ativações</th><th>Validade</th><th>Gerenciar</th></tr></thead><tbody>{plans.map(p=><tr key={p.key}><td>{p.name}</td><td>{p.audience}</td><td>{currency(p.monthlyPriceCents)}</td><td>{p.maxServers??"Sem limite"}</td><td>{p.activationLimit??"Sem limite"}</td><td>{p.validityDays??30} dias · {p.active?"Ativo":"Inativo"}</td><td>{permits("network:plans:write")&&<div className="actions"><button className="btn sm" onClick={()=>setPlanForm({key:p.key,name:p.name,description:p.description,audience:p.audience,monthlyPrice:(p.monthlyPriceCents/100).toFixed(2),maxServers:String(p.maxServers??""),noDnsLimit:p.maxServers==null,activationLimit:String(p.activationLimit??''),noActivationLimit:p.activationLimit==null,validityDays:String(p.validityDays??30),autoFailover:p.autoFailover,autoPriority:p.autoPriority,emailAlerts:p.emailAlerts,detailedHistory:p.detailedHistory})}>Editar</button><button className="btn sm" disabled={busy} onClick={()=>void act(()=>request(`plans/${p.key}`,{method:"PUT",body:{active:!p.active}}),p.active?"Plano desativado.":"Plano reativado.")}>{p.active?"Desativar":"Reativar"}</button><button className="btn sm" disabled={busy} onClick={()=>void previewPlanDeletion(p)}>Excluir</button></div>}</td></tr>)}</tbody></table>:<p className="muted">Nenhum plano criado nesta rede.</p>}
+       {plans.length?<table className="table"><thead><tr><th>Plano</th><th>Tipo</th><th>Preço mensal</th><th>DNS</th><th>Ativações</th><th>Validade</th><th>Gerenciar</th></tr></thead><tbody>{plans.map(p=><tr key={p.key}><td>{p.name} {p.hiddenFromNetwork&&<span className="pill">Oculto</span>}</td><td>{p.audience}</td><td>{currency(p.monthlyPriceCents)}</td><td>{p.maxServers??"Sem limite"}</td><td>{p.activationLimit??"Sem limite"}</td><td>{p.validityDays??30} dias · {p.active?"Ativo":"Inativo"}</td><td>{permits("network:plans:write")&&<div className="actions"><button className="btn sm" onClick={()=>setPlanForm({key:p.key,name:p.name,description:p.description,audience:p.audience,monthlyPrice:(p.monthlyPriceCents/100).toFixed(2),maxServers:String(p.maxServers??""),noDnsLimit:p.maxServers==null,activationLimit:String(p.activationLimit??''),noActivationLimit:p.activationLimit==null,validityDays:String(p.validityDays??30),autoFailover:p.autoFailover,autoPriority:p.autoPriority,emailAlerts:p.emailAlerts,detailedHistory:p.detailedHistory,hiddenFromNetwork:!!p.hiddenFromNetwork})}>Editar</button><button className="btn sm" disabled={busy} onClick={()=>void act(()=>request(`plans/${p.key}`,{method:"PUT",body:{active:!p.active}}),p.active?"Plano desativado.":"Plano reativado.")}>{p.active?"Desativar":"Reativar"}</button><button className="btn sm" disabled={busy} onClick={()=>void previewPlanDeletion(p)}>Excluir</button></div>}</td></tr>)}</tbody></table>:<p className="muted">Nenhum plano criado nesta rede.</p>}
      </div>
    </>}
    {deletingPlan&&<Modal title="Excluir plano" onClose={()=>setDeletingPlan(null)}>
