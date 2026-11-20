@@ -250,18 +250,19 @@ function WorkspaceContractModal({partner,call,query,permits,onClose,onSaved}) {
     if(!canReadPlans)return;
     let active=true;
     api("/admin/workspace/plans",{query}).then(r=>{
-      if(active)setPlans((r.data||[]).filter(plan=>plan.active!==false && (plan.audience===partner.kind||plan.audience==="both"||partner.kind==="both")));
+      if(active)setPlans((r.data||[]).filter(plan=>plan.active!==false && (plan.audience===partner.kind||plan.audience==="both")));
     }).catch(e=>{if(active)setPlansError(e.message||"Falha ao consultar planos.")});
     return ()=>{active=false};
   },[partner.id,canReadPlans,query?.adminId]);
   const run = useAction();
+  const originalEndsAt=partner.endsAt ? new Date(partner.endsAt).toISOString().slice(0,10) : "";
   const [form,setForm] = useState({name:partner.name||"",contactName:partner.contactName||"",
     contactEmail:partner.contactEmail||"",contactPhone:partner.contactPhone||"",
-    endsAt:partner.endsAt ? new Date(partner.endsAt).toISOString().slice(0,10) : "",planKey:partner.plan?.tier||""});
+    endsAt:originalEndsAt,planKey:partner.plan?.tier||""});
   const change=(key)=>(event)=>setForm(v=>({...v,[key]:event.target.value}));
   const save=async()=>{
     const body={name:form.name,contactName:form.contactName||null,contactEmail:form.contactEmail||null,
-      contactPhone:form.contactPhone||null,...(form.endsAt?{endsAt:new Date(`${form.endsAt}T12:00:00Z`).toISOString()}:{}),
+      contactPhone:form.contactPhone||null,...(form.endsAt&&form.endsAt!==originalEndsAt?{endsAt:new Date(`${form.endsAt}T12:00:00Z`).toISOString()}:{}),
       ...(canReadPlans && form.planKey && form.planKey !== (partner.plan?.tier||"") ? {planKey:form.planKey} : {})};
     if(await run(()=>call("",{method:"PATCH",body}),"Contrato atualizado."))onSaved();
   };
