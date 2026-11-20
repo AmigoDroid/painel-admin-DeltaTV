@@ -4,8 +4,9 @@ import { Modal, useUi } from "../ui.jsx";
 
 /** A prévia vem do servidor; nenhum dado de exclusão é decidido pelo frontend. */
 const normalizeConfirmation = (value) => String(value ?? "").normalize("NFKC").trim().toLocaleLowerCase("pt-BR");
-export default function AdminDeleteModal({ type, id, onClose, onDone }) {
-  const root = type === "partner" ? `/admin/partners/${id}`
+export default function AdminDeleteModal({ type, id, onClose, onDone, scoped = false }) {
+  const root = scoped && type === "activation" ? `/admin/workspace/devices/activations/${id}`
+    : type === "partner" ? `/admin/partners/${id}`
     : type === "device" ? `/admin/devices/registrations/${id}`
       : `/admin/devices/activations/${id}`;
   const [info, setInfo] = useState(null);
@@ -35,9 +36,9 @@ export default function AdminDeleteModal({ type, id, onClose, onDone }) {
     setSubmitError("");
     try {
       const body = type === "partner" ? { confirmation: confirmed.trim(), deleteClients, deleteDevices, reason: reason.trim() }
-        : { confirmMac: confirmed.trim(), reason: reason.trim(), force };
+        : { confirmMac: confirmed.trim(), reason: reason.trim(), ...(scoped ? {} : {force}) };
       const result = await api(root, { method: "DELETE", body });
-      if (result?.deleted) {
+      if (result?.deleted || (scoped && result?.ok)) {
         toast(type === "partner" ? "Cadastro arquivado. Encontre-o em Sistema → Lixeira." : "Exclusão administrativa concluída.");
         onDone?.(result);
       } else {
@@ -81,7 +82,7 @@ export default function AdminDeleteModal({ type, id, onClose, onDone }) {
         <label className="field"><span>Motivo da exclusão (obrigatório)</span>
           <textarea rows={2} maxLength={400} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Explique o motivo para o histórico de auditoria" />
         </label>
-        {type !== "partner" && <label className="field" style={{display:"flex",gap:8,alignItems:"center"}}><input type="checkbox" checked={force} onChange={e=>setForce(e.target.checked)}/><span>Forçar exclusão mesmo com licença vigente (somente Superadmin; operação irreversível)</span></label>}
+        {type !== "partner" && !scoped && <label className="field" style={{display:"flex",gap:8,alignItems:"center"}}><input type="checkbox" checked={force} onChange={e=>setForce(e.target.checked)}/><span>Forçar exclusão mesmo com licença vigente (somente Superadmin; operação irreversível)</span></label>}
         <label className="field"><span>{type === "partner" ? <>Para confirmar, digite o <strong>nome completo</strong> ou o <strong>identificador</strong> abaixo:</> : <>Digite o MAC abaixo para confirmar:</>}</span>
           <strong style={{ userSelect: "all", overflowWrap: "anywhere" }}>{key}</strong>
           {type === "partner" && <small className="muted">Identificador alternativo: <strong style={{ userSelect: "all" }}>{info.slug}</strong></small>}

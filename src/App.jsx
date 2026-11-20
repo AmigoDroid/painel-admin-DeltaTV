@@ -290,7 +290,9 @@ function Shell({ user }) {
           {(page === "dashboard" || page === "workspace") && <AppInstallSpotlight onOpen={() => go("downloads")} />}
           <TaskFinder tasks={TASKS.filter(task => allowed(task.route))} onNavigate={go} />
           {simpleMode && page !== "dashboard" && <EasyPageGuide role="admin" page={page} onBack={() => go("dashboard")} />}
-          {user.role === "admin" && page !== "downloads" ?
+          {user.role === "admin" && page === "devices" ?
+            <Devices key={page} scoped /> :
+          user.role === "admin" && page !== "downloads" ?
             <NetworkWorkspace key={page} section={adminView || "workspace"} onNavigate={go} /> :
             <Current onChanged={refreshCounts} menu={homeGroups} onNavigate={go} />}
         </main>

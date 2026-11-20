@@ -9,12 +9,13 @@ import DeviceLists, { removeMessage, saveMessage } from "./DeviceLists.jsx";
  * chave de 6 dígitos da TV. A autorização é do backend (/admin/devices/registrations/:id...), a cada chamada.
  * O login por chave (DeviceAccess) continua existindo, mas só para quem NÃO tem conta no painel.
  */
-export default function DeviceListsModal({ device, onClose, onChanged }) {
+export default function DeviceListsModal({ device, onClose, onChanged, scoped = false, canWrite = true }) {
   const { confirm } = useUi();
   const run = useAction();
   const [state, setState] = useState(null);
   const [attribution, setAttribution] = useState(null);
-  const base = `/admin/devices/registrations/${device.deviceId}`;
+  const apiRoot = scoped ? "/admin/workspace/devices" : "/admin/devices";
+  const base = `${apiRoot}/registrations/${device.deviceId}`;
 
   const load = async () => {
     const d = await run(() => api(base));
@@ -48,7 +49,7 @@ export default function DeviceListsModal({ device, onClose, onChanged }) {
     const c = await confirm({title:"Desvincular ativação",danger:true,reason:"optional",confirmLabel:"Desvincular",
       message:`O MAC ${device.mac} continuará cadastrado. A ativação selecionada ficará revogada.`});
     if (!c) return;
-    const r = await run(() => api(`/admin/devices/activations/${list.activationId}/revoke`,{method:"POST",body:{reason:c.reason}}),"Ativação desvinculada.");
+    const r = await run(() => api(`${apiRoot}/activations/${list.activationId}/revoke`,{method:"POST",body:{reason:c.reason}}),"Ativação desvinculada.");
     if (r) { await load(); onChanged?.(); }
   };
   const deleteLink = async list => {
@@ -56,7 +57,7 @@ export default function DeviceListsModal({ device, onClose, onChanged }) {
     if (typed !== device.mac) return;
     const reason=window.prompt("Motivo obrigatório (mínimo 3 caracteres):");
     if (!reason || reason.trim().length < 3) return;
-    const r=await run(() => api(`/admin/devices/activations/${list.activationId}`,{method:"DELETE",body:{confirmMac:typed,reason}}),"Vínculo excluído.");
+    const r=await run(() => api(`${apiRoot}/activations/${list.activationId}`,{method:"DELETE",body:{confirmMac:typed,reason}}),"Vínculo excluído.");
     if (r) { await load(); onChanged?.(); }
   };
 
@@ -64,7 +65,7 @@ export default function DeviceListsModal({ device, onClose, onChanged }) {
     <Modal title={`Listas de ${device.mac}`} onClose={onClose} wide>
       {!state ? <p className="muted">Carregando…</p> : (
         <>
-          <DeviceLists device={state} onRemove={remove} onRevoke={revoke} onDelete={deleteLink} />
+          <DeviceLists device={state} onRemove={scoped || !canWrite ? undefined : remove} onRevoke={canWrite ? revoke : undefined} onDelete={canWrite ? deleteLink : undefined} />
           <h4>Quem ativou e configurou</h4>
           {attribution?.activations?.map(item => (
             <section className="card" key={item.activationId} style={{padding:14, marginBottom:12, overflowWrap:"anywhere"}}>
@@ -75,9 +76,22 @@ export default function DeviceListsModal({ device, onClose, onChanged }) {
               <div className="muted">{item.listAddedBy?.at ? new Date(item.listAddedBy.at).toLocaleString("pt-BR") : "Sem data de autoria registrada"}</div>
             </section>
           ))}
-          <ConfigureForm device={state} onSubmit={submit} />
+          {canWrite && !scoped && <ConfigureForm device={state} onSubmit={submit} />}
+          {scoped && canWrite && <ScopedPartnerForm onSubmit={async body=>{const success=await run(()=>api(`${base}/configuration`,{method:"POST",body:{mode:"partner",confirm:true,...body}}),"Parceria configurada.");if(success){await load();onChanged?.();}}} />}
         </>
       )}
     </Modal>
   );
+}
+
+function ScopedPartnerForm({onSubmit}) {
+  const [code,setCode]=useState(""),[username,setUsername]=useState(""),[password,setPassword]=useState("");
+  return <section className="card" style={{padding:14,display:"grid",gap:10}}>
+    <h4>Adicionar / atualizar parceria da minha rede</h4>
+    <p className="muted">Somente códigos pertencentes à sua rede são aceitos. Não é possível configurar uma licença global desta tela.</p>
+    <label>Código<input value={code} onChange={e=>setCode(e.target.value)} /></label>
+    <label>Usuário<input value={username} onChange={e=>setUsername(e.target.value)} /></label>
+    <label>Senha<input type="password" autoComplete="new-password" value={password} onChange={e=>setPassword(e.target.value)} /></label>
+    <button type="button" className="btn primary" disabled={!code||!username||!password} onClick={()=>onSubmit({code,username,password})}>Salvar parceiro</button>
+  </section>;
 }
