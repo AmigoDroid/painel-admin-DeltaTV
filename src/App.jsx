@@ -299,7 +299,7 @@ function Shell({ user }) {
           {user.role === "admin" && page === "network-finance" ? <NetworkFinance /> :
           user.role === "admin" && page === "devices" ?
             <Devices key={page} scoped /> :
-          user.role === "admin" && page !== "downloads" ?
+          user.role === "admin" && page !== "downloads" && page !== "conta" ?
             <NetworkWorkspace key={page} section={adminView || "workspace"} onNavigate={go} /> :
             <Current onChanged={refreshCounts} menu={homeGroups} onNavigate={go} />}
         </main>
