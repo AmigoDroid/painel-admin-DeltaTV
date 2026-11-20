@@ -6,7 +6,7 @@ import AppInstallSpotlight from "@deltatv/ui/AppInstallSpotlight";
 import { TASKS } from "./task-directory.js";
 import { connectRealtime } from "./realtime.js";
 import { useEffect, useRef, useState } from "react";
-import { api, getAuth, login, logout } from "./api.js";
+import { api, getAuth, login, logout, updateAuthUser } from "./api.js";
 import { UiProvider, Field, useAction, BrandMark } from "./ui.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import NetworkWorkspace from "./pages/NetworkWorkspace.jsx";
@@ -315,6 +315,21 @@ export default function App() {
     window.addEventListener("auth-changed", h);
     return () => window.removeEventListener("auth-changed", h);
   }, []);
+  // Sempre consultar as permissões efetivas da sessão; nunca confiar no cache do navegador.
+  // Se a DeltaTV as revogou, a API devolve 401 e o cliente encerra a sessão antiga.
+  useEffect(() => {
+    if (auth?.user?.role !== "admin" || !auth.accessToken) return;
+    let active = true;
+    const accessToken = auth.accessToken;
+    api("/auth/profile").then(({ user }) => {
+      if (!active || !Array.isArray(user?.delegatedPermissions) ||
+          user.id !== auth.user.id || getAuth()?.accessToken !== accessToken) return;
+      const current = getAuth()?.user?.delegatedPermissions || [];
+      if (JSON.stringify(current) !== JSON.stringify(user.delegatedPermissions))
+        updateAuthUser({ id: user.id, delegatedPermissions: user.delegatedPermissions });
+    }).catch(() => { /* O cliente central já trata expiração/revogação da sessão. */ });
+    return () => { active = false; };
+  }, [auth?.user?.id, auth?.user?.role, auth?.accessToken]);
   // Login de dispositivo (MAC + chave da TV): sessão própria, limitada a um dispositivo; independente do login do painel.
   const [deviceMode, setDeviceMode] = useState(() => location.hash === "#dispositivo");
   const toDevice = (on) => { setDeviceMode(on); location.hash = on ? "dispositivo" : ""; };

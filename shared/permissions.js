@@ -48,9 +48,22 @@ export const ADMIN_SCOPED_PAGES = Object.freeze({
 });
 export const adminScopedView = page => ADMIN_SCOPED_PAGES[page]?.view ?? null;
 
+// O formulário não permite configuração de gateway sem poder consultar o cadastro.
+export function toggleDelegatedPermission(current, permission, checked) {
+  const next = new Set(current);
+  if (checked) {
+    next.add(permission);
+    if (permission === "network:gateways:write") next.add("network:gateways:read");
+  } else {
+    next.delete(permission);
+    if (permission === "network:gateways:read") next.delete("network:gateways:write");
+  }
+  return [...next];
+}
+
 export function adminPageAllowed(page, user) {
   if (page === "finance-networks") return user?.role === "superadmin";
-  if (page === "network-finance" && user?.role === "admin") return Boolean(user.delegatedPermissions?.includes("network:billing:read") || user.delegatedPermissions?.includes("network:gateways:read"));
+  if (page === "network-finance" && user?.role === "admin") return Boolean(user.delegatedPermissions?.includes("network:billing:read") || user.delegatedPermissions?.includes("network:gateways:read") || user.delegatedPermissions?.includes("network:gateways:write"));
   if (user?.role === "superadmin") return true;
   // O menu é espelhado, mas TODA página de Admin usa somente /admin/workspace.
   // Não confundir permissão com liberação de rotas globais da DeltaTV.

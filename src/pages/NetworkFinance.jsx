@@ -26,7 +26,7 @@ export default function NetworkFinance(){
  const granted=new Set(viewer?.delegatedPermissions||[]);
  const canRead=granted.has('network:billing:read');
  const canWrite=granted.has('network:billing:write');
- const canGateways=granted.has('network:gateways:read');
+ const canGateways=granted.has('network:gateways:read')||granted.has('network:gateways:write');
  const canConfigure=granted.has('network:gateways:write');
  const [gateways,setGateways]=useState([]),[charges,setCharges]=useState([]),[totals,setTotals]=useState({}),[meta,setMeta]=useState({}),[page,setPage]=useState(1);
  const [status,setStatus]=useState(''),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[error,setError]=useState('');
@@ -69,6 +69,7 @@ export default function NetworkFinance(){
  return <div style={{display:'grid',gap:18}}>
   <header><h1>Recebimentos da minha rede</h1><p className="muted">Os valores vão diretamente para o provedor configurado na sua conta. Não há transferência para a carteira DeltaTV.</p></header>
   {error&&<div className="alert" role="alert" style={{position:'fixed',top:16,right:16,zIndex:10000,maxWidth:'min(95vw,520px)',boxShadow:'0 6px 22px #0003'}}>{error}</div>}{message&&<div className="notice" role="status">{message}</div>}
+  {!canGateways&&<div className="notice" role="status">Para visualizar e configurar Mercado Pago ou InfinitePay, solicite à DeltaTV a permissão de gateways desta rede.</div>}
   {canGateways&&<section className="card" style={{padding:20}}><h2>Provedor ativo — selecione apenas um</h2>
    <p className="muted">Trocar de provedor não invalida as cobranças em aberto. As credenciais antigas ficam preservadas enquanto houver pagamento pendente.</p>
    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(250px,1fr))',gap:16}}>{providerList.map(g=><div key={g.provider} className="card" style={{padding:16}}>

@@ -2,6 +2,7 @@ import {ImpersonateDialog,UserRoleDialog,DeleteUserDialog} from "./Superadmin.js
 import PartnerPicker from "../PartnerPicker.jsx";
 import { useEffect, useState } from "react";
 import { api, getAuth } from "../api.js";
+import { toggleDelegatedPermission } from "../../shared/permissions.js";
 import { Badge, Empty, Field, Modal, PasswordInput, Pager, Table, fmtDateTime, useAction, useDebounced, useList, RowMenu } from "../ui.jsx";
 
 /**
@@ -160,6 +161,7 @@ function UserForm({ user, me, full, fixedPartnerId, onClose, onSaved }) {
       </div>
       {full && f.role === "admin" && <section className="card" style={{padding:16,display:"grid",gap:12}}>
         <h3>Permissões deste Admin</h3>
+        <p className="muted">Para configurar Mercado Pago ou InfinitePay, a permissão de configuração inclui automaticamente a visualização dos gateways.</p>
         <div className="actions" style={{flexWrap:"wrap"}}>
           <button type="button" className="btn sm" onClick={()=>setF(v=>({...v,delegatedPermissions:ADMIN_RIGHTS.map(([key])=>key)}))}>Liberar toda a própria rede</button>
           <button type="button" className="btn sm" onClick={()=>setF(v=>({...v,delegatedPermissions:[]}))}>Remover permissões</button>
@@ -182,7 +184,7 @@ function UserForm({ user, me, full, fixedPartnerId, onClose, onSaved }) {
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(225px,1fr))",gap:10}}>
           {ADMIN_RIGHTS.map(([permission,label])=><label key={permission} style={{display:"flex",alignItems:"center",gap:8}}>
             <input type="checkbox" checked={f.delegatedPermissions.includes(permission)} onChange={e=>setF(v=>({...v,
-              delegatedPermissions:e.target.checked?[...v.delegatedPermissions,permission]:v.delegatedPermissions.filter(p=>p!==permission)}))}/>{label}
+              delegatedPermissions:toggleDelegatedPermission(v.delegatedPermissions,permission,e.target.checked)}))}/>{label}
           </label>)}
         </div>
         <h4>Limites desta rede</h4>
