@@ -42,12 +42,15 @@ export const ADMIN_SCOPED_PAGES = Object.freeze({
   sources: {permission:"network:resources:read", view:"resources"},
   devices: {permission:"network:devices:read", view:"devices"},
   billing: {permission:"network:billing:read", view:"billing"},
+  "network-finance": {permission:"network:billing:read", view:"finance"},
   audit: {permission:"network:audit:read", view:"audit"},
   trash: {permission:null, view:"trash"},
 });
 export const adminScopedView = page => ADMIN_SCOPED_PAGES[page]?.view ?? null;
 
 export function adminPageAllowed(page, user) {
+  if (page === "finance-networks") return user?.role === "superadmin";
+  if (page === "network-finance" && user?.role === "admin") return Boolean(user.delegatedPermissions?.includes("network:billing:read") || user.delegatedPermissions?.includes("network:gateways:read"));
   if (user?.role === "superadmin") return true;
   // O menu é espelhado, mas TODA página de Admin usa somente /admin/workspace.
   // Não confundir permissão com liberação de rotas globais da DeltaTV.

@@ -83,3 +83,19 @@ export async function uploadRokuImage(path, file) {
   };
   return send(true);
 }
+
+/** CSV protegido por Bearer; nunca coloca token na URL ou permite exportar segredos. */
+export async function downloadNetworkFinanceCsv(query={}) {
+  const token=await ensureAccessToken();
+  if(!token)throw new ApiError(401,{message:'Sessão expirada.'});
+  const url=new URL(`${API}/api/v1/admin/finance-networks/export.csv`);
+  Object.entries(query).filter(([,v])=>v!=null&&v!=='').forEach(([key,value])=>url.searchParams.set(key,value));
+  const response=await fetch(url,{headers:{Authorization:`Bearer ${token}`},cache:'no-store'});
+  if(!response.ok)throw new ApiError(response.status,await response.json().catch(()=>({message:'Falha ao exportar.'})));
+  if(!(response.headers.get('Content-Type')||'').includes('text/csv'))throw new ApiError(502,{message:'Resposta inesperada do servidor.'});
+  const file=await response.blob();
+  if(file.size>2_000_000)throw new ApiError(502,{message:'Exportação excedeu o limite seguro.'});
+  const blobUrl=URL.createObjectURL(file);
+  try {const a=document.createElement('a');a.href=blobUrl;a.download='deltatv-financeiro-redes.csv';document.body.appendChild(a);a.click();a.remove();}
+  finally {setTimeout(()=>URL.revokeObjectURL(blobUrl),2000)}
+}

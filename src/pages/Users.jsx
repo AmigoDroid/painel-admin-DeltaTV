@@ -18,6 +18,7 @@ const ADMIN_RIGHTS = [
   ["network:members:read","Consultar usuários dos portais"],["network:members:write","Criar usuários dos próprios parceiros e revendas"],
   ["network:resources:read","Consultar códigos e DNS"],["network:resources:write","Cadastrar e editar códigos e DNS"],
   ["network:devices:read","Consultar dispositivos da rede"],["network:devices:write","Bloquear, desbloquear e remover ativações da rede"],
+  ["network:gateways:read","Ver gateways próprios"],["network:gateways:write","Configurar e ativar gateways próprios"],
   ["network:billing:read","Consultar cobranças da rede"],["network:billing:write","Emitir faturas da rede"],["network:audit:read","Consultar auditoria da própria rede"],
 ];
 const ADMIN_LIMITS = [
