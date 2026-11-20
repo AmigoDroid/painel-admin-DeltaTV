@@ -53,9 +53,9 @@ export function useBalances(enabled, path) {
  * Cria um código de parceria: escolhido (validado ao vivo e único em toda a plataforma) ou gerado.
  * Cada código aponta para UM servidor da parceria (`providers`) e, para revendedor, a UMA duração de licença do estoque.
  */
-export default function CodeModal({ checkPath, createPath, balancesPath, kind = "content", providers = [], onClose, onCreated }) {
+export default function CodeModal({ checkPath, createPath, balancesPath, kind = "content", providers = [], onClose, onCreated, scoped = false, query = {} }) {
   const run = useAction();
-  const sells = kind === "reseller" || kind === "both";
+  const sells = !scoped && (kind === "reseller" || kind === "both");
   const balances = useBalances(sells, balancesPath);
   const [code, setCode] = useState("");
   const [label, setLabel] = useState("");
@@ -67,9 +67,9 @@ export default function CodeModal({ checkPath, createPath, balancesPath, kind = 
   const dcode = useDebounced(code.trim(), 300);
 
   useEffect(() => {
-    if (!dcode) { setState(null); return; }
+    if (!checkPath || !dcode) { setState(null); return; }
     let live = true;
-    api(checkPath, { query: { code: dcode } }).then((r) => live && setState(r)).catch(() => live && setState(null));
+    api(checkPath, { query: { ...query, code: dcode } }).then((r) => live && setState(r)).catch(() => live && setState(null));
     return () => { live = false; };
   }, [dcode, checkPath]);
 
@@ -79,7 +79,7 @@ export default function CodeModal({ checkPath, createPath, balancesPath, kind = 
       ...(sells && months ? { licenseMonths: Number(months) } : {}),
       ...(withCode ? { code: code.trim() } : {}),
     };
-    const r = await run(() => api(createPath, { method: "POST", body }), "Código criado.");
+    const r = await run(() => api(createPath, { method: "POST", body, query }), "Código criado.");
     if (r) onCreated(r.code);
   };
   // Só vale se a verificação corresponde ao texto atual (evita usar resultado de um código anterior).
@@ -114,13 +114,13 @@ export default function CodeModal({ checkPath, createPath, balancesPath, kind = 
 }
 
 /** Edita servidor, licença, rótulo e limite de um código. Só afeta NOVAS ativações: quem já ativou não muda de servidor nem perde o prazo. */
-export function CodeEditModal({ partnerId, code, kind = "content", providers = [], onClose, onSaved }) {
+export function CodeEditModal({ basePath = "/admin/partners", scoped = false, query = {}, partnerId, code, kind = "content", providers = [], onClose, onSaved }) {
   const run = useAction();
-  const superadmin = getAuth()?.user?.role === "superadmin";
+  const superadmin = !scoped && getAuth()?.user?.role === "superadmin";
   const [allowWeb, setAllowWeb] = useState(!!code.allowWebIssuance);
   const [expires, setExpires] = useState(code.expiresAt ? new Date(code.expiresAt).toISOString().slice(0,16) : "");
-  const sells = kind === "reseller" || kind === "both";
-  const balances = useBalances(sells, `/admin/partners/${partnerId}/stock`);
+  const sells = !scoped && (kind === "reseller" || kind === "both");
+  const balances = useBalances(sells, `${basePath}/${partnerId}/stock`);
   const [providerId, setProviderId] = useState(code.providerId || "");
   const [label, setLabel] = useState(code.label || "");
   const [max, setMax] = useState(code.maxActivations ?? "");
@@ -130,7 +130,7 @@ export function CodeEditModal({ partnerId, code, kind = "content", providers = [
       ...(providerId !== (code.providerId || "") ? {providerId: providerId || null} : {}), expiresAt: expires ? new Date(expires+"Z").toISOString() : null, ...(superadmin ? {allowWebIssuance:allowWeb} : {}), label: label || undefined, maxActivations: max === "" ? null : Number(max),
       ...(sells ? { licenseMonths: months ? Number(months) : null } : {}),
     };
-    if (await run(() => api(`/admin/partners/${partnerId}/codes/${code.id}`, { method: "PATCH", body }), "Código atualizado.")) onSaved();
+    if (await run(() => api(`${basePath}/${partnerId}/codes/${code.id}`, { method: "PATCH", body, query }), "Código atualizado.")) onSaved();
   };
   return (
     <Modal title={`Editar código ${code.code}`} onClose={onClose}>
@@ -147,7 +147,7 @@ export function CodeEditModal({ partnerId, code, kind = "content", providers = [
       <Field label="Vencimento (UTC, vazio = sem prazo)"><input type="datetime-local" value={expires} onChange={e=>setExpires(e.target.value)} /></Field>
       {superadmin && <label><input type="checkbox" checked={allowWeb} onChange={e=>setAllowWeb(e.target.checked)}/> Autorizar emissão de PlayerWeb por este código (exige liberação no contrato)</label>}
       {superadmin && <CodeManagement partnerId={partnerId} code={code} providers={providers} onSaved={onSaved}/>}
-      <div className="actions"><button className="btn" onClick={onClose}>Cancelar</button><button className="btn primary" disabled={kind === "reseller" && !months} onClick={submit}>Salvar</button></div>
+      <div className="actions"><button className="btn" onClick={onClose}>Cancelar</button><button className="btn primary" disabled={sells && kind === "reseller" && !months} onClick={submit}>Salvar</button></div>
     </Modal>
   );
 }

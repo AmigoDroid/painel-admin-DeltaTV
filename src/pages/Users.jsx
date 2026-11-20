@@ -26,7 +26,11 @@ const ADMIN_LIMITS = [
   ["maxActivationsPerPartner","Máximo de ativações por parceiro"],
 ];
 
-export function UsersPanel({ partnerId: fixedPartnerId }) {
+export function UsersPanel(props) {
+  return props.scoped ? <ScopedPortalUsers {...props} /> : <GlobalUsersPanel {...props} />;
+}
+
+function GlobalUsersPanel({ partnerId: fixedPartnerId }) {
   const me = getAuth()?.user;
   const [q, setQ] = useState("");
   const dq = useDebounced(q);
@@ -184,3 +188,36 @@ export default function Users() {
     </>
   );
 }
+
+/** A mesma aba de usuários integra o modal compartilhado. Nunca usa /admin/users no modo Admin. */
+function ScopedPortalUsers({users,call,permits,reload}) {
+ const run=useAction(),[form,setForm]=useState(null),[error,setError]=useState("");
+ const writable=permits("network:members:write");
+ const save=async()=>{
+   if(!form?.name?.trim()||!form.email?.includes("@") || (!form.id&&form.password.length<12) || (form.password&&form.password.length<12))return;
+   const body={name:form.name.trim(),email:form.email.trim(),...(form.password?{password:form.password}:{})};
+   const ok=await run(()=>call(form.id?`/users/${form.id}`:"/users",{method:form.id?"PATCH":"POST",body}),"Usuário salvo.");
+   if(ok){setForm(null);reload();}
+ };
+ const deactivate=async user=>{if(await run(()=>call(`/users/${user.id}`,{method:"PATCH",body:{status:user.status==="active"?"disabled":"active"}}),"Acesso atualizado."))reload();};
+ const remove=async()=>{if(await run(()=>call(`/users/${form.id}`,{method:"DELETE",body:{reason:form.reason||""}}),"Usuário arquivado.")){setForm(null);reload();}};
+ return <>
+   {writable&&<div className="actions left"><button className="btn primary" onClick={()=>setForm({name:"",email:"",password:""})}>Novo usuário do portal</button></div>}
+   <Table><thead><tr><th>Nome</th><th>E-mail</th><th>Status</th><th>Ações</th></tr></thead><tbody>{users.map(user=><tr key={user.id}>
+     <td>{user.name}</td><td>{user.email}</td><td><Badge status={user.status==="active"?"active":"disabled"}/></td>
+     <td><RowMenu items={[{label:"Editar",hidden:!writable,onClick:()=>setForm({...user,password:""})},
+       {label:user.status==="active"?"Desativar":"Ativar",hidden:!writable,onClick:()=>deactivate(user)},
+       {label:"Excluir",hidden:!writable,danger:true,onClick:()=>setForm({...user,reason:"",delete:true})}]}/></td>
+   </tr>)}</tbody></Table>
+   {form&&<Modal title={form.delete?"Excluir usuário":form.id?"Editar usuário":"Novo usuário do portal"} onClose={()=>setForm(null)}>
+     {form.delete?<><p>O acesso de {form.email} será revogado e o registro arquivado.</p><Field label="Motivo (opcional)"><textarea value={form.reason||""} onChange={e=>setForm(v=>({...v,reason:e.target.value}))}/></Field></>:
+       <><Field label="Nome"><input value={form.name} onChange={e=>setForm(v=>({...v,name:e.target.value}))}/></Field>
+         <Field label="E-mail"><input type="email" value={form.email} onChange={e=>setForm(v=>({...v,email:e.target.value}))}/></Field>
+         <Field label={form.id?"Nova senha (vazio para manter)":"Senha (mínimo 12 caracteres)"}><input type="password" value={form.password} onChange={e=>setForm(v=>({...v,password:e.target.value}))}/></Field></>}
+     {error&&<p className="error" role="alert">{error}</p>}
+     <div className="actions"><button className="btn" onClick={()=>setForm(null)}>Cancelar</button>
+       <button className={`btn ${form.delete?"danger":"primary"}`} disabled={!form.delete&&(!form.name?.trim()||!form.email?.includes("@")||(!form.id&&form.password.length<12)||(form.password&&form.password.length<12))} onClick={form.delete?remove:save}>Confirmar</button></div>
+   </Modal>}
+ </>;
+}
+

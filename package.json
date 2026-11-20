@@ -7,7 +7,8 @@
     "dev": "vite --port 5174",
     "build": "node scripts/verify-env.mjs && vite build",
     "preview": "vite preview",
-    "test": "node --test tests/*.test.js"
+    "test": "node --test tests/*.test.js",
+    "test:components": "vitest run tests/components"
   },
   "dependencies": {
     "react": "^18.3.1",

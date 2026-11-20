@@ -6,7 +6,7 @@ const read = path => readFileSync(new URL(path,import.meta.url),'utf8');
 test('Badge do admin usa o MESMO componente de Partners e effectiveStatus',()=>{
  const workspace=read('../src/pages/NetworkWorkspace.jsx');
  const superadmin=read('../src/pages/Partners.jsx');
- assert.match(workspace,/import \{ Modal, Badge \} from "\.\.\/ui\.jsx"/);
+ assert.match(workspace,/import \{ Modal, Badge, RowMenu \} from "\.\.\/ui\.jsx"/);
  assert.match(superadmin,/Badge[^\n]*from "\.\.\/ui\.jsx"/);
  assert.match(workspace,/function PartnerBadge\(\{partner\}\)/);
  assert.match(workspace,/<Badge status=\{partner\.effectiveStatus\}/);

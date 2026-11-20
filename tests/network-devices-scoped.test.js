@@ -5,11 +5,14 @@ const read=(p)=>readFileSync(new URL(p, import.meta.url),'utf8');
 const ui=read('../src/pages/NetworkWorkspace.jsx');
 const routes=read('../../backend/src/modules/admin-workspaces/workspace.routes.js');
 const perms=read('../../backend/src/modules/admin-workspaces/permissions.js');
-test('a seção de TVs lista dispositivos reais, e não contas comerciais',()=>{
- assert.match(ui,/section==="devices"&&permits\("network:devices:read"\)&&<NetworkDevices/);
- assert.match(ui,/section!=="invitations"&&section!=="devices"&&section!=="trash"&&<div/);
- assert.match(ui,/request\(`partners\/\$\{accountId\}\/devices`/);
- assert.match(ui,/MAC \/ Dispositivo/);
+test('seção de dispositivos do Admin reutiliza Devices.jsx com escopo',()=>{
+ const app=read('../src/App.jsx');
+ const devices=read('../src/pages/Devices.jsx');
+ assert.match(app,/<Devices key=\{page\} scoped \/>/);
+ assert.match(ui,/import Devices from "\.\/Devices\.jsx"/);
+ assert.match(ui,/<Devices scoped \/>/);
+ assert.match(devices,/scoped \? "\/admin\/workspace\/devices"/);
+ assert.doesNotMatch(ui,/&&<NetworkDevices accounts=/);
 });
 test('ações exigem permissão de escrita e propriedade validada pelo backend',()=>{
  assert.match(perms,/"network:devices:write"/);

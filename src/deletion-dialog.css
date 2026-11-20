@@ -4,3 +4,6 @@
 .delta-delete-dialog p{margin:0;line-height:1.55}.delta-delete-dialog label{display:grid;gap:6px;font-size:14px}.delta-delete-dialog input:not([type=checkbox]),.delta-delete-dialog textarea,.delta-delete-dialog select{width:100%;box-sizing:border-box;background:#0e1729;color:#f2f6ff;border:1px solid #5b6f95;padding:10px;border-radius:8px;font:inherit}
 .delta-delete-impact{display:grid;gap:9px;border-radius:10px;background:#111c30;border:1px solid #405473;padding:12px}.delta-delete-warning,.delta-delete-error{background:#502827;padding:10px;border-radius:8px}.delta-delete-force{display:flex!important;gap:10px!important;align-items:start;line-height:1.4}.delta-delete-force input{margin-top:3px}
 .delta-delete-actions{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap}.delta-delete-actions button{padding:10px 15px;border-radius:8px;cursor:pointer}.delta-delete-actions button:disabled{opacity:.55;cursor:not-allowed}.delta-delete-danger{background:#b22738!important;color:white!important;border:1px solid #dc4c58!important}
+
+.delta-delete-dialog-embedded{width:100%;max-height:none;overflow:visible;padding:0;border:0;box-shadow:none;background:transparent;color:inherit}
+.delta-delete-dialog-embedded .delta-delete-impact{max-width:100%}

@@ -1,5 +1,6 @@
-import { useDeviceBulkActions } from "../../shared/useDeviceBulkActions.jsx";
-import { Modal, Badge } from "../ui.jsx";
+import { Modal, Badge, RowMenu } from "../ui.jsx";
+import PartnerDetailModal from "./PartnerDetailModal.jsx";
+import Devices from "./Devices.jsx";
 import {useCallback,useEffect,useMemo,useRef,useState} from "react";
 import {api,getAuth} from "../api.js";
 import {addMonthsClamped} from "../workspace-dates.js";
@@ -28,7 +29,6 @@ const field=(name,child)=><label className="field" style={{display:"grid",gap:5}
 function ErrorMessage({message}){return message?<div className="notice error" role="alert" style={{position:"fixed",top:16,right:16,zIndex:2147483647,maxWidth:"min(560px,calc(100vw - 32px))",boxShadow:"0 12px 36px #0008"}}>{message}</div>:null;}
 function PartnerBadge({partner}) {return partner.pending ? <Badge status="pending" label="Novo cadastro"/> : <Badge status={partner.effectiveStatus}/>;}
 function StatusMessage({message}){return message?<div className="notice" role="status">{message}</div>:null;}
-const between=(min,max)=>value=>Number.isInteger(Number(value))&&Number(value)>=min&&Number(value)<=max;
 
 const SECTION_TABS = Object.freeze({
   partners:"partners",resellers:"resellers",plans:"plans",invitations:"partners",devices:"partners",
@@ -56,15 +56,10 @@ export default function NetworkWorkspace({section="workspace", onNavigate}){
  // A DeltaTV mantém a navegação interna de inspeção de redes já existentes.
  const showWorkspaceManager=central || section!=="workspace";
  const scopedSection=section !== "workspace" && section !== "dashboard";
- const selectedArea=section === "devices" ? "devices" : section === "billing" ? "billing" : "resources";
  const [selected,setSelected]=useState(null);
  const [trashRows,setTrashRows]=useState([]),[trashMeta,setTrashMeta]=useState(null),[restoring,setRestoring]=useState(null),[restoreReason,setRestoreReason]=useState("");
- const [statusAction,setStatusAction]=useState(null),[statusReason,setStatusReason]=useState("");
  const [deletingPlan,setDeletingPlan]=useState(null),[planDeletePreview,setPlanDeletePreview]=useState(null),[planDeleteReason,setPlanDeleteReason]=useState(""),
  [planForm,setPlanForm]=useState(null),[accountForm,setAccountForm]=useState(null),[editingAccount,setEditingAccount]=useState(null);
- const [newUser,setNewUser]=useState(null),[editUser,setEditUser]=useState(null),[deleteUser,setDeleteUser]=useState(null),[userDeleteReason,setUserDeleteReason]=useState("");
- const [deletePreview,setDeletePreview]=useState(null),[deleteReason,setDeleteReason]=useState('');
- const [paymentReference,setPaymentReference]=useState(''),[confirmingPayment,setConfirmingPayment]=useState(false);
  const [inviteForm,setInviteForm]=useState(null),[inviteResult,setInviteResult]=useState(null),
   [invitations,setInvitations]=useState([]),[invitePage,setInvitePage]=useState(1),[inviteMeta,setInviteMeta]=useState(null),
   [registrations,setRegistrations]=useState(null),[editingInvite,setEditingInvite]=useState(null);
@@ -113,18 +108,10 @@ export default function NetworkWorkspace({section="workspace", onNavigate}){
  const canBrowse=permits(sectionPermission)||(section==='invitations'&&permits('network:resellers:write'));
  const visibleAccounts=partners.filter(p=>(tab==="resellers"?["reseller","both"].includes(p.kind):
    (section==="devices"||section==="resources"||section==="billing"||section==="members") ? true : ["content","both"].includes(p.kind)));
- const openPartner=async p=>{
-   const generation=requestGeneration.current;
-   setDeletePreview(null);setDeleteReason('');setStatusAction(null);
-   setError("");try{const d=await request(`partners/${p.id}`);if(requestGeneration.current===generation)setSelected(d);}
-   catch(e){if(requestGeneration.current===generation)setError(e.message);}
- };
- const editPartner=()=>{
-  if(!selected)return;
-  const p=selected.partner;
-  setEditingAccount({id:p.id,name:p.name,kind:p.kind,planKey:selected.plan?.tier||'',
-   contactName:p.contactName||'',contactEmail:p.contactEmail||'',contactPhone:p.contactPhone||'',
-   status:p.status,endsAt:p.endsAt?new Date(p.endsAt).toISOString().slice(0,10):''});
+ const openPartner=(p, initialEdit=false)=>{
+   setError("");
+   // A ficha compartilha a consulta segura com o Superadmin; evita GET duplicado.
+   setSelected({partner:p,initialEdit});
  };
  const issueInvite=async()=>{
    if(!inviteForm?.planKey || (inviteForm.mode==='email'&&!inviteForm.email.trim()))return setError('Escolha um plano e informe o e-mail apenas para convite pessoal.');
@@ -232,7 +219,7 @@ export default function NetworkWorkspace({section="workspace", onNavigate}){
        <span>Página {trashMeta.page} de {trashMeta.totalPages}</span>
        <button className="btn sm" disabled={page===trashMeta.totalPages} onClick={()=>setPage(v=>v+1)}>Próxima</button>
      </div>}
-     {restoring&&<div className="card" style={{padding:14,display:"grid",gap:10}}>
+     {restoring&&<Modal title={`Restaurar ${restoring.name}`} onClose={()=>setRestoring(null)}>
        <h4>Restaurar {restoring.name}</h4><p>O estado anterior será restaurado quando houver fotografia de exclusão. O acesso pode precisar de revisão.</p>
        {field("Motivo da restauração",<textarea minLength={8} maxLength={400} value={restoreReason} onChange={e=>setRestoreReason(e.target.value)}/>)}
        <div className="actions"><button className="btn" onClick={()=>setRestoring(null)}>Cancelar</button>
@@ -240,7 +227,7 @@ export default function NetworkWorkspace({section="workspace", onNavigate}){
           const ok=await act(()=>request(`trash/${restoring.id}/restore`,{method:"POST",body:{reason:restoreReason.trim()}}),"Conta restaurada na própria rede.");
           if(ok){setRestoring(null);setRestoreReason("");}
         }}>Confirmar restauração</button></div>
-     </div>}
+     </Modal>}
    </section>}
    {section==="audit"&&permits("network:audit:read")&&<section className="card" style={{padding:20}}><h3>Histórico de ações na rede</h3>
      <p className="muted">Eventos relacionados às contas da sua rede. Auditoria global da plataforma permanece exclusiva da DeltaTV.</p>
@@ -292,13 +279,13 @@ export default function NetworkWorkspace({section="workspace", onNavigate}){
        {plans.length?<table className="table"><thead><tr><th>Plano</th><th>Tipo</th><th>Preço mensal</th><th>DNS</th><th>Ativações</th><th>Validade</th><th>Gerenciar</th></tr></thead><tbody>{plans.map(p=><tr key={p.key}><td>{p.name}</td><td>{p.audience}</td><td>{currency(p.monthlyPriceCents)}</td><td>{p.maxServers??"Sem limite"}</td><td>{p.activationLimit??"Sem limite"}</td><td>{p.validityDays??30} dias · {p.active?"Ativo":"Inativo"}</td><td>{permits("network:plans:write")&&<div className="actions"><button className="btn sm" onClick={()=>setPlanForm({key:p.key,name:p.name,description:p.description,audience:p.audience,monthlyPrice:(p.monthlyPriceCents/100).toFixed(2),maxServers:String(p.maxServers??""),noDnsLimit:p.maxServers==null,activationLimit:String(p.activationLimit??''),noActivationLimit:p.activationLimit==null,validityDays:String(p.validityDays??30),autoFailover:p.autoFailover,autoPriority:p.autoPriority,emailAlerts:p.emailAlerts,detailedHistory:p.detailedHistory})}>Editar</button><button className="btn sm" disabled={busy} onClick={()=>void act(()=>request(`plans/${p.key}`,{method:"PUT",body:{active:!p.active}}),p.active?"Plano desativado.":"Plano reativado.")}>{p.active?"Desativar":"Reativar"}</button><button className="btn sm" disabled={busy} onClick={()=>void previewPlanDeletion(p)}>Excluir</button></div>}</td></tr>)}</tbody></table>:<p className="muted">Nenhum plano criado nesta rede.</p>}
      </div>
    </>}
-   {deletingPlan&&<div className="card" role="dialog" aria-modal="true" aria-label="Excluir plano" style={{padding:20,display:"grid",gap:12}}>
+   {deletingPlan&&<Modal title="Excluir plano" onClose={()=>setDeletingPlan(null)}>
      <h3>Excluir plano: {deletingPlan.name}</h3>
      {planDeletePreview?<><p>{planDeletePreview.warning}</p><p>Contas vinculadas: {planDeletePreview.accounts} · Convites históricos: {planDeletePreview.invitations}</p></>:<p>Consultando os vínculos...</p>}
      {field("Motivo da exclusão (opcional)",<input value={planDeleteReason} onChange={e=>setPlanDeleteReason(e.target.value)} placeholder="Opcional"/>)}
      <div className="actions"><button className="btn" onClick={()=>{setDeletingPlan(null);setPlanDeletePreview(null);}}>Cancelar</button>
        <button className="btn danger" disabled={busy||!planDeletePreview} onClick={()=>void confirmPlanDeletion()}>Confirmar exclusão</button></div>
-   </div>}
+   </Modal>}
    {section !== "dashboard" && section!=="audit" && section!=="trash" && showWorkspaceManager && tab!=="plans"&&canBrowse&&<>
      {(section==="workspace"||section==="partners"||section==="resellers")&&!editingAccount&&!accountForm&&permits(tab==="resellers"?"network:resellers:write":"network:partners:write")&&<div className="actions">
        <button className="btn primary" onClick={()=>{setAccountForm(blankAccount(tab==="resellers"?"reseller":"content"));setInviteForm(null);setSelected(null);}}>Novo {tab==="resellers"?"revendedor":"parceiro"}</button>
@@ -369,9 +356,9 @@ export default function NetworkWorkspace({section="workspace", onNavigate}){
            <button className="btn sm" disabled={invitePage>=inviteMeta.totalPages||busy} onClick={()=>setInvitePage(p=>p+1)}>Próxima</button></div>
        </nav>}
      </section>}
-     {accountForm&&renderAccountForm(accountForm,setAccountForm)}
-     {editingAccount&&renderAccountForm(editingAccount,setEditingAccount,true)}
-     {section==="devices"&&permits("network:devices:read")&&<NetworkDevices accounts={visibleAccounts} request={request} permits={permits} accountPage={page} accountMeta={pageMeta} setAccountPage={setPage} accountQuery={q} setAccountQuery={setQ}/>}
+     {accountForm&&<Modal title="Nova conta da rede" onClose={()=>setAccountForm(null)} wide>{renderAccountForm(accountForm,setAccountForm)}</Modal>}
+     {editingAccount&&<Modal title="Editar conta da rede" onClose={()=>setEditingAccount(null)} wide>{renderAccountForm(editingAccount,setEditingAccount,true)}</Modal>}
+     {section==="devices"&&permits("network:devices:read")&&(!central?<Devices scoped />:<p className="muted">Para gerenciar dispositivos por MAC de uma rede delegada, use a área de dispositivos da conta correspondente. Esta visão central não possui API de MAC com seleção de rede.</p>)}
      {section!=="invitations"&&section!=="devices"&&section!=="trash"&&<div className="card network-partner-panel" style={{padding:16}}>
        <div className="row" style={{justifyContent:"space-between",alignItems:"center"}}><h3>{section==="devices"||section==="resources"||section==="billing"||section==="members"?"Contas da minha rede":tab==="resellers"?"Minhas revendas":"Meus parceiros"}</h3>
         <div className="actions" style={{flexWrap:"wrap"}}>
@@ -382,279 +369,36 @@ export default function NetworkWorkspace({section="workspace", onNavigate}){
           <option value="suspended">Suspensos</option><option value="blocked">Bloqueados</option><option value="cancelled">Cancelados</option>
          </select>
         </div></div>
-       {visibleAccounts.length?<div className="network-partner-table-scroll"><table className="table network-partner-table"><thead><tr><th>Empresa</th><th>Mensalidade</th><th>Vencimento</th><th>Status</th><th>Ações</th></tr></thead><tbody>{visibleAccounts.map(p=><tr key={p.id}><td>{p.name}</td><td>{p.monthlyFeeCents == null ? "—" : currency(p.monthlyFeeCents)}</td><td>{p.endsAt ? new Date(p.endsAt).toLocaleDateString("pt-BR") : "—"}</td><td><PartnerBadge partner={p}/></td><td><button className="btn sm" onClick={()=>openPartner(p)}>Gerenciar</button></td></tr>)}</tbody></table></div>:<p className="muted">Nenhuma conta corresponde à pesquisa nesta rede.</p>}
+       {visibleAccounts.length?<div className="network-partner-table-scroll"><table className="table network-partner-table">
+         <thead><tr><th>{tab==="resellers"?"Revenda":"Parceiro"}</th><th>Status</th><th>Portal</th><th>Mensalidade</th><th>Dispositivos</th><th>Término</th><th>Ações</th></tr></thead>
+         <tbody>{visibleAccounts.map(p=><tr key={p.id}>
+           <td><strong>{p.name}</strong><div className="muted">{p.slug||""}</div></td>
+           <td><PartnerBadge partner={p}/></td><td className="muted">—</td>
+           <td>{p.monthlyFeeCents == null ? "—" : currency(p.monthlyFeeCents)}</td>
+           <td>{p.deviceCount ?? (p.deviceLimit != null ? `— / ${p.deviceLimit}` : "—")}</td>
+           <td>{p.endsAt ? new Date(p.endsAt).toLocaleDateString("pt-BR") : "—"}</td>
+           <td className="actions"><button className="btn sm" onClick={()=>openPartner(p)}>Gerenciar</button>
+             <RowMenu items={[{label:"Gerenciar",onClick:()=>openPartner(p)},
+               {label:"Editar",hidden:!permits(p.kind==="reseller"?"network:resellers:write":"network:partners:write")||(p.kind==="both"&&!permits("network:resellers:write")),onClick:()=>openPartner(p,true)}]}/></td>
+         </tr>)}</tbody></table></div>:<p className="muted">Nenhuma conta corresponde à pesquisa nesta rede.</p>}
        {pageMeta&&<nav className="row" aria-label="Páginas de contas" style={{justifyContent:"space-between",marginTop:12,flexWrap:"wrap"}}>
          <span className="muted">{pageMeta.total} conta(s) · página {pageMeta.page} de {Math.max(1,pageMeta.totalPages)}</span>
          <div className="actions"><button className="btn sm" disabled={page<=1||busy} onClick={()=>setPage(x=>Math.max(1,x-1))}>Anterior</button>
          <button className="btn sm" disabled={page>=pageMeta.totalPages||busy} onClick={()=>setPage(x=>x+1)}>Próxima</button></div>
        </nav>}
      </div>}
-     {section!=="devices"&&section!=="trash"&&selected&&<div className="card" style={{padding:20,display:"grid",gap:12}}>
-       <h3>{selected.partner.name} <PartnerBadge partner={selected.partner}/></h3>
-       {(selected.plan || selected.contract) && <p>Plano: {plans.find(p=>p.key===selected.plan?.tier)?.name||selected.plan?.tier||"Não informado"} · Ativações: {selected.contract?.activationLimit ?? "Sem limite"}</p>}
-       <div className="actions"><button className="btn" onClick={()=>setSelected(null)}>Fechar</button>
-         {permits(selected.partner.kind==="reseller"?"network:resellers:write":"network:partners:write")&&<button className="btn primary" onClick={editPartner}>Editar contrato</button>}
-         {selected.partner.statusReason==='awaiting_payment'&&permits('network:billing:write')&&permits(selected.partner.kind==='reseller'?'network:resellers:write':'network:partners:write')&&
-         <button className="btn primary" disabled={busy} onClick={()=>setConfirmingPayment(v=>!v)}>Confirmar recebimento</button>}
-         {permits(selected.partner.kind==='reseller'?'network:resellers:delete':'network:partners:delete')&&<button type="button" className="btn" onClick={async()=>{try{setDeletePreview(await request(`partners/${selected.partner.id}/delete-preview`));setDeleteReason('');}catch(e){setError(e.message);}}}>Excluir parceiro ou revenda</button>}
-         {permits("network:members:write")&&<button className="btn" onClick={()=>setNewUser({name:"",email:"",password:""})}>Adicionar usuário</button>}
-       </div>
-       {permits(selected.partner.kind==="reseller"?"network:resellers:write":"network:partners:write")&&
-         <div className="actions" style={{flexWrap:"wrap"}}>
-          {selected.partner.status==="active"&&<button className="btn" onClick={()=>setStatusAction("suspend")}>Suspender</button>}
-          {["active","suspended"].includes(selected.partner.status)&&<button className="btn danger" onClick={()=>setStatusAction("block")}>Bloquear</button>}
-          {["blocked","suspended"].includes(selected.partner.status)&&selected.partner.statusReason!=="awaiting_payment"&&<button className="btn primary" onClick={()=>setStatusAction("reactivate")}>Reativar</button>}
-          {["active","blocked","suspended"].includes(selected.partner.status)&&<button className="btn danger" onClick={()=>setStatusAction("cancel")}>Cancelar</button>}
-         </div>}
-       {statusAction&&<section className="card" style={{padding:14,display:"grid",gap:10,maxWidth:600}}>
-         <h4>{({suspend:"Suspender",block:"Bloquear",reactivate:"Reativar",cancel:"Cancelar"})[statusAction]} {selected.partner.name}</h4>
-         {statusAction!=="reactivate"&&field("Motivo (obrigatório)",<textarea value={statusReason} maxLength={500} onChange={e=>setStatusReason(e.target.value)}/>)}
-         <div className="actions"><button className="btn" onClick={()=>{setStatusAction(null);setStatusReason("");}}>Voltar</button>
-          <button className="btn primary" disabled={busy||(statusAction!=="reactivate"&&statusReason.trim().length<3)} onClick={async()=>{
-            const id=selected.partner.id, action=statusAction;
-            const ok=await act(()=>request(`partners/${id}/${action}`,{method:"POST",body:statusAction==="reactivate"?{}:{reason:statusReason.trim()}}),"Situação atualizada.");
-            if(ok){setStatusAction(null);setStatusReason("");await openPartner(selected.partner);}
-          }}>Confirmar</button></div>
-       </section>}
-       {deletePreview&&<section className="card" role="group" aria-label="Confirmar exclusão" style={{padding:18,border:'1px solid var(--danger,#c2414e)',display:'grid',gap:10,maxWidth:650}}>
-         <h4>Excluir {selected.partner.name} desta rede</h4>
-         <p>Esta operação revoga logins, códigos e acessos, e move a conta para a lixeira. Não remove recibos ou registros financeiros obrigatórios, nem dados de outras redes.</p>
-         <p className="muted">Impacto: {deletePreview.users} usuário(s), {deletePreview.codes} código(s), {deletePreview.activations} ativação(ões), {deletePreview.providers} DNS.</p>
-         {field('Motivo da exclusão (opcional)',<textarea rows={2} value={deleteReason} onChange={e=>setDeleteReason(e.target.value)}/>)}
-         <div className="actions"><button className="btn" onClick={()=>setDeletePreview(null)}>Cancelar</button>
-           <button className="btn" disabled={busy} onClick={async()=>{const ok=await act(()=>request(`partners/${selected.partner.id}/archive`,{method:'POST',body:{reason:deleteReason.trim()}}),'Conta excluída da operação e acessos revogados.');if(ok){setSelected(null);setDeletePreview(null);}}}>Confirmar exclusão</button></div>
-       </section>}
-       {confirmingPayment&&selected.partner.statusReason==='awaiting_payment'&&<div className="card" style={{padding:14,display:'grid',gap:10,maxWidth:520}}>
-         <strong>Confirmação financeira</strong>
-         <p className="muted">Confirme o recebimento real antes de liberar os recursos pagos. O comprovante sozinho não confirma a transação.</p>
-         {field('Referência do pagamento recebido',<input placeholder="ID Pix ou identificação bancária" value={paymentReference} onChange={e=>setPaymentReference(e.target.value)}/>)}
-         <div className="actions"><button className="btn" onClick={()=>setConfirmingPayment(false)}>Cancelar</button>
-           <button className="btn primary" disabled={busy||paymentReference.trim().length<3} onClick={async()=>{
-             const ok=await act(()=>request(`partners/${selected.partner.id}/confirm-payment`,{method:'POST',body:{reference:paymentReference.trim()}}),'Recebimento registrado. Acesso ativado.');
-             if(ok){setPaymentReference('');setConfirmingPayment(false);setSelected(null);}
-           }}>Confirmar e ativar</button></div>
-       </div>}
-       {selected.users?.length>0&&<><h4>Usuários do painel</h4>{selected.users.map(u=><div key={u.id} className="row" style={{justifyContent:"space-between",flexWrap:"wrap",gap:8}}><span>{u.name} · {u.email} · {u.status}</span>{permits("network:members:write")&&<div className="actions">
-         <button className="btn sm" onClick={()=>setEditUser({id:u.id,name:u.name,email:u.email,password:"",status:u.status})}>Editar</button>
-         <button className="btn sm" onClick={()=>void act(()=>request(`partners/${selected.partner.id}/users/${u.id}`,{method:"PATCH",body:{status:u.status==="active"?"disabled":"active"}}),"Acesso atualizado.").then(()=>openPartner(selected.partner))}>{u.status==="active"?"Desativar":"Ativar"}</button>
-         <button className="btn sm" onClick={()=>{setDeleteUser(u);setUserDeleteReason("");}}>Excluir</button></div>}</div>)}
-         {editUser&&<section className="card" style={{padding:14,display:"grid",gap:10}}><h4>Editar usuário</h4>
-          {field("Nome",<input value={editUser.name} onChange={e=>setEditUser({...editUser,name:e.target.value})}/>)}
-          {field("E-mail",<input type="email" value={editUser.email} onChange={e=>setEditUser({...editUser,email:e.target.value})}/>)}
-          {field("Nova senha (deixe em branco para manter)",<input type="password" value={editUser.password} onChange={e=>setEditUser({...editUser,password:e.target.value})}/>)}
-          <div className="actions"><button className="btn" onClick={()=>setEditUser(null)}>Cancelar</button><button className="btn primary" disabled={busy||!editUser.name.trim()||!editUser.email.includes("@")||(editUser.password.length>0&&editUser.password.length<12)} onClick={async()=>{const {id,name,email,password}=editUser;const ok=await act(()=>request(`partners/${selected.partner.id}/users/${id}`,{method:"PATCH",body:{name,email,...(password?{password}:{})}}),"Usuário atualizado.");if(ok){setEditUser(null);await openPartner(selected.partner);}}}>Salvar</button></div>
-         </section>}
-         {deleteUser&&<section className="card" style={{padding:14,display:"grid",gap:10}}><h4>Excluir usuário {deleteUser.email}</h4>
-          <p className="muted">O acesso será desativado e o registro arquivado para auditoria, sem apagar histórico financeiro.</p>
-          {field("Motivo da exclusão (opcional)",<textarea value={userDeleteReason} onChange={e=>setUserDeleteReason(e.target.value)}/>)}
-          <div className="actions"><button className="btn" onClick={()=>setDeleteUser(null)}>Cancelar</button><button className="btn" disabled={busy} onClick={async()=>{const ok=await act(()=>request(`partners/${selected.partner.id}/users/${deleteUser.id}`,{method:"DELETE",body:{reason:userDeleteReason.trim()}}),"Usuário arquivado.");if(ok){setDeleteUser(null);await openPartner(selected.partner);}}}>Confirmar exclusão</button></div>
-         </section>}
-        </>}
-       {(permits("network:resources:read")||permits("network:devices:read")||permits("network:billing:read"))&&
-          <NetworkResources key={`${selected.partner.id}-${section}`} account={selected.partner} request={request} permits={permits} initialArea={selectedArea}/>}
-       {newUser&&<div style={{display:"grid",gap:8}}><h4>Novo usuário do portal</h4><div className="row">{field("Nome",<input value={newUser.name} onChange={e=>setNewUser({...newUser,name:e.target.value})}/>)}{field("E-mail",<input type="email" value={newUser.email} onChange={e=>setNewUser({...newUser,email:e.target.value})}/>)}{field("Senha",<input type="password" value={newUser.password} onChange={e=>setNewUser({...newUser,password:e.target.value})}/>)}</div><div className="actions"><button className="btn" onClick={()=>setNewUser(null)}>Cancelar</button><button className="btn primary" disabled={busy||newUser.password.length<12} onClick={async()=>{const ok=await act(()=>request(`partners/${selected.partner.id}/users`,{method:"POST",body:newUser}),"Usuário criado.");if(ok){setNewUser(null);openPartner(selected.partner);}}}>Salvar usuário</button></div></div>}
-     </div>}
+     {section!=="devices"&&section!=="trash"&&selected?.partner?.id && <PartnerDetailModal
+       key={`${selected.partner.id}-${central?adminId:"network"}`}
+       id={selected.partner.id} partnerName={selected.partner.name} initialEdit={selected.initialEdit}
+       role="admin" basePath="/admin/workspace/partners"
+       query={central?{adminId}:{}} permits={permits}
+       initialTab={section==="resources"?"codes":section==="billing"?"invoices":section==="members"?"users":null}
+       onClose={()=>setSelected(null)} onChanged={reload} />}
    </>}
   </>}
  </div>;
 }
 
 
-// Lista operacional de TVs: nunca confundir contas comerciais com dispositivos físicos.
-// A API exige ownership da conta e filtra as ativações pelo partnerId real.
-function NetworkDevices({accounts,request,permits,accountPage,accountMeta,setAccountPage,accountQuery,setAccountQuery}){
- const [accountId,setAccountId]=useState("");
- const [devices,setDevices]=useState([]),[meta,setMeta]=useState(null);
- const [q,setQ]=useState(""),[status,setStatus]=useState(""),[page,setPage]=useState(1);
- const [showRemoved,setShowRemoved]=useState(false),[hiddenIds,setHiddenIds]=useState([]);
- const [loading,setLoading]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
- const [pending,setPending]=useState(null),[reason,setReason]=useState(""),[confirmMac,setConfirmMac]=useState("");
- const generation=useRef(0);
- useEffect(()=>{if(accountId&&!accounts.some(item=>item.id===accountId))setAccountId("");},[accounts,accountId]);
- useEffect(()=>{setPage(1);setDevices([]);setMeta(null);setPending(null);setHiddenIds([]);},[accountId,q,status,showRemoved]);
- const load=useCallback(async()=>{
-  const n=++generation.current;
-  if(!accountId){setDevices([]);setMeta(null);setLoading(false);return;}
-  setLoading(true);setError("");
-  try{
-   const response=await request(`partners/${accountId}/devices`,{query:{page,pageSize:20,q:q||undefined,status:status||undefined,showRemoved:String(showRemoved)}});
-   if(n!==generation.current)return;
-   const items=response.data||[];
-   setDevices(items);setMeta(response.meta||null);
-  }catch(e){if(n===generation.current){setError(e.message||"Falha ao consultar TVs.");setDevices([]);setMeta(null);}}
-  finally{if(n===generation.current)setLoading(false);}
- },[accountId,page,q,status,showRemoved,request]);
- useEffect(()=>{void load();return()=>{generation.current++;};},[load]);
- const shown=devices.filter(d=>!hiddenIds.includes(d.id));
- const bulk=useDeviceBulkActions({
-  Modal, rows:shown,scope:JSON.stringify([accountId,q,page,status,showRemoved]),loading:loading||!accountId,
-  request:(action,body)=>request(`partners/${accountId}/devices/bulk-${action}`,{method:"POST",body}),
-  refresh:load,onOptimistic:ids=>setHiddenIds(old=>[...old,...ids]),
- });
- const change=async()=>{
-  if(!pending)return;
-  setLoading(true);setError("");setNotice("");
-  try{
-   if(pending.action==="delete"){
-     await request(`partners/${accountId}/devices/${pending.id}`,{method:"DELETE",body:{confirmMac,reason:reason.trim()}});
-   } else {
-     await request(`partners/${accountId}/devices/${pending.id}/${pending.action}`,{method:"POST",body:{reason:reason.trim()}});
-   }
-   if(pending.action==="delete"||pending.action==="revoke")setHiddenIds(old=>[...old,pending.id]);
-   setNotice("Operação registrada no histórico do dispositivo.");setPending(null);setReason("");setConfirmMac("");await load();
-  }catch(e){setError(e.message||"Não foi possível atualizar o dispositivo.");}
-  finally{setLoading(false);}
- };
- return <section className="card" style={{padding:20,display:"grid",gap:16}} aria-label="Gestão de TVs e dispositivos">
-  <div><h3>TVs e dispositivos da rede</h3><p className="muted">Selecione a conta que possui os aparelhos. A lista mostra ativações reais, não cadastros de parceiros.</p></div>
-  <div className="row" style={{flexWrap:"wrap",gap:10}}>
-   {field("Buscar conta da rede",<input value={accountQuery} onChange={e=>setAccountQuery(e.target.value)} placeholder="Nome da conta"/>)}
-   {field("Conta",<select value={accountId} onChange={e=>setAccountId(e.target.value)}><option value="">Selecione o parceiro ou revenda</option>{accounts.map(a=><option value={a.id} key={a.id}>{a.name}</option>)}</select>)}
-   {field("Buscar MAC",<input value={q} onChange={e=>setQ(e.target.value)} placeholder="MAC do aparelho" disabled={!accountId}/>)}
-   {field("Status",<select value={status} onChange={e=>setStatus(e.target.value)} disabled={!accountId}><option value="">Vínculos atuais</option><option value="active">Ativo</option><option value="blocked">Bloqueado</option><option value="revoked">Removido</option></select>)}
-   <label><input type="checkbox" checked={showRemoved} disabled={!accountId} onChange={e=>setShowRemoved(e.target.checked)}/> Mostrar removidos</label>
-   <button type="button" className="btn" disabled={!accountId||loading} onClick={()=>void load()}>Atualizar TVs</button>
-  </div>
-  {accountMeta?.totalPages>1&&<div className="row" style={{justifyContent:"space-between"}}><span className="muted">Contas: página {accountMeta.page} de {accountMeta.totalPages}</span><div className="actions"><button className="btn sm" disabled={accountPage<=1} onClick={()=>setAccountPage(p=>Math.max(1,p-1))}>Contas anteriores</button><button className="btn sm" disabled={accountPage>=accountMeta.totalPages} onClick={()=>setAccountPage(p=>p+1)}>Próximas contas</button></div></div>}
-  {error&&<ErrorMessage message={error}/>} {notice&&<StatusMessage message={notice}/>}
-  {!accountId?<p className="muted">Selecione uma conta para consultar seus dispositivos.</p>:<>
-   {loading&&<p role="status">Atualizando dispositivos...</p>}
-   <p className="muted">Desvincular mantém o dispositivo cadastrado. Excluir remove somente o vínculo da conta selecionada.</p>
-   {permits("network:devices:write")&&bulk.toolbar}
-   <div className="network-partner-table-scroll"><table className="table network-partner-table"><thead><tr><th>MAC / Dispositivo</th><th>Plataforma</th><th>Estado</th><th>Ações</th></tr></thead><tbody>
-    {shown.map(d=><tr key={d.id}><td>{permits("network:devices:write")&&bulk.pick(d)}{d.mac||d.deviceId||"Sem identificador"}</td><td>{d.platform||d.device?.platform||"—"}</td><td>{({active:"Ativo",blocked:"Bloqueado",revoked:"Removido"})[d.status]||d.status||"—"}</td><td><div className="actions" style={{flexWrap:"wrap"}}>
-     {permits("network:devices:write")&&d.status==="active"&&<button className="btn sm" type="button" onClick={()=>{setPending({id:d.id,action:"block",mac:d.mac});setReason("");}}>Bloquear</button>}
-     {permits("network:devices:write")&&d.status==="blocked"&&<button className="btn sm" type="button" onClick={()=>{setPending({id:d.id,action:"unblock",mac:d.mac});setReason("");}}>Desbloquear</button>}
-     {permits("network:devices:write")&&d.status!=="revoked"&&<button className="btn sm" type="button" onClick={()=>{setPending({id:d.id,action:"revoke",mac:d.mac});setReason("");}}>Desvincular</button>}
-     {permits("network:devices:write")&&<button className="btn danger sm" type="button" onClick={()=>{setPending({id:d.id,action:"delete",mac:d.mac});setReason("");setConfirmMac("");}}>Excluir vínculo</button>}
-    </div></td></tr>)}
-   </tbody></table></div>
-   {!loading&&shown.length===0&&<p className="muted">{devices.length?"Nenhum aparelho corresponde aos filtros.":"Nenhuma ativação encontrada para esta conta."}</p>}
-   {meta&&<div className="row" style={{justifyContent:"space-between",flexWrap:"wrap"}}><span className="muted">{meta.total??0} ativação(ões) · página {meta.page||page} de {Math.max(1,meta.totalPages||1)}</span><div className="actions"><button className="btn sm" disabled={loading||page<=1} onClick={()=>setPage(p=>Math.max(1,p-1))}>Anterior</button><button className="btn sm" disabled={loading||page>=meta.totalPages} onClick={()=>setPage(p=>p+1)}>Próxima</button></div></div>}
-   {pending&&<div className="card" style={{padding:16,display:"grid",gap:10}} role="group" aria-label="Confirmar ação no dispositivo">
-    <h4>Confirmar {({block:"bloqueio",unblock:"desbloqueio",revoke:"desvinculação",delete:"exclusão definitiva"})[pending.action]} · {pending.mac||"Dispositivo"}</h4>
-    <p className="muted">{pending.action==="revoke"?"A remoção revoga o acesso e pode apagar credenciais de configuração. Não é a exclusão permanente do registro.":"A ação modifica o acesso da TV e fica registrada na auditoria."}</p>
-    {field(pending.action==="delete"?"Motivo obrigatório (mínimo 3 caracteres)":"Motivo da alteração",<textarea rows={2} value={reason} onChange={e=>setReason(e.target.value)} placeholder="Descreva o motivo da alteração"/>)}
-    {pending.action==="delete"&&field("Digite o MAC para confirmar",<input value={confirmMac} onChange={e=>setConfirmMac(e.target.value)} placeholder={pending.mac}/>)}
-    <div className="actions"><button className="btn" onClick={()=>setPending(null)}>Cancelar</button><button className="btn primary" disabled={loading||(pending.action==="delete"&&(confirmMac!==pending.mac||reason.trim().length<3))} onClick={()=>void change()}>Confirmar ação</button></div>
-   </div>}
-  </>}
-  <p className="muted">O cadastro/ativação inicial da TV usa o fluxo de licenças apropriado. Exclusão física definitiva continua exclusiva do Superadmin.</p>
- </section>;
-}
 
-// Recursos operacionais sempre associados à conta selecionada e ao Admin titular.
-// Nenhuma chamada dessa seção usa endpoints globais da DeltaTV.
-function NetworkResources({account,request,permits,initialArea="resources"}){
- const [area,setArea]=useState(initialArea),[dns,setDns]=useState([]),[codes,setCodes]=useState([]),
-   [devices,setDevices]=useState([]),[invoices,setInvoices]=useState([]),
-   [providerForm,setProviderForm]=useState(null),[codeForm,setCodeForm]=useState(null),
-   [deleting,setDeleting]=useState(null),[deleteReason,setDeleteReason]=useState(""),
-   [replacement,setReplacement]=useState(""),[force,setForce]=useState(false),
-   [competence,setCompetence]=useState(new Date().toISOString().slice(0,7)),
-   [saving,setSaving]=useState(false),[notice,setNotice]=useState("");
- const reloadResources=useCallback(async()=>{
-   const base=`partners/${account.id}`;
-   const tasks=[];
-   if(permits("network:resources:read")){
-     tasks.push(request(`${base}/providers`).then(r=>setDns(r.data||[])));
-     tasks.push(request(`${base}/codes`).then(r=>setCodes(r.data||[])));
-   }
-   if(permits("network:devices:read"))tasks.push(request(`${base}/devices`,{query:{pageSize:30}}).then(r=>setDevices(r.data||[])));
-   if(permits("network:billing:read"))tasks.push(request(`${base}/invoices`).then(r=>setInvoices(r.data||[])));
-   const outcome=await Promise.allSettled(tasks);
-   const bad=outcome.find(r=>r.status==="rejected");if(bad)setNotice(bad.reason?.message||"Falha ao carregar recursos.");
- },[account.id,request]);
- useEffect(()=>{void reloadResources();},[reloadResources]);
- const submit=async(path,body,method="POST")=>{
-   setSaving(true);setNotice("");
-   try{await request(`partners/${account.id}/${path}`,{method,body});await reloadResources();setNotice("Operação registrada.");return true;}
-   catch(e){setNotice(e.message||"Não foi possível salvar.");return false;}
-   finally{setSaving(false);}
- };
- const previewDeletion=async(kind,item)=>{
-  setNotice("");setDeleting(null);setDeleteReason("");setReplacement("");setForce(false);
-  try{
-   const path=kind==="provider"?`providers/${item.id}`:`codes/${item.id}`;
-   const preview=await request(`partners/${account.id}/${path}/deletion-preview`);
-   setDeleting({kind,item,preview});
-  }catch(e){setNotice(e.message||"Não foi possível consultar impacto da exclusão.");}
- };
- const confirmDeletion=async()=>{
-  if(!deleting)return;
-  const path=deleting.kind==="provider"?`providers/${deleting.item.id}`:`codes/${deleting.item.id}`;
-  const body={reason:deleteReason.trim(),
-   ...(deleting.kind==="provider"?{replacementProviderId:replacement||null,force}: {})};
-  if(await submit(path,body,"DELETE")){setDeleting(null);setProviderForm(null);setCodeForm(null);}
- };
- return <section style={{display:"grid",gap:12,borderTop:"1px solid var(--border, #d5d5d5)",paddingTop:12}}>
-  <h4>Recursos desta conta</h4>
-  <div className="row" style={{gap:8,flexWrap:"wrap"}}>
-   {permits("network:resources:read")&&<button className="btn sm" onClick={()=>setArea("resources")}>DNS e códigos</button>}
-   {permits("network:devices:read")&&<button className="btn sm" onClick={()=>setArea("devices")}>Dispositivos</button>}
-   {permits("network:billing:read")&&<button className="btn sm" onClick={()=>setArea("billing")}>Faturas</button>}
-  </div>
-  {notice&&<div className="notice" role="status">{notice}</div>}
-  {area==="resources"&&permits("network:resources:read")&&<>
-    <h5>DNS/servidores — {dns.length}</h5>
-    {dns.length?dns.map(item=><div className="row" key={item.id} style={{justifyContent:"space-between",flexWrap:"wrap",gap:8}}><span>{item.name} · {item.baseUrl} · {item.status}</span>
-     {permits("network:resources:write")&&<div className="actions"><button className="btn sm" onClick={()=>setProviderForm({id:item.id,name:item.name,baseUrl:item.baseUrl,deliveryMode:item.deliveryMode||"redirect",status:item.status||"active",priority:item.priority||0,playlistTemplate:item.playlistTemplate})}>Editar</button>
-      <button className="btn sm" onClick={()=>void previewDeletion("provider",item)}>Excluir</button></div>}
-    </div>):<p className="muted">Nenhum servidor cadastrado.</p>}
-    {permits("network:resources:write")&&<>
-      {!providerForm?<button className="btn sm" onClick={()=>setProviderForm({name:"",baseUrl:"",deliveryMode:"redirect"})}>Adicionar DNS</button>:
-      <div className="card" style={{padding:12,display:"grid",gap:10}}><h5>{providerForm.id?"Editar DNS":"Novo DNS"}</h5>
-       {field("Nome",<input value={providerForm.name} onChange={e=>setProviderForm({...providerForm,name:e.target.value})}/>)}
-       {field("Endereço do servidor",<input placeholder="https://exemplo.com" value={providerForm.baseUrl} onChange={e=>setProviderForm({...providerForm,baseUrl:e.target.value})}/>)}
-       {field("Entrega",<select value={providerForm.deliveryMode} onChange={e=>setProviderForm({...providerForm,deliveryMode:e.target.value})}><option value="redirect">Redirect</option><option value="proxy">Proxy</option></select>)}
-       {providerForm.id&&field("Situação",<select value={providerForm.status} onChange={e=>setProviderForm({...providerForm,status:e.target.value})}><option value="active">Ativo</option><option value="disabled">Desativado</option></select>)}
-       <div className="actions"><button className="btn" onClick={()=>setProviderForm(null)}>Cancelar</button>
-         <button className="btn primary" disabled={saving||!providerForm.name||!providerForm.baseUrl} onClick={async()=>{const {id,...body}=providerForm;if(await submit(id?`providers/${id}`:"providers",body,id?"PATCH":"POST"))setProviderForm(null);}}>Salvar DNS</button></div>
-      </div>}
-    </>}
-    <h5>Códigos — {codes.length}</h5>
-    {account.kind==="reseller"&&<p className="muted">Para emitir códigos de Revenda, use o fluxo de licenças das TVs autorizado pela DeltaTV. Esta tela não emite licenças.</p>}
-    {codes.map(c=><div className="row" key={c.id} style={{justifyContent:"space-between",flexWrap:"wrap",gap:8}}><span>{c.code} · {c.label||"Sem nome"} · {c.status||"—"}</span>
-      {permits("network:resources:write")&&<div className="actions"><button className="btn sm" onClick={()=>setCodeForm({id:c.id,code:c.code,label:c.label||"",providerId:c.providerId||"",maxActivations:c.maxActivations??""})}>Editar</button>
-      {c.status!=="revoked"&&<button className="btn sm" onClick={()=>void submit(`codes/${c.id}/revoke`,{},"POST")}>Revogar</button>}
-      <button className="btn sm" onClick={()=>void previewDeletion("code",c)}>Excluir</button></div>}
-    </div>)}
-    {permits("network:resources:write") && account.kind!=="reseller" && <>
-       {!codeForm?<button className="btn sm" onClick={()=>setCodeForm({code:"",label:"",providerId:""})}>Criar código de ativação</button>:
-       <div className="card" style={{padding:12,display:"grid",gap:10}}><h5>{codeForm.id?"Editar código":"Novo código"}</h5>
-         {!codeForm.id&&field("Código (opcional, gera automático)",<input value={codeForm.code} onChange={e=>setCodeForm({...codeForm,code:e.target.value})}/>)}
-         {codeForm.id&&<p className="muted">Código: {codeForm.code} (identificador imutável)</p>}
-         {field("Descrição",<input value={codeForm.label} onChange={e=>setCodeForm({...codeForm,label:e.target.value})}/>)}
-         {field("DNS principal",<select value={codeForm.providerId} onChange={e=>setCodeForm({...codeForm,providerId:e.target.value})}><option value="">Automático</option>{dns.map(d=><option value={d.id} key={d.id}>{d.name}</option>)}</select>)}
-         <div className="actions"><button className="btn" onClick={()=>setCodeForm(null)}>Cancelar</button>
-         <button className="btn primary" disabled={saving} onClick={async()=>{const b={label:codeForm.label||"",providerId:codeForm.providerId||null,...(!codeForm.id&&codeForm.code?{code:codeForm.code}:{})};if(await submit(codeForm.id?`codes/${codeForm.id}`:"codes",b,codeForm.id?"PATCH":"POST"))setCodeForm(null);}}>{codeForm.id?"Salvar alterações":"Criar"}</button></div>
-       </div>}
-    </>}
-   {deleting&&<div className="card" style={{padding:16,display:"grid",gap:10,border:"1px solid var(--danger,#c2414e)"}} role="group" aria-label="Confirmar exclusão de recurso">
-    <h5>Excluir {deleting.kind==="provider"?"servidor":"código"}: {deleting.kind==="provider"?deleting.item.name:deleting.item.code}</h5>
-    <p className="muted">Exclusão operacional com auditoria. Histórico financeiro e licenças existentes são preservados.</p>
-    <p>{deleting.preview.warning||"Confira os vínculos antes de continuar."}</p>
-    <p className="muted">Ativações em uso: {deleting.preview.liveActivations??0} · Códigos vinculados: {deleting.preview.codes??0} · Pools: {deleting.preview.pools??0}</p>
-    {deleting.kind==="provider"&&<>
-      {field("Servidor substituto",<select value={replacement} onChange={e=>setReplacement(e.target.value)}><option value="">Nenhum</option>{(deleting.preview.alternatives||[]).map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select>)}
-      {(deleting.preview.liveActivations>0&&!replacement)&&<label><input type="checkbox" checked={force} onChange={e=>setForce(e.target.checked)}/> Confirmo o risco de interrupção das TVs sem substituto.</label>}
-    </>}
-    {field("Motivo da exclusão (opcional)",<textarea rows={2} value={deleteReason} onChange={e=>setDeleteReason(e.target.value)}/>)}
-    <div className="actions"><button className="btn" onClick={()=>setDeleting(null)}>Cancelar</button>
-      <button className="btn" disabled={saving||(deleting.kind==="provider"&&deleting.preview.liveActivations>0&&!replacement&&!force)} onClick={()=>void confirmDeletion()}>Confirmar exclusão</button></div>
-   </div>}
-  </>}
-  {area==="devices"&&permits("network:devices:read")&&<div style={{display:"grid",gap:8}}>
-    <h5>Ativações recentes (até 30)</h5>
-    {devices.length?devices.map(a=><div className="row" key={a.id}><span>{a.mac||a.deviceId} · {a.status} · {a.platform||"—"}</span></div>):<p className="muted">Nenhuma ativação registrada.</p>}
-  </div>}
-  {area==="billing"&&permits("network:billing:read")&&<div style={{display:"grid",gap:9}}>
-    <h5>Faturas</h5>
-    {invoices.map(i=><div key={i.id} className="row">{i.competence} · {currency(i.totalCents||i.amountCents||0)} · {i.status}</div>)}
-    {!invoices.length&&<p className="muted">Nenhuma fatura registrada.</p>}
-    {permits("network:billing:write")&&<div className="row">{field("Competência",<input type="month" value={competence} onChange={e=>setCompetence(e.target.value)}/>)}<button className="btn primary" disabled={saving} onClick={()=>submit("invoices",{competence})}>Emitir fatura</button></div>}
-  </div>}
- </section>;
-}
-
-export {LABELS};
+export { LABELS };

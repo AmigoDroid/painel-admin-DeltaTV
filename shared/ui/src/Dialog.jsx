@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef } from "react";
+import { createPortal } from "react-dom";
 const stack = [];
 const FOCUSABLE =
   'button:not([disabled]),[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
@@ -6,11 +7,15 @@ const FOCUSABLE =
 export default function Dialog({ title, onClose, children, wide }) {
   const titleId = useId(),
     boxRef = useRef(null),
-    close = useRef(onClose);
+    close = useRef(onClose),
+    layer = useRef(null),
+    activeMarker = useRef(null);
+  if (layer.current === null) layer.current = 1100 + stack.length * 20;
   close.current = onClose;
   useEffect(() => {
     const marker = Symbol("dialog"),
       previouslyFocused = document.activeElement;
+    activeMarker.current = marker;
     stack.push(marker);
     const container = boxRef.current;
     const getFocusables = () =>
@@ -60,10 +65,14 @@ export default function Dialog({ title, onClose, children, wide }) {
         previouslyFocused.focus();
     };
   }, []);
-  return (
+  const contents = (
     <div
       className="overlay"
-      onMouseDown={(e) => e.target === e.currentTarget && close.current()}
+      style={{ zIndex: layer.current }}
+      onMouseDown={(e) => {
+        if (stack.length && stack[stack.length - 1] !== activeMarker.current) return;
+        if (e.target === e.currentTarget) close.current();
+      }}
     >
       <div
         ref={boxRef}
@@ -88,4 +97,5 @@ export default function Dialog({ title, onClose, children, wide }) {
       </div>
     </div>
   );
+  return typeof document === "undefined" ? contents : createPortal(contents, document.body);
 }
