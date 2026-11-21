@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.js",
     "./TaskFinder": "./src/TaskFinder.jsx",
+    "./EmergencyDns": "./src/EmergencyDns.jsx",
     "./EasyStart": "./src/EasyStart.jsx",
     "./useSimpleMode": "./src/useSimpleMode.js",
     "./money": "./src/money.js",

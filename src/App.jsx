@@ -1,3 +1,4 @@
+import EmergencyDnsPage from "./EmergencyDnsPage.jsx";
 import {Breadcrumb,PlatformBrand} from "../shared/PanelExperience.jsx";
 import Superadmin from "./pages/Superadmin.jsx";
 import { panelAllows, adminPageAllowed, adminScopedView } from "../shared/permissions.js";
@@ -6,7 +7,7 @@ import AppInstallSpotlight from "@deltatv/ui/AppInstallSpotlight";
 import { TASKS } from "./task-directory.js";
 import { connectRealtime } from "./realtime.js";
 import { useEffect, useRef, useState } from "react";
-import { api, getAuth, login, logout, updateAuthUser } from "./api.js";
+import { api, getAuth, login, logout } from "./api.js";
 import { UiProvider, Field, useAction, BrandMark } from "./ui.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import NetworkWorkspace from "./pages/NetworkWorkspace.jsx";
@@ -59,7 +60,7 @@ const PAGES = {
   dashboard: ["Visão geral", Dashboard], vpsmonitor: ["Servidor / VPS", VpsMonitor], vpsfiles: ["Arquivos da VPS", VpsFiles],
   webaccess: ["Player Web", WebAccess], whiteLabel: ["Aplicativos white-label", WhiteLabel],
   "ativar-tv": ["Ativar TV", LicenseActivation], licenses: ["Licenças das TVs", Licenses], devices: ["TVs e dispositivos", Devices], unlinked: ["TVs sem configuração", Unlinked],
-  partners: ["Gerenciar parceiros", Partners], servermonitor: ["Qualidade dos servidores", ServerMonitor], sources: ["Fontes globais de conteúdo", Sources],
+  partners: ["Gerenciar parceiros", Partners], servermonitor: ["Qualidade dos servidores", ServerMonitor], emergencydns: ["Troca emergencial de DNS", EmergencyDnsPage], sources: ["Fontes globais de conteúdo", Sources],
   resellers: ["Revendas", Resellers], network: ["Rede de distribuição", DistributionNetwork], "portal-sales": ["Gerenciar parceiros", Partners], support: ["Resolver problema da TV", () => <SupportCenter base="/admin" />], trash: ["Lixeira", PartnerTrash], clients: ["Clientes", Clients], credits: ["Créditos", Credits], downloads: ["Aplicativos", Downloads],
   "network-finance": ["Recebimentos da minha rede", NetworkFinance], "finance-networks": ["Financeiro das redes", NetworkFinanceSuperadmin],
   billing: ["Financeiro", Billing], gateways: ["Gateways de pagamento", PaymentGateways], pix: ["Pix (legado)", Pix], pricing: ["Planos e recursos", PlansAndPricing], "service-packages": ["Pacotes de serviço", ServicePackages], "global-config": ["Configurações Globais", GlobalSettings], commerce3: ["Planos SaaS e comissões", Commerce3],
@@ -69,15 +70,15 @@ const PAGES = {
 // Menu único e direto (como no painel do parceiro): cada função abre a própria página,
 // sem passar por sub-dashboards. A mesma lista alimenta o menu lateral e a tela inicial.
 const GROUPS = [
- {label:null,items:['dashboard','workspace','partners','resellers','pricing','invitations','devices']},
+ {label:null,items:['dashboard','workspace','partners','resellers','pricing','service-packages','invitations','devices']},
  {label:'Operação',items:['licenses','billing','network-finance','sources','support','downloads']},
  {label:'Administração',items:['users','global-config']},
 ];
 // Ferramentas avançadas continuam acessíveis sem poluir a navegação principal.
 // As permissões e as rotas permanecem iguais às da versão anterior.
 const EXTRA_GROUPS = [
- {label:'Operações avançadas',items:['control','ativar-tv','clients','unlinked','credits','network','service-packages']},
- {label:'Aplicativos e DNS',items:['whiteLabel','webaccess','servermonitor']},
+ {label:'Operações avançadas',items:['control','ativar-tv','clients','unlinked','credits','network']},
+ {label:'Aplicativos e DNS',items:['whiteLabel','webaccess','servermonitor','emergencydns']},
  {label:'Infraestrutura e auditoria',items:['finance-networks','gateways','vpsmonitor','vpsfiles','trash','loginhistory','audit','notifications','mail','help','conta']},
 ];
 
@@ -96,6 +97,7 @@ const ICONS = {
   licenses: <><circle cx="8" cy="15" r="4" /><path d="M11 12l9-9M16 7l3 3M14 9l2 2" /></>,
   partners: <><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5" /><path d="M16 4.8a3.5 3.5 0 010 6.4M18.5 14.8c1.7.7 2.8 2.3 3 5.2" /></>,
   servermonitor: <><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M6 14h3l2-5 3 8 2-4h2"/></>,
+  emergencydns: <><path d="M4 6h16M4 12h12M4 18h16"/><path d="M17 9l3 3-3 3"/></>,
   commerce3: <><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 10h10M7 14h8"/></>,
   "portal-sales": <><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M7 12h10M7 16h6"/></>,
   network: <><circle cx="12" cy="5" r="2"/><circle cx="5" cy="18" r="2"/><circle cx="19" cy="18" r="2"/><path d="M12 7v5M5 16l7-4 7 4"/></>,
@@ -197,15 +199,13 @@ function Shell({ user }) {
   // Itens do menu são conveniência: cada rota é protegida por permissão no backend.
   // As opções dos Admins são permitidas pelo mesmo catálogo e aparecem na mesma navegação.
   // APIs globais não são expostas: módulos delegáveis abrem sua versão isolada por rede.
-  const hidden = (k) => (user.role === "admin" && k === "service-packages") ||
-    !adminPageAllowed(k,user) || (user.role === "support" && k === "audit");
-  const pageLabel = id => user.role === "admin" && id === "pricing" ? "Planos que ofereço" : PAGES[id][0];
+  const hidden = (k) => !adminPageAllowed(k,user) ||
+    (user.role === "support" && k === "audit");
   const canOpenPage = id => Boolean(PAGES[id]) && !hidden(id);
   const allowed = id => canOpenPage(id);
   // Endereços antigos de sub-dashboards (#area/..., #pagamentos) abrem direto a função correspondente.
   const fromHash = () => {
-    const oldId = resolveLegacyRoute(location.hash.slice(1));
-    const id = user.role === "admin" && oldId === "service-packages" ? "pricing" : oldId;
+    const id = resolveLegacyRoute(location.hash.slice(1));
     return allowed(id) ? id : (canOpenPage('dashboard') ? 'dashboard' : canOpenPage('workspace') ? 'workspace' : 'conta');
   };
   const [page, setPage] = useState(fromHash);
@@ -258,7 +258,7 @@ function Shell({ user }) {
         className={`nav ${page === k ? 'active' : ''}`}
         aria-current={page === k ? 'page' : undefined}
         onClick={() => go(k)}>
-        <span className="nav__label"><NavIcon k={k}/>{pageLabel(k)}</span>
+        <span className="nav__label"><NavIcon k={k}/>{PAGES[k][0]}</span>
         {badges[k] > 0 && <span className="count">{badges[k] > 99 ? '99+' : badges[k]}</span>}
       </button>)}
     </div>;
@@ -266,7 +266,7 @@ function Shell({ user }) {
   // Mesmas funções do menu lateral, em cartões na tela inicial (o painel inicial já é a primeira entrada).
   const homeGroups = [...GROUPS,...EXTRA_GROUPS].map(g => ({
     label: g.label || "Geral",
-    items: g.items.filter(k => k !== "dashboard" && allowed(k)).map(k => ({ id: k, label: pageLabel(k), icon: <NavIcon k={k} />, badge: badges[k] })),
+    items: g.items.filter(k => k !== "dashboard" && allowed(k)).map(k => ({ id: k, label: PAGES[k][0], icon: <NavIcon k={k} />, badge: badges[k] })),
   }));
   return (
     <div className="layout">
@@ -288,19 +288,19 @@ function Shell({ user }) {
           <button type="button" className="icon menu-btn" aria-label="Abrir menu" aria-controls="menu-principal" aria-expanded={open} onClick={() => setOpen(true)}>
             <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
           </button>
-          <strong className="topbar-title">{pageLabel(page)}</strong>
+          <strong className="topbar-title">{PAGES[page][0]}</strong>
           {badges.unlinked > 0 || badges.resellers > 0 ? <span className="count" aria-label="Itens aguardando">{(badges.unlinked || 0) + (badges.resellers || 0)}</span> : null}
           <button type="button" className="easy-mode-button" aria-pressed={!simpleMode} onClick={() => setSimpleMode((s) => !s)}>{simpleMode ? "Guia das telas: ligado" : "Guia das telas: desligado"}</button>
           <UserMenu user={user} onAccount={() => go("conta")} />
         </div>
-        <main className="content"><Breadcrumb panel="admin" current={pageLabel(page)} onHome={()=>go(canOpenPage('dashboard')?'dashboard':'workspace')}/>
+        <main className="content"><Breadcrumb panel="admin" current={PAGES[page][0]} onHome={()=>go(canOpenPage('dashboard')?'dashboard':'workspace')}/>
           {(page === "dashboard" || page === "workspace") && <AppInstallSpotlight onOpen={() => go("downloads")} />}
           <TaskFinder tasks={TASKS.filter(task => allowed(task.route))} onNavigate={go} />
           {simpleMode && page !== "dashboard" && <EasyPageGuide role="admin" page={page} onBack={() => go("dashboard")} />}
           {user.role === "admin" && page === "network-finance" ? <NetworkFinance /> :
           user.role === "admin" && page === "devices" ?
             <Devices key={page} scoped /> :
-          user.role === "admin" && page !== "downloads" && page !== "conta" ?
+          user.role === "admin" && page !== "downloads" ?
             <NetworkWorkspace key={page} section={adminView || "workspace"} onNavigate={go} /> :
             <Current onChanged={refreshCounts} menu={homeGroups} onNavigate={go} />}
         </main>
@@ -317,21 +317,6 @@ export default function App() {
     window.addEventListener("auth-changed", h);
     return () => window.removeEventListener("auth-changed", h);
   }, []);
-  // Sempre consultar as permissões efetivas da sessão; nunca confiar no cache do navegador.
-  // Se a DeltaTV as revogou, a API devolve 401 e o cliente encerra a sessão antiga.
-  useEffect(() => {
-    if (auth?.user?.role !== "admin" || !auth.accessToken) return;
-    let active = true;
-    const accessToken = auth.accessToken;
-    api("/auth/profile").then(({ user }) => {
-      if (!active || !Array.isArray(user?.delegatedPermissions) ||
-          user.id !== auth.user.id || getAuth()?.accessToken !== accessToken) return;
-      const current = getAuth()?.user?.delegatedPermissions || [];
-      if (JSON.stringify(current) !== JSON.stringify(user.delegatedPermissions))
-        updateAuthUser({ id: user.id, delegatedPermissions: user.delegatedPermissions });
-    }).catch(() => { /* O cliente central já trata expiração/revogação da sessão. */ });
-    return () => { active = false; };
-  }, [auth?.user?.id, auth?.user?.role, auth?.accessToken]);
   // Login de dispositivo (MAC + chave da TV): sessão própria, limitada a um dispositivo; independente do login do painel.
   const [deviceMode, setDeviceMode] = useState(() => location.hash === "#dispositivo");
   const toDevice = (on) => { setDeviceMode(on); location.hash = on ? "dispositivo" : ""; };

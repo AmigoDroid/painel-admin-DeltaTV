@@ -27,12 +27,14 @@ const ADMIN_PAGES = {
   downloads: "downloads:read",
   audit: "audit:read",
   servermonitor: "devices:read",
+  emergencydns: "partners:write",
 };
 // Páginas compartilhadas com a DeltaTV que já possuem leitura/escrita isoladas por rede.
 // Uma página ausente daqui continua indisponível para Admins até ter API tenant-safe.
 export const ADMIN_SCOPED_PAGES = Object.freeze({
   dashboard: {permission:"network:dashboard:read", view:"dashboard"},
   workspace: {permission:null, view:"workspace"},
+  emergencydns: {permission:"network:resources:write",view:"resources"},
   invitations: {permission:"network:partners:write", view:"invitations"},
   partners: {permission:"network:partners:read", view:"partners"},
   resellers: {permission:"network:resellers:read", view:"resellers"},
@@ -48,22 +50,9 @@ export const ADMIN_SCOPED_PAGES = Object.freeze({
 });
 export const adminScopedView = page => ADMIN_SCOPED_PAGES[page]?.view ?? null;
 
-// O formulário não permite configuração de gateway sem poder consultar o cadastro.
-export function toggleDelegatedPermission(current, permission, checked) {
-  const next = new Set(current);
-  if (checked) {
-    next.add(permission);
-    if (permission === "network:gateways:write") next.add("network:gateways:read");
-  } else {
-    next.delete(permission);
-    if (permission === "network:gateways:read") next.delete("network:gateways:write");
-  }
-  return [...next];
-}
-
 export function adminPageAllowed(page, user) {
   if (page === "finance-networks") return user?.role === "superadmin";
-  if (page === "network-finance" && user?.role === "admin") return Boolean(user.delegatedPermissions?.includes("network:billing:read") || user.delegatedPermissions?.includes("network:gateways:read") || user.delegatedPermissions?.includes("network:gateways:write"));
+  if (page === "network-finance" && user?.role === "admin") return Boolean(user.delegatedPermissions?.includes("network:billing:read") || user.delegatedPermissions?.includes("network:gateways:read"));
   if (user?.role === "superadmin") return true;
   // O menu é espelhado, mas TODA página de Admin usa somente /admin/workspace.
   // Não confundir permissão com liberação de rotas globais da DeltaTV.
