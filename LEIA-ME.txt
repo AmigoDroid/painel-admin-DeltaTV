@@ -1,0 +1,15 @@
+CORRECAO DE IMPORT - DELTATV / PAINEL ADMIN
+
+Este ZIP e instalado EXCLUSIVAMENTE na raiz do projeto Vite Admin.
+Nao altera outros paines nem cria pastas shared/vendor.
+
+1. Coloque o ZIP na raiz do projeto e execute: unzip -o DeltaTV_Correcao_EmergencyDns_Admin_Vite.zip
+2. Execute: sh aplicar-correcao.sh
+3. Execute: npm run build
+
+O shell altera SOMENTE as referencias @deltatv/ui/EmergencyDns em:
+- src/EmergencyDnsPage.jsx -> ./EmergencyDns.jsx
+- src/pages/DeviceRecordModal.jsx -> ../EmergencyDns.jsx
+
+Se o Vite apresentar outro erro diferente, veja o caminho indicado pelo log.
+Nao foi possivel executar npm run build completo neste ambiente porque as dependencias nao estao instaladas.
