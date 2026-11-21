@@ -27,14 +27,12 @@ const ADMIN_PAGES = {
   downloads: "downloads:read",
   audit: "audit:read",
   servermonitor: "devices:read",
-  emergencydns: "partners:write",
 };
 // Páginas compartilhadas com a DeltaTV que já possuem leitura/escrita isoladas por rede.
 // Uma página ausente daqui continua indisponível para Admins até ter API tenant-safe.
 export const ADMIN_SCOPED_PAGES = Object.freeze({
   dashboard: {permission:"network:dashboard:read", view:"dashboard"},
   workspace: {permission:null, view:"workspace"},
-  emergencydns: {permission:"network:resources:write",view:"resources"},
   invitations: {permission:"network:partners:write", view:"invitations"},
   partners: {permission:"network:partners:read", view:"partners"},
   resellers: {permission:"network:resellers:read", view:"resellers"},

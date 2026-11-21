@@ -4,7 +4,6 @@ import { Empty, Field, LoadError, Modal, Pager, Table, fmtMoney, toCents, useDeb
 import ContentContract from "./ContentContract.jsx";
 import ServicePlan from "./ServicePlan.jsx";
 import "./plans-pricing.css";
-import {PlanTechnicalOptions,PlanVisibilityOption} from "./PlanCommonFields.jsx";
 
 const BILLING_NAMES = { none: "Sem mensalidade", fixed: "Mensalidade fixa", per_device: "Por dispositivo", tiered: "Por faixa" };
 const CONTRACT_NAMES = { legacy: "Regras anteriores", credits: "Pré-pago por créditos", fixed_unlimited: "Valor fixo · ilimitado", fixed_limited: "Valor fixo · limitado" };
@@ -127,10 +126,10 @@ function ContractList() {
   </>;
 }
 
-const blankPlan = () => ({key:"",name:"",description:"",audience:"both",monthlyPriceCents:0,
+const blankPlan = () => ({key:"",name:"",description:"",audience:"content",monthlyPriceCents:0,
   canResellPanel:false,canCreateSubmasters:false,canViewFinance:false,canManageGateways:false,
   maxServers:1,autoFailover:false,autoPriority:false,emailAlerts:false,detailedHistory:false,
-  sortOrder:100,active:true,hiddenFromNetwork:false});
+  sortOrder:100,active:true});
 function CatalogEditor({plan,onClose,onSaved}) {
   const isNew = !plan?.key;
   const [data,setData]=useState(plan||blankPlan());
@@ -142,13 +141,13 @@ function CatalogEditor({plan,onClose,onSaved}) {
     if(price.trim() && (cents == null || cents>100000000)) return setError("Informe um preço válido em reais.");
     setBusy(true);
     try {
-      const payload={name:data.name.trim(),description:data.description.trim(),audience:"both",
+      const payload={name:data.name.trim(),description:data.description.trim(),audience:data.audience,
         monthlyPriceCents:cents,maxServers:data.maxServers == null ? null : Number(data.maxServers),autoFailover:!!data.autoFailover,
         autoPriority:!!data.autoPriority,emailAlerts:!!data.emailAlerts,detailedHistory:!!data.detailedHistory,
         canResellPanel:!!data.canResellPanel,canCreateSubmasters:!!data.canResellPanel&&!!data.canCreateSubmasters,
         canViewFinance:!!data.canResellPanel&&!!data.canViewFinance,
         canManageGateways:!!data.canResellPanel&&!!data.canManageGateways,
-        sortOrder:Number(data.sortOrder),hiddenFromNetwork:!!data.hiddenFromNetwork};
+        sortOrder:Number(data.sortOrder)};
       if(isNew) await api("/admin/service-plans",{method:"POST",body:{key:data.key.trim(),...payload}});
       else await api(`/admin/service-plans/${encodeURIComponent(plan.key)}`,{method:"PUT",body:{...payload,active:!!data.active}});
       onSaved();onClose();
@@ -163,6 +162,7 @@ function CatalogEditor({plan,onClose,onSaved}) {
       </div>
       <Field label="Descrição"><textarea maxLength={500} rows={2} value={data.description} onChange={e=>set("description",e.target.value)}/></Field>
       <div className="pricing-form-grid">
+        <Field label="Disponível para"><select value={data.audience} onChange={e=>set("audience",e.target.value)}><option value="content">Parceiros de conteúdo</option><option value="reseller">Revendas</option><option value="both">Ambos</option></select></Field>
         <Field label="Mensalidade paga à DeltaTV (R$)"><input inputMode="decimal" value={price} onChange={e=>setPrice(e.target.value)} placeholder="0,00 para acesso gratuito"/></Field>
         <Field label="DNS por código">
           <label className="pricing-check"><input type="checkbox" checked={data.maxServers == null} onChange={e=>set("maxServers",e.target.checked ? null : 1)}/> DNS ilimitados</label>
@@ -171,7 +171,7 @@ function CatalogEditor({plan,onClose,onSaved}) {
         <Field label="Ordem de exibição"><input type="number" min="0" max="9999" required value={data.sortOrder} onChange={e=>set("sortOrder",e.target.value)}/></Field>
       </div>
       <div className="pricing-feature-options">
-        <PlanTechnicalOptions plan={data} onChange={set} labelClassName="pricing-check"/>
+        {[["autoFailover","Failover automático"],["autoPriority","Prioridade por desempenho"],["emailAlerts","Alertas por e-mail"],["detailedHistory","Histórico detalhado"]].map(([id,label])=><label key={id} className="pricing-check"><input type="checkbox" checked={!!data[id]} disabled={id==="autoPriority"&&!data.autoFailover} onChange={e=>set(id,e.target.checked)}/>{label}</label>)}
         <div className="pricing-form-grid" style={{gridColumn:'1/-1',borderTop:'1px solid var(--border,#ddd)',paddingTop:14}}>
           <label className="pricing-check"><input type="checkbox" checked={!!data.canResellPanel} onChange={e=>set('canResellPanel',e.target.checked)}/> Permitir revender o Painel do Parceiro</label>
           {data.canResellPanel&&<>
@@ -179,7 +179,6 @@ function CatalogEditor({plan,onClose,onSaved}) {
           <label className="pricing-check"><input type="checkbox" checked={!!data.canViewFinance} onChange={e=>set('canViewFinance',e.target.checked)}/> Consultar financeiro da rede</label>
           <label className="pricing-check"><input type="checkbox" checked={!!data.canManageGateways} onChange={e=>set('canManageGateways',e.target.checked)}/> Configurar Mercado Pago / InfinitePay</label></>}
         </div>
-        <PlanVisibilityOption hidden={data.hiddenFromNetwork} onChange={value=>set("hiddenFromNetwork",value)} labelClassName="pricing-check"/>
         {!isNew&&!plan.system&&<label className="pricing-check"><input type="checkbox" checked={!!data.active} onChange={e=>set("active",e.target.checked)}/> Plano disponível para novas atribuições</label>}
       </div>
       {error&&<p className="error" role="alert">{error}</p>}
@@ -206,11 +205,12 @@ function CatalogPlans(){
     {loading&&<p className="muted">Carregando planos…</p>}
     <div className="pricing-tier-grid">{plans.map(p=><article key={p.key} className="pricing-tier card">
       <div className="pricing-tier-label">{p.system?"Plano padrão":p.active?"Personalizado":"Desativado"}</div>
-      <h3>{p.name} {p.hiddenFromNetwork&&<span className="pill">Oculto</span>}</h3>
+      <h3>{p.name}</h3>
       <p className="muted">{p.description||"Sem descrição"}</p>
       <div className="pricing-tier-big">{p.maxServers == null ? "Ilimitadas" : `${p.maxServers} ${p.maxServers===1?"URL":"URLs"}`}</div>
       <dl>
         <div><dt>Mensalidade DeltaTV</dt><dd>{p.monthlyPriceCents==null?"A definir":`${money(p.monthlyPriceCents)} / mês`}</dd></div>
+        <div><dt>Disponível para</dt><dd>{p.audience==="content"?"Parceiros":p.audience==="reseller"?"Revendas":"Ambos"}</dd></div>
         <div><dt>Failover</dt><dd>{p.autoFailover?"Sim":"Não"}</dd></div>
         <div><dt>Prioridade automática</dt><dd>{p.autoPriority?"Sim":"Não"}</dd></div>
         <div><dt>Alertas por e-mail</dt><dd>{p.emailAlerts?"Sim":"Não"}</dd></div>
