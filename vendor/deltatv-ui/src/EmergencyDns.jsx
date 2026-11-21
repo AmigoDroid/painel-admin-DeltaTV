@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 /** Mesmo formulário de emergência nos portais; a API impõe o escopo no servidor. */
 export default function EmergencyDns({api,base}) {
+  const [target,setTarget]=useState('codes');
   const [data,setData]=useState(null);
   const [error,setError]=useState('');
   const [notice,setNotice]=useState('');
@@ -52,8 +53,10 @@ export default function EmergencyDns({api,base}) {
   };
   const card={border:'1px solid var(--border, #39414c)',borderRadius:14,padding:18,display:'grid',gap:14,maxWidth:850,background:'var(--surface, transparent)'};
   const label={display:'grid',gap:6};
+  if(target==='device') return <DeviceDns api={api} base={base} onBack={()=>setTarget('codes')}/>;
   return <section style={card} aria-label="Troca emergencial de DNS">
     <header><h2 style={{margin:'0 0 6px'}}>Troca emergencial de DNS</h2><p style={{margin:0,opacity:.8}}>Prioridade temporária por código. O failover continua protegendo as TVs quando a DNS escolhida falhar.</p></header>
+    <button type="button" onClick={()=>setTarget('device')}>Trocar DNS de uma TV específica (MAC)</button>
     {error&&<p role="alert" style={{color:'#dc4e4e',margin:0}}>{error}</p>}
     {notice&&<p role="status" style={{margin:0}}>{notice}</p>}
     {!data&&loading?<p>Carregando DNS e códigos...</p>:<>
@@ -110,5 +113,80 @@ export default function EmergencyDns({api,base}) {
         <div style={{display:'flex',gap:8}}><button type="button" onClick={()=>void submit()}>Confirmar envio</button><button type="button" onClick={()=>setConfirm(false)}>Cancelar</button></div>
       </div>
     </div>}
+  </section>;
+}
+
+
+/** Mesmo recurso em todos os portais, com autorização conferida no backend pelo parceiro. */
+export function DeviceDns({api,base,onBack,initialMac=''}) {
+  const [mac,setMac]=useState(initialMac);
+  const [data,setData]=useState(null);
+  const [providerId,setProviderId]=useState('');
+  const [minutes,setMinutes]=useState(30);
+  const [notify,setNotify]=useState(true);
+  const [message,setMessage]=useState('Atualizando servidor. A transmissão será retomada automaticamente.');
+  const [busy,setBusy]=useState(false);
+  const [error,setError]=useState('');
+  const [notice,setNotice]=useState('');
+  const load=async()=>{
+    setBusy(true);setError('');setNotice('');setData(null);
+    try {
+      const result=await api(`${base}/device`,{query:{mac:mac.trim()}});
+      setData(result);setProviderId(result.active?.providerId||result.servers[0]?.id||'');
+    } catch(e){setError(e.message);}finally{setBusy(false);}
+  };
+  useEffect(()=>{if(initialMac)void load();},[initialMac,base]);
+  const save=async()=>{
+    if(!window.confirm(`Trocar somente a TV ${data.device.mac} por ${minutes} minutos?`))return;
+    setBusy(true);setError('');setNotice('');
+    try {
+      const result=await api(`${base}/device/${data.device.id}`,{method:'POST',body:{providerId,minutes,notify,message:notify?message:undefined}});
+      setData(v=>({...v,active:{providerId,expiresAt:result.expiresAt}}));
+      setNotice(`Ordem enviada somente para ${data.device.mac}. Prioridade até ${new Date(result.expiresAt).toLocaleString('pt-BR')}.`);
+    } catch(e){setError(e.message);}finally{setBusy(false);}
+  };
+  const stop=async()=>{
+    if(!window.confirm(`Desfazer a prioridade de DNS de ${data.device.mac}?`))return;
+    setBusy(true);setError('');setNotice('');
+    try {
+      await api(`${base}/device/${data.device.id}`,{method:'DELETE'});
+      setData(v=>({...v,active:null}));setNotice('Prioridade individual encerrada. A TV volta ao failover normal.');
+    }catch(e){setError(e.message);}finally{setBusy(false);}
+  };
+  const card={border:'1px solid var(--border,#39414c)',borderRadius:14,padding:18,display:'grid',gap:14,maxWidth:850};
+  return <section style={card} aria-label="Trocar DNS de uma TV">
+    <header><h2 style={{margin:'0 0 6px'}}>Trocar DNS desta TV</h2>
+      <p style={{margin:0,opacity:.8}}>Selecione a TV pelo MAC. A alteração não modifica a DNS de outras TVs do código e o failover permanece ativo.</p></header>
+    <button type="button" onClick={onBack}>Voltar à troca por códigos</button>
+    <form onSubmit={e=>{e.preventDefault();void load();}} style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+      <input aria-label="MAC da TV" placeholder="AA:BB:CC:DD:EE:FF" value={mac} onChange={e=>{setMac(e.target.value);setData(null);}} maxLength={24} required/>
+      <button type="submit" disabled={busy}>Localizar TV</button>
+    </form>
+    {error&&<p role="alert" style={{color:'#dc4e4e',margin:0}}>{error}</p>}
+    {notice&&<p role="status" style={{margin:0}}>{notice}</p>}
+    {data&&<>
+      <div><strong>{data.device.mac}</strong> · Código {data.device.code}
+        {data.active&&<p>Prioridade vigente até {new Date(data.active.expiresAt).toLocaleString('pt-BR')}</p>}
+      </div>
+      <label style={{display:'grid',gap:6}}>DNS autorizada para este código
+        <select value={providerId} onChange={e=>setProviderId(e.target.value)}>
+          {data.servers.map(p=><option value={p.id} key={p.id}>{p.name} — {p.baseUrl}</option>)}
+        </select>
+      </label>
+      <label style={{display:'grid',gap:6}}>Duração da prioridade
+        <select value={minutes} onChange={e=>setMinutes(Number(e.target.value))}>
+          {[5,10,15,30,60,120,180,360].map(t=><option value={t} key={t}>{t} minutos</option>)}
+        </select>
+      </label>
+      <label><input type="checkbox" checked={notify} onChange={e=>setNotify(e.target.checked)}/> Mostrar aviso na TV</label>
+      {notify&&<label style={{display:'grid',gap:6}}>Mensagem
+        <textarea rows={2} value={message} maxLength={300} onChange={e=>setMessage(e.target.value)}/>
+      </label>}
+      <p style={{margin:0,opacity:.8}}>Somente servidores já permitidos no código aparecem aqui. Para incluir uma DNS nova no pool, cadastre-a antes em Meus DNS. A TV precisa estar conectada para receber o aviso imediatamente; se estiver offline, aplicará a preferência válida ao reconectar.</p>
+      <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+        <button type="button" disabled={busy||!providerId} onClick={()=>void save()}>Trocar DNS somente desta TV</button>
+        <button type="button" disabled={busy||!data.active} onClick={()=>void stop()}>Desfazer troca</button>
+      </div>
+    </>}
   </section>;
 }

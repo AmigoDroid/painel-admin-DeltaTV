@@ -1,3 +1,4 @@
+import { DeviceDns } from "@deltatv/ui/EmergencyDns";
 import ConnectionAudit from "../ConnectionAudit.jsx";
 import CredentialsModal from "./CredentialsModal.jsx";
 import { useEffect, useState } from "react";
@@ -24,6 +25,7 @@ const detailOf = event => [event.metadata?.reason, event.metadata?.days ? `Teste
   event.metadata?.listName, event.metadata?.webAutoHttps !== undefined ? `HTTPS automático: ${event.metadata.webAutoHttps ? "ativado" : "desativado"}` : null].filter(Boolean).join(" · ");
 
 export default function DeviceRecordModal({ device, initialTab = "summary", onClose, onChanged, onManage, scoped = false, canWrite = true }) {
+  const [dnsFor,setDnsFor]=useState(null);
   const [auditId, setAuditId] = useState(null);
   const [credentials, setCredentials] = useState(null);
   const [tab, setTab] = useState(initialTab);
@@ -91,6 +93,7 @@ export default function DeviceRecordModal({ device, initialTab = "summary", onCl
             {!scoped && <button className="btn" onClick={()=>setAuditId(a.id)}>Conexão / URL</button>}
             {isSuper && <button className="btn" onClick={() => setEditing(a)}>Editar</button>}
             {isSuper && a.status!=="revoked" && <button className="btn" onClick={()=>setCredentials(a.id)}>Credenciais</button>}
+            {canWrite && a.status === "active" && a.partnerId && <button className="btn" onClick={() => setDnsFor(a)}>Trocar DNS desta TV</button>}
             {canWrite && a.status === "active" && <button className="btn" onClick={() => act(a, "block")}>Bloquear</button>}
             {canWrite && a.status === "blocked" && <button className="btn" onClick={() => act(a, "unblock")}>Desbloquear</button>}
             {canWrite && a.status === "revoked" && (isSuper || (scoped && a.restorable)) && <button className="btn" onClick={() => act(a, "restore")}>Restaurar</button>}
@@ -100,6 +103,9 @@ export default function DeviceRecordModal({ device, initialTab = "summary", onCl
       </tbody></Table>
       {!rows.length && <p className="muted">{tab === "removed" ? "Nenhum vínculo removido." : "Nenhuma lista atual. Use Adicionar / configurar listas para vincular este aparelho."}</p>}
     </>}
+    {dnsFor && <Modal title={`DNS de ${device.mac}`} onClose={()=>setDnsFor(null)} wide><DeviceDns api={api}
+      base={scoped?`/admin/workspace/partners/${dnsFor.partnerId}/emergency-dns`:`/admin/partners/${dnsFor.partnerId}/emergency-dns`}
+      initialMac={device.mac} onBack={()=>setDnsFor(null)}/></Modal>}
     {editing && <EditDeviceModal device={editing} onClose={() => setEditing(null)} onDone={() => { setEditing(null); changed(); }} />}
     {deleting && <AdminDeleteModal type="activation" id={deleting.id} scoped={scoped} onClose={() => setDeleting(null)} onDone={() => { setDeleting(null); changed(); }} />}
   </Modal>;
