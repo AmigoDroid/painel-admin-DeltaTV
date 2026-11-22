@@ -19,7 +19,7 @@ const quoteBody=v=>({partnerId:v.partnerId,kind:v.kind,planTo:v.planTo,
    interestCents:Math.round(Number(v.waiveInterest||0)*100),reason:v.waiveReason||''}}:{})});
 const instructions={
  mercadopago: <ol><li>Entre em <a href="https://www.mercadopago.com.br/developers/pt" target="_blank" rel="noreferrer">Mercado Pago Developers</a> e abra <b>Suas integrações</b>.</li><li>Selecione sua aplicação, abra <b>Credenciais de produção</b> e copie o <b>Access Token</b>.</li><li>Em <b>Webhooks</b>, configure o endereço informado pelo suporte técnico para cobranças da rede e gere a <b>assinatura secreta</b>. Guarde-a apenas aqui.</li></ol>,
- infinitepay: <ol><li>Entre na sua conta <a href="https://www.infinitepay.io/checkout-documentacao" target="_blank" rel="noreferrer">InfinitePay — Checkout Integrado</a>.</li><li>Copie sua <b>InfiniteTag</b> (sem o símbolo $). A <b>API Key</b> do Checkout Integrado (começa com <code>inchk_</code>) é opcional: com ela os links ganham validade e aceitam um único pagamento.</li><li>O teste cria um link de R$ 1,00, sem cobrar ninguém. Não efetue o pagamento desse link.</li></ol>,
+ infinitepay: <ol><li>Entre na sua conta <a href="https://www.infinitepay.io/checkout-documentacao" target="_blank" rel="noreferrer">InfinitePay — Checkout Integrado</a>.</li><li>Copie sua <b>InfiniteTag</b> (sem o símbolo $).</li><li>O teste cria um link de R$ 1,00, sem cobrar ninguém. Não efetue o pagamento desse link.</li></ol>,
 };
 export default function NetworkFinance(){
  const viewer=getAuth()?.user;
@@ -45,8 +45,8 @@ export default function NetworkFinance(){
   .then(([gs,cs,bs])=>{if(alive){setGateways(gs.data||[]);setCharges(cs.data||[]);setMeta(cs.meta||{});setTotals(cs.totals||{});if(bs)setBillingSettings(bs);setError('');}})
   .catch(e=>{if(alive)setError(e.message)});return()=>{alive=false};},[page,status,canGateways,canRead]);
  const action=async(fn,notice)=>{setBusy(true);setError('');setMessage('');try{await fn();await load();setMessage(notice);return true;}catch(e){setError(e.message||'Falha de operação.');return false;}finally{setBusy(false)}};
- const edit=provider=>{setForm({provider,handle:'',apiKey:'',accessToken:'',webhookSecret:''});setEditing(provider)};
- const save=e=>{e.preventDefault();const {provider}=form;const fields=provider==='mercadopago'?{accessToken:form.accessToken,webhookSecret:form.webhookSecret}:{handle:form.handle,apiKey:form.apiKey};void action(()=>api(`/admin/workspace/finance/gateways/${provider}`,{method:'PUT',body:{provider,...fields}}),'Credenciais salvas. Teste a conexão antes de ativar.').then(ok=>ok&&setEditing(null));};
+ const edit=provider=>{setForm({provider,handle:'',accessToken:'',webhookSecret:''});setEditing(provider)};
+ const save=e=>{e.preventDefault();const {provider}=form;const fields=provider==='mercadopago'?{accessToken:form.accessToken,webhookSecret:form.webhookSecret}:{handle:form.handle};void action(()=>api(`/admin/workspace/finance/gateways/${provider}`,{method:'PUT',body:{provider,...fields}}),'Credenciais salvas. Teste a conexão antes de ativar.').then(ok=>ok&&setEditing(null));};
  const startCharge=async()=>{setError('');try{
   const [p,pl]=await Promise.all([api('/admin/workspace/partners',{query:{pageSize:100,page:1}}),api('/admin/workspace/plans')]);
   setPartners(p.data||[]);setPlans(pl.data||[]);setPreview(null);setNewCharge({partnerId:'',kind:'renewal',planTo:'',method:'automatic',manualType:'',manualValue:'',manualReason:'',stack:false,waive:false,waiveAll:true,waiveReason:'',waiveFee:0,waiveInterest:0});
@@ -93,7 +93,7 @@ export default function NetworkFinance(){
   {editing&&<Modal title={`Configurar ${labels[editing]}`} onClose={()=>setEditing(null)} wide><form onSubmit={save}><p>Os segredos são armazenados criptografados e nunca são exibidos novamente. Salvar desativa esse provedor até o próximo teste.</p>
    {instructions[editing]}
    {editing==='mercadopago'?<><label className="label">Access Token de produção<input required type="password" autoComplete="off" value={form.accessToken} onChange={e=>setForm(v=>({...v,accessToken:e.target.value}))}/></label><label className="label">Segredo de assinatura do webhook<input required type="password" autoComplete="off" value={form.webhookSecret} onChange={e=>setForm(v=>({...v,webhookSecret:e.target.value}))}/></label></>:
-    <><label className="label">InfiniteTag<input required value={form.handle} onChange={e=>setForm(v=>({...v,handle:e.target.value}))}/></label><label className="label">API Key do Checkout Integrado (opcional)<input type="password" autoComplete="off" value={form.apiKey} onChange={e=>setForm(v=>({...v,apiKey:e.target.value}))}/></label></>}
+    <label className="label">InfiniteTag<input required value={form.handle} onChange={e=>setForm(v=>({...v,handle:e.target.value}))}/></label>}
    <div className="row"><button className="btn" type="button" onClick={()=>setEditing(null)}>Fechar</button><button className="btn primary" disabled={busy}>Salvar credenciais</button></div></form></Modal>}
   {newCharge&&<Modal title="Nova cobrança da rede" onClose={()=>{setNewCharge(null);setPreview(null)}} wide><form onSubmit={create} style={{display:'grid',gap:12}}>
     <label>Parceiro<select required value={newCharge.partnerId} onChange={e=>changeCharge('partnerId',e.target.value)}><option value="">Selecione</option>{partners.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
