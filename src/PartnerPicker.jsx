@@ -45,7 +45,7 @@ export default function PartnerPicker({ value = "", onChange, kind, emptyLabel =
     options.unshift(selected?.id === value ? selected : { id: value, name: "Parceiro selecionado (carregando…)" });
 
   return (
-    <div style={{ display: "grid", gap: 5, minWidth: 210, width: "100%" }}>
+    <div style={{ display: "grid", gap: 5, minWidth: 0, gridTemplateColumns: "minmax(0,1fr)", width: "100%" }}>
       <input type="search" value={search} onChange={(e) => setSearch(e.target.value)}
         disabled={disabled} placeholder="Buscar pelo nome ou identificador…" aria-label={`Buscar ${ariaLabel.toLowerCase()}`} />
       <select value={value} disabled={disabled || loading && options.length === 0} aria-label={ariaLabel}
@@ -53,7 +53,7 @@ export default function PartnerPicker({ value = "", onChange, kind, emptyLabel =
         <option value="">{emptyLabel}</option>
         {options.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
       </select>
-      {(meta.totalPages > 1 || loading || error) && <div style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 12 }}>
+      {(meta.totalPages > 1 || loading || error) && <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", fontSize: 12 }}>
         <button type="button" className="btn sm" disabled={disabled || page <= 1} onClick={() => setPage((v) => v - 1)}>Anterior</button>
         <span className="muted">{loading ? "Buscando…" : error || `Página ${page} de ${meta.totalPages || 1}`}</span>
         <button type="button" className="btn sm" disabled={disabled || page >= (meta.totalPages || 1)} onClick={() => setPage((v) => v + 1)}>Próxima</button>

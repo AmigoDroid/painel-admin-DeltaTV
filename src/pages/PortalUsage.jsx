@@ -60,7 +60,7 @@ export default function PortalUsageAdmin(){
   {!data&&devices.length>0&&<div className="notice"><strong>Dispositivos disponíveis (resumo indisponível)</strong><p>{devices.length} registros retornados. Recarregue o resumo depois de verificar o backend.</p></div>}
   {data&&<>
    <div className="notice"><strong>Atenção à precisão:</strong> bytes enviados pelo Nginx via X-Accel <strong>não são medidos</strong> por esta coleta Node. Redirects não são consumo de mídia na VPS. O custo em reais é uma estimativa pelo valor por GB configurado; o custo fixo por Master é rateado pelas contas vinculadas. Não representam a cobrança da hospedagem nem lucro líquido.</div>
-   <div className="stats" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(155px,1fr))',gap:10}}>
+   <div className="stats" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(min(100%, 155px),1fr))',gap:10}}>
     <Card name="Tráfego Node medido" value={g(data.totals.nodeGb)} details="Saída HTTP; incluindo HLS"/>
     <Card name="Requisições delegadas ao Nginx" value={Number(data.totals.nginxUnmeteredRequests).toLocaleString('pt-BR')} details="Bytes não disponíveis"/>
     <Card name="Redirects" value={Number(data.totals.redirectRequests).toLocaleString('pt-BR')} details="Origem atende diretamente"/>
@@ -68,7 +68,7 @@ export default function PortalUsageAdmin(){
     <Card name="Custo fixo mensal configurado" value={brl(data.finance.fixedMonthlyCents)} details="VPS + domínio/12 + extras"/>
     <Card name="Tráfego sem rede comercial" value={g(data.totals.unattributedNodeGb)} details="Legados/sem contrato"/>
    </div>
-   {data.host&&<div className="stats" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:10}}>
+   {data.host&&<div className="stats" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(min(100%, 160px),1fr))',gap:10}}>
     <Card name="CPU host (amostra)" value={data.host.cpuPercent==null?'Aguardando':`${data.host.cpuPercent}%`} details="Não é média mensal"/>
     <Card name="Memória host" value={`${data.host.memoryPercent??'—'}%`} details="MemAvailable do Linux"/>
     <Card name="Armazenamento" value={`${data.host.storagePercent??'—'}%`} details="Disco do servidor"/>
@@ -95,7 +95,7 @@ export default function PortalUsageAdmin(){
      <p className="muted">O identificador é técnico; não há token de reprodução, MAC, IP ou credenciais no relatório. Os 50 dispositivos principais são exibidos.</p>
     </div></details>
    <details><summary>Configurar limites dos alertas</summary>
-    {settings&&<form onSubmit={save} style={{display:'grid',gap:10,marginTop:12}}><div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:10}}>
+    {settings&&<form onSubmit={save} style={{display:'grid',gap:10,marginTop:12}}><div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(min(100%, 160px),1fr))',gap:10}}>
      {[
       ['monthlyNodeGbBudget','Limite mensal global de Node (GB)'],['masterMonthlyNodeGbBudget','Limite mensal por Master (GB)'],
       ['cpuPercent','Alerta de CPU (%)'],['memoryPercent','Alerta de memória (%)'],['storagePercent','Alerta de disco (%)'],['retentionDays','Retenção da telemetria (dias)'],

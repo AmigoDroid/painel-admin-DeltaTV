@@ -70,7 +70,7 @@ export default function NetworkFinance(){
   {error&&<div className="alert" role="alert" style={{position:'fixed',top:16,right:16,zIndex:10000,maxWidth:'min(95vw,520px)',boxShadow:'0 6px 22px #0003'}}>{error}</div>}{message&&<div className="notice" role="status">{message}</div>}
   {canGateways&&<section className="card" style={{padding:20}}><h2>Provedor ativo — selecione apenas um</h2>
    <p className="muted">Trocar de provedor não invalida as cobranças em aberto. As credenciais antigas ficam preservadas enquanto houver pagamento pendente.</p>
-   <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(250px,1fr))',gap:16}}>{providerList.map(g=><div key={g.provider} className="card" style={{padding:16}}>
+   <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(min(100%, 250px),1fr))',gap:16}}>{providerList.map(g=><div key={g.provider} className="card" style={{padding:16}}>
     <h3>{labels[g.provider]}</h3><p>{g.active?'Ativo':g.configured?'Cadastrado, inativo':'Não cadastrado'}</p><p className="muted">Conta: {g.accountRefMasked||'Não informada'}<br/>Conexão: {g.tested?'Testada':'Teste necessário'}</p>
     <div className="row" style={{flexWrap:'wrap',gap:8}}>{canConfigure&&<><button className="btn" onClick={()=>edit(g.provider)}>Configurar</button>
      <button className="btn" disabled={!g.configured||busy} onClick={()=>action(()=>api(`/admin/workspace/finance/gateways/${g.provider}/test`,{method:'POST'}),'Conexão verificada.')}>Testar conexão</button>
