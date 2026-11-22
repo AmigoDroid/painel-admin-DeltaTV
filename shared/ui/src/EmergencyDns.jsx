@@ -16,6 +16,8 @@ export default function EmergencyDns({ api, base }) {
   const [notice, setNotice] = useState('');
   const [codes, setCodes] = useState([]);
   const [search, setSearch] = useState('');
+  const [query, setQuery] = useState('');
+  const [page, setPage] = useState(1);
   const [mode, setMode] = useState('existing');
   const [providerId, setProviderId] = useState('');
   const [baseUrl, setBaseUrl] = useState('');
@@ -29,26 +31,25 @@ export default function EmergencyDns({ api, base }) {
     if (!base) return;
     setLoading(true);
     try {
-      const result = await api(base);
+      const result = await api(base, { query: { page, search: query } });
       const servers = Array.isArray(result.servers) ? result.servers : [];
-      const available = Array.isArray(result.codes) ? result.codes : [];
       setData(result);
       setProviderId(old => servers.some(server => server.id === old && server.status === 'active')
         ? old : servers.find(server => server.status === 'active')?.id || '');
-      setCodes(old => old.filter(id => available.some(code => code.id === id)));
+      // Preservar seleções feitas em outras páginas; o backend valida o escopo na escrita.
       setError('');
     } catch (err) {
       setError(err.message || 'Não foi possível carregar as configurações de DNS.');
     } finally {
       setLoading(false);
     }
-  }, [api, base]);
+  }, [api, base, page, query]);
 
+  useEffect(() => { void refresh(); }, [refresh]);
   useEffect(() => {
-    setData(null);
-    setCodes([]);
-    void refresh();
-  }, [refresh]);
+    const timer = setTimeout(() => { setPage(1); setQuery(search.trim()); }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
   useEffect(() => {
     if (!confirm) return undefined;
     const close = event => { if (event.key === 'Escape' && !busy) setConfirm(null); };
@@ -60,11 +61,7 @@ export default function EmergencyDns({ api, base }) {
   const eligibleCodes = data?.codes || [];
   const active = data?.active || [];
   const progress = data?.progress || [];
-  const visibleCodes = useMemo(() => {
-    const term = search.trim().toLocaleLowerCase('pt-BR');
-    return term ? eligibleCodes.filter(code => `${code.code} ${code.label || ''}`.toLocaleLowerCase('pt-BR').includes(term)) : eligibleCodes;
-  }, [eligibleCodes, search]);
-  const selectedActive = codes.filter(id => active.some(item => item.codeId === id)).length;
+  const visibleCodes = eligibleCodes; // A busca e a paginação são feitas no backend.
   const allVisibleSelected = visibleCodes.length > 0 && visibleCodes.every(code => codes.includes(code.id));
   const canApply = !loading && !busy && codes.length > 0 && (mode === 'existing'
     ? !!providerId : /^https?:\/\/\S+/i.test(baseUrl.trim()) && (!name.trim() || name.trim().length >= 2));
@@ -74,39 +71,47 @@ export default function EmergencyDns({ api, base }) {
     ? old.filter(id => !visibleCodes.some(code => code.id === id))
     : [...new Set([...old, ...visibleCodes.map(code => code.id)])]);
 
+  const batchCodes = items => Array.from({length:Math.ceil(items.length / 500)},(_,index)=>items.slice(index*500,(index+1)*500));
   const submit = async () => {
     if (!canApply) return;
     setConfirm(null);
     setBusy(true); setError(''); setNotice('');
+    let processed=0;
     try {
-      const payload = {
-        codeIds: codes, minutes: Number(minutes), notify,
-        message: notify ? message : undefined,
-        ...(mode === 'existing' ? { providerId } : { baseUrl: baseUrl.trim(), name: name.trim() || undefined }),
-      };
-      const result = await api(base, { method: 'POST', body: payload });
-      setNotice(`Prioridade enviada para ${result.codeCount} código(s), até ${displayDate(result.expiresAt)}. TVs desconectadas recebem a configuração ao retornar.`);
+      for(const chunk of batchCodes(codes)) {
+        const payload = {
+          codeIds: chunk, minutes: Number(minutes), notify,
+          message: notify ? message : undefined,
+          ...(mode === 'existing' ? { providerId } : { baseUrl: baseUrl.trim(), name: name.trim() || undefined }),
+        };
+        const result = await api(base, { method: 'POST', body: payload });
+        processed += result.codeCount;
+      }
+      setNotice(`Prioridade enviada para ${processed} código(s). TVs offline recebem a configuração ao retornar, enquanto vigente.`);
+      setCodes([]);
       await refresh();
     } catch (err) {
-      setError(err.message || 'Não foi possível iniciar a troca emergencial.');
-    } finally {
-      setBusy(false);
-    }
+      setError(`${processed} código(s) processados antes do erro: ${err.message || 'não foi possível concluir todos os lotes'}. Confira o estado antes de repetir.`);
+      await refresh();
+    } finally { setBusy(false); }
   };
   const stop = async () => {
-    if (!selectedActive || busy) return;
+    if (!codes.length || busy) return;
     setConfirm(null);
     setBusy(true); setError(''); setNotice('');
+    let ended=0;
     try {
-      const activeIds = codes.filter(id => active.some(item => item.codeId === id));
-      const result = await api(base, { method: 'DELETE', body: { codeIds: activeIds } });
-      setNotice(`Prioridade emergencial encerrada em ${result.ended} código(s).`);
+      for(const chunk of batchCodes(codes)) {
+        const result = await api(base, { method: 'DELETE', body: { codeIds: chunk } });
+        ended+=result.ended;
+      }
+      setNotice(`Prioridade emergencial encerrada em ${ended} código(s).`);
+      setCodes([]);
       await refresh();
     } catch (err) {
-      setError(err.message || 'Não foi possível encerrar a prioridade.');
-    } finally {
-      setBusy(false);
-    }
+      setError(`${ended} prioridade(s) encerradas antes do erro: ${err.message || 'falha ao concluir todos os lotes'}. Confira antes de repetir.`);
+      await refresh();
+    } finally { setBusy(false); }
   };
 
   if (target === 'device') return <DeviceDns api={api} base={base} onBack={() => setTarget('codes')} />;
@@ -131,7 +136,7 @@ export default function EmergencyDns({ api, base }) {
 
     <div className="dns-stats" aria-label="Resumo dos recursos">
       <div><span>DNS disponíveis</span><strong>{loading && !data ? '…' : activeServers.length}</strong></div>
-      <div><span>Códigos disponíveis</span><strong>{loading && !data ? '…' : eligibleCodes.length}</strong></div>
+      <div><span>Códigos disponíveis</span><strong>{loading && !data ? '…' : (data?.totalCodes ?? eligibleCodes.length)}</strong></div>
       <div><span>Prioridades ativas</span><strong>{loading && !data ? '…' : active.length}</strong></div>
     </div>
 
@@ -184,7 +189,7 @@ export default function EmergencyDns({ api, base }) {
                 {allVisibleSelected ? 'Desmarcar visíveis' : 'Selecionar visíveis'}
               </button>
             </div>
-            <div className="dns-code-meta"><span>{visibleCodes.length} exibidos</span><strong>{codes.length} selecionados</strong></div>
+            <div className="dns-code-meta"><span>{visibleCodes.length} nesta página de {data?.totalCodes ?? visibleCodes.length}</span><strong>{codes.length} selecionados</strong></div>
             <div className="dns-code-list" aria-label="Lista de códigos">
               {visibleCodes.map(code => {
                 const override = active.find(item => item.codeId === code.id);
@@ -197,7 +202,12 @@ export default function EmergencyDns({ api, base }) {
                   {override && <span className="dns-status-tag">Em prioridade</span>}
                 </label>;
               })}
-              {!visibleCodes.length && <div className="dns-empty">{eligibleCodes.length ? 'Nenhum código corresponde à busca.' : 'Nenhum código ativo disponível.'}</div>}
+              {!visibleCodes.length && <div className="dns-empty">Nenhum código encontrado.</div>}
+            </div>
+            <div className="dns-code-meta" aria-label="Paginação de códigos">
+              <button type="button" className="dns-button dns-secondary" disabled={busy || loading || page === 1} onClick={() => setPage(old => old-1)}>Anterior</button>
+              <span>Página {page} de {Math.max(1,Math.ceil((data?.totalCodes || 0)/(data?.pageSize || 100)))}</span>
+              <button type="button" className="dns-button dns-secondary" disabled={busy || loading || !data?.hasMore} onClick={() => setPage(old => old+1)}>Próxima</button>
             </div>
           </section>
         </div>
@@ -218,8 +228,8 @@ export default function EmergencyDns({ api, base }) {
             <button type="button" className="dns-button dns-primary" disabled={!canApply} onClick={() => setConfirm('apply')}>
               {busy ? 'Enviando…' : 'Iniciar troca emergencial'}
             </button>
-            <button type="button" className="dns-button dns-secondary" disabled={busy || !selectedActive} onClick={() => setConfirm('stop')}>
-              Encerrar prioridade ({selectedActive})
+            <button type="button" className="dns-button dns-secondary" disabled={busy || !codes.length} onClick={() => setConfirm('stop')}>
+              Encerrar prioridade dos selecionados ({codes.length})
             </button>
             <button type="button" className="dns-link-button dns-refresh" disabled={busy || loading} onClick={() => void refresh()}>
               {loading ? 'Atualizando…' : 'Atualizar informações'}
@@ -229,7 +239,7 @@ export default function EmergencyDns({ api, base }) {
       </div>
     }
 
-    <p className="dns-footnote">A contagem de rotas informa configurações resolvidas, não confirma o vídeo em reprodução. Se o limite de DNS estiver preenchido, a operação pode substituir uma associação anterior.</p>
+    <p className="dns-footnote">A contagem de rotas indica escolhas do servidor, não confirma reprodução. Se o limite estiver cheio, a nova DNS terá prioridade temporária sem remover as associações antigas.</p>
 
     {confirm && <div className="dns-confirm-overlay" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget && !busy) setConfirm(null); }}>
       <div className="dns-confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="dns-confirm-title">
@@ -237,7 +247,7 @@ export default function EmergencyDns({ api, base }) {
         <h3 id="dns-confirm-title">{confirm === 'apply' ? 'Iniciar troca de DNS?' : 'Encerrar prioridade emergencial?'}</h3>
         <p>{confirm === 'apply'
           ? `A alteração terá prioridade por ${displayDuration(minutes)} em ${codes.length} código(s). Algumas TVs podem reiniciar o vídeo.`
-          : `A prioridade de ${selectedActive} código(s) será encerrada. O resolvedor voltará à seleção normal.`}</p>
+          : `A prioridade dos ${codes.length} código(s) selecionados será encerrada (quando estiver ativa). O resolvedor voltará à seleção normal.`}</p>
         <div className="dns-confirm-actions">
           <button type="button" className="dns-button dns-secondary" disabled={busy} onClick={() => setConfirm(null)}>Cancelar</button>
           <button type="button" className={`dns-button ${confirm === 'apply' ? 'dns-primary' : 'dns-danger'}`} disabled={busy} onClick={() => void (confirm === 'apply' ? submit() : stop())} autoFocus>

@@ -37,7 +37,7 @@ function GlobalUsersPanel({ partnerId: fixedPartnerId }) {
   const dq = useDebounced(q);
   const list = useList("/admin/users", { q: "", role: "", status: "", partnerId: fixedPartnerId || "" });
   const [form, setForm] = useState(null);
-  const [impersonating,setImpersonating]=useState(null),[roleUser,setRoleUser]=useState(null),[deleting,setDeleting]=useState(null);
+  const [impersonating,setImpersonating]=useState(null),[roleUser,setRoleUser]=useState(null),[deleting,setDeleting]=useState(null),[sessionsUser,setSessionsUser]=useState(null);
   const sendResetAction = useAction();
   useEffect(() => { list.filter({ q: dq }); /* eslint-disable-next-line */ }, [dq]);
   const full = me?.role === "superadmin";
@@ -65,6 +65,12 @@ function GlobalUsersPanel({ partnerId: fixedPartnerId }) {
                 ...(full && u.role === "admin" ? [{label:"Abrir rede do Admin",onClick:()=>{sessionStorage.setItem("deltatv-selected-admin",u.id);location.hash="workspace";}}] : []),
                 ...(full && u.role !== "superadmin" && u.role !== "admin" ? [{label:"Papel e permissões",onClick:()=>setRoleUser(u)}] : []),
                 ...(full && u.id !== me?.id ? [{label:"Excluir usuário",danger:true,onClick:()=>setDeleting(u)}] : []),
+                { label: "Sessões abertas", onClick: () => setSessionsUser(u) },
+                ...(u.lockedUntil && new Date(u.lockedUntil) > new Date() ? [{ label: "Desbloquear login", onClick: () => {
+                  if (window.confirm(`Desbloquear login de ${u.email}?`)) {
+                    void sendResetAction(() => api(`/admin/users/${u.id}/unlock`, { method: "POST" }), "Login desbloqueado.").then(() => list.reload());
+                  }
+                } }] : []),
                 ...(u.status === "active" ? [{ label: "Enviar link de redefinição de senha", onClick: () => {
                   if (window.confirm(`Enviar um link de redefinição para ${u.email}? O link expira em 30 minutos.`)) {
                     void sendResetAction(() => api(`/admin/users/${u.id}/send-password-reset`, { method: "POST" }), "Link enviado para o e-mail cadastrado.");
@@ -79,9 +85,50 @@ function GlobalUsersPanel({ partnerId: fixedPartnerId }) {
       {impersonating&&<ImpersonateDialog user={impersonating} onClose={()=>setImpersonating(null)}/>}
       {roleUser&&<UserRoleDialog user={roleUser} onClose={()=>setRoleUser(null)} onSaved={()=>{setRoleUser(null);list.reload()}}/>}
       {deleting&&<DeleteUserDialog user={deleting} onClose={()=>setDeleting(null)} onSaved={()=>{setDeleting(null);list.reload()}}/>}
+      {sessionsUser && <UserSessions user={sessionsUser} onClose={() => setSessionsUser(null)} /> }
       {form && <UserForm {...form} me={me} full={full} fixedPartnerId={fixedPartnerId} onClose={() => setForm(null)} onSaved={() => { setForm(null); list.reload(); }} />}
     </>
   );
+}
+
+function UserSessions({ user, onClose }) {
+  const [sessions, setSessions] = useState([]);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const run = useAction();
+  const reload = async () => {
+    setLoading(true);
+    try {
+      const result = await api(`/admin/users/${user.id}/sessions`);
+      setSessions(result.data || []);
+      setError("");
+    } catch (err) {
+      setError(err.message || "Não foi possível consultar as sessões.");
+    } finally { setLoading(false); }
+  };
+  useEffect(() => { void reload(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [user.id]);
+  const revoke = async (sessionId) => {
+    if (!window.confirm(sessionId ? "Encerrar esta sessão?" : `Encerrar todas as sessões de ${user.email}?`)) return;
+    const ok = await run(() => api(`/admin/users/${user.id}/sessions${sessionId ? `/${sessionId}` : ""}`, { method: "DELETE" }), "Sessão encerrada.");
+    if (ok) await reload();
+  };
+  return <Modal title={`Sessões abertas — ${user.name}`} onClose={onClose}>
+    {error && <p className="notice error" role="alert">{error}</p>}
+    {loading ? <p className="muted">Carregando sessões...</p> : !sessions.length ? <p className="muted">Nenhuma sessão ativa.</p> :
+      <div style={{maxHeight:360,overflowY:"auto"}}>
+        <Table><thead><tr><th>Login / dispositivo</th><th>Expira</th><th>Ação</th></tr></thead><tbody>
+          {sessions.map(s => <tr key={s.id}>
+            <td>{s.audience || "—"}<div className="muted">{s.userAgent || "Dispositivo desconhecido"}</div></td>
+            <td>{fmtDateTime(s.expiresAt)}</td>
+            <td><button className="btn sm" onClick={() => revoke(s.id)}>Encerrar</button></td>
+          </tr>)}
+        </tbody></Table>
+      </div>}
+    <div className="actions">
+      <button className="btn" onClick={onClose}>Fechar</button>
+      {!!sessions.length && <button className="btn danger" onClick={() => revoke(null)}>Encerrar todas</button>}
+    </div>
+  </Modal>;
 }
 
 function UserForm({ user, me, full, fixedPartnerId, onClose, onSaved }) {
