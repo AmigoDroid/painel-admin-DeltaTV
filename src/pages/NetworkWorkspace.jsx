@@ -1,3 +1,4 @@
+import './service-packages.css';
 import { Modal, Badge, RowMenu } from "../ui.jsx";
 import PartnerDetailModal from "./PartnerDetailModal.jsx";
 import Devices from "./Devices.jsx";
@@ -263,8 +264,8 @@ export default function NetworkWorkspace({section="workspace", onNavigate}){
    </div>}
    {section !== "dashboard" && section!=="audit" && section!=="trash" && showWorkspaceManager && tab==="plans"&&permits("network:plans:read")&&<>
      {permits("network:plans:write")&&<div><button className="btn primary" onClick={()=>setPlanForm(blankPlan())}>Novo plano</button></div>}
-     {planForm&&<div className="card" style={{display:"grid",gap:12,padding:20}}>
-       <h3>{planForm.key?"Editar plano":"Novo plano"}</h3>
+     {planForm&&<Modal wide title={planForm.key?"Editar plano da rede":"Novo plano da rede"} onClose={()=>{if(!busy)setPlanForm(null)}}>
+       <div className="sp-editor sp-network-editor"><p className="muted sp-editor-intro">Os recursos deste plano controlam o acesso dos parceiros da rede. Exceções individuais permanecem preservadas.</p>
        <div className="row">{field("Nome",<input value={planForm.name} onChange={e=>setPlanForm({...planForm,name:e.target.value})}/>)}
        {field("Tipo",<select value={planForm.audience} onChange={e=>setPlanForm({...planForm,audience:e.target.value})}><option value="content">Parceiro</option><option value="reseller">Revenda</option><option value="both">Ambos</option></select>)}
        {field("Mensalidade (R$)",<input type="number" min="0" step="0.01" value={planForm.monthlyPrice} onChange={e=>setPlanForm({...planForm,monthlyPrice:e.target.value})}/>)}</div>
@@ -274,8 +275,8 @@ export default function NetworkWorkspace({section="workspace", onNavigate}){
          {field('Validade inicial do acesso (dias)',<input type="number" min="1" max="3660" value={planForm.validityDays} onChange={e=>setPlanForm({...planForm,validityDays:e.target.value})}/>)}</div>
        <div className="row">{field('Apps próprios incluídos',<input type="number" min="0" max="50" step="1" value={planForm.maxApps} onChange={e=>setPlanForm({...planForm,maxApps:e.target.value})}/>)}</div>
        <div className="row">{[["autoFailover","Failover automático"],["autoPriority","Prioridade automática"],["emailAlerts","Alertas por e-mail"],["detailedHistory","Histórico detalhado"]].map(([key,label])=><label key={key}><input type="checkbox" checked={planForm[key]} onChange={e=>setPlanForm({...planForm,[key]:e.target.checked})}/> {label}</label>)}</div>
-       <div className="actions"><button className="btn" onClick={()=>setPlanForm(null)}>Cancelar</button><button className="btn primary" disabled={busy||!planForm.name} onClick={savePlan}>Salvar plano</button></div>
-     </div>}
+       <div className="actions sp-editor-footer"><button className="btn" disabled={busy} onClick={()=>setPlanForm(null)}>Cancelar</button><button className="btn primary" disabled={busy||!planForm.name} onClick={savePlan}>Salvar plano</button></div>
+       </div></Modal>}
      <div className="card" style={{padding:16}}><h3>Planos desta rede</h3>
        {plans.length?<div className="table-wrap" role="region" tabIndex={0} aria-label="Planos desta rede"><table className="table"><thead><tr><th>Plano</th><th>Tipo</th><th>Preço mensal</th><th>DNS</th><th>Ativações</th><th>Apps próprios</th><th>Validade</th><th>Gerenciar</th></tr></thead><tbody>{plans.map(p=><tr key={p.key}><td>{p.name}</td><td>{p.audience}</td><td>{currency(p.monthlyPriceCents)}</td><td>{p.maxServers??"Sem limite"}</td><td>{p.activationLimit??"Sem limite"}</td><td>{p.maxApps??0}</td><td>{p.validityDays??30} dias · {p.active?"Ativo":"Inativo"}</td><td>{permits("network:plans:write")&&<div className="actions"><button className="btn sm" onClick={()=>setPlanForm({key:p.key,name:p.name,description:p.description,audience:p.audience,monthlyPrice:(p.monthlyPriceCents/100).toFixed(2),maxServers:String(p.maxServers??""),noDnsLimit:p.maxServers==null,activationLimit:String(p.activationLimit??''),noActivationLimit:p.activationLimit==null,maxApps:String(p.maxApps??0),validityDays:String(p.validityDays??30),autoFailover:p.autoFailover,autoPriority:p.autoPriority,emailAlerts:p.emailAlerts,detailedHistory:p.detailedHistory})}>Editar</button><button className="btn sm" disabled={busy} onClick={()=>void act(()=>request(`plans/${p.key}`,{method:"PUT",body:{active:!p.active}}),p.active?"Plano desativado.":"Plano reativado.")}>{p.active?"Desativar":"Reativar"}</button><button className="btn sm" disabled={busy} onClick={()=>void previewPlanDeletion(p)}>Excluir</button></div>}</td></tr>)}</tbody></table></div>:<p className="muted">Nenhum plano criado nesta rede.</p>}
      </div>
