@@ -47,7 +47,8 @@ import Notifications from "./pages/Notifications.jsx";
 import WebAccessPage from "./pages/WebAccess.jsx";
 import Downloads from "./pages/Downloads.jsx";
 import ProfilePage from "./ProfilePage.jsx";
-import WhiteLabel from "./pages/WhiteLabel.jsx";
+import WhiteLabel from './pages/WhiteLabel.jsx';
+import ClientApps from './pages/ClientApps.jsx';
 import HelpManagement from "./pages/HelpManagement.jsx";
 
 const WebAccess = () => <WebAccessPage admin />;
@@ -58,7 +59,7 @@ const PAGES = {
   invitations: ["Links de convite", () => <NetworkWorkspace section="invitations" />],
   conta: ["Minha conta", ProfilePage],
   dashboard: ["Visão geral", Dashboard], vpsmonitor: ["Servidor / VPS", VpsMonitor], vpsfiles: ["Arquivos da VPS", VpsFiles],
-  webaccess: ["Player Web", WebAccess], whiteLabel: ["Aplicativos white-label", WhiteLabel],
+  webaccess: ["Player Web", WebAccess], whiteLabel: ["Aplicativos white-label", WhiteLabel], clientApps: ["Apps da plataforma", ClientApps],
   "ativar-tv": ["Ativar TV", LicenseActivation], licenses: ["Licenças das TVs", Licenses], devices: ["TVs e dispositivos", Devices], unlinked: ["TVs sem configuração", Unlinked],
   partners: ["Gerenciar parceiros", Partners], servermonitor: ["Qualidade dos servidores", ServerMonitor], emergencydns: ["Troca emergencial de DNS", EmergencyDnsPage], sources: ["Fontes globais de conteúdo", Sources],
   resellers: ["Revendas", Resellers], network: ["Rede de distribuição", DistributionNetwork], "portal-sales": ["Gerenciar parceiros", Partners], support: ["Resolver problema da TV", () => <SupportCenter base="/admin" />], trash: ["Lixeira", PartnerTrash], clients: ["Clientes", Clients], credits: ["Créditos", Credits], downloads: ["Aplicativos", Downloads],
@@ -78,7 +79,7 @@ const GROUPS = [
 // As permissões e as rotas permanecem iguais às da versão anterior.
 const EXTRA_GROUPS = [
  {label:'Operações avançadas',items:['control','ativar-tv','clients','unlinked','credits','network']},
- {label:'Aplicativos e DNS',items:['whiteLabel','webaccess','servermonitor','emergencydns']},
+ {label:'Aplicativos e DNS',items:['clientApps','whiteLabel','webaccess','servermonitor','emergencydns']},
  {label:'Infraestrutura e auditoria',items:['finance-networks','gateways','vpsmonitor','vpsfiles','trash','loginhistory','audit','notifications','mail','help','conta']},
 ];
 

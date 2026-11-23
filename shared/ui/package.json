@@ -17,6 +17,8 @@
     "./WizardProgress": "./src/WizardProgress.jsx",
     "./HelpExperience": "./src/HelpExperience.jsx",
     "./WhiteLabelApps": "./src/WhiteLabelApps.jsx",
+    "./ClientApps": "./src/ClientApps.jsx",
+    "./PartnerUnlinkedApps": "./src/PartnerUnlinkedApps.jsx",
     "./ConnectionAudit": "./src/ConnectionAudit.jsx",
     "./ContentSourcesWorkspace": "./src/ContentSourcesWorkspace.jsx",
     "./server-health": "./src/server-health.js",

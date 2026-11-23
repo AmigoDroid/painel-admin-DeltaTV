@@ -128,7 +128,7 @@ function ContractList() {
 
 const blankPlan = () => ({key:"",name:"",description:"",audience:"content",monthlyPriceCents:0,
   canResellPanel:false,canCreateSubmasters:false,canViewFinance:false,canManageGateways:false,
-  maxServers:1,autoFailover:false,autoPriority:false,emailAlerts:false,detailedHistory:false,
+  maxServers:1,maxApps:0,autoFailover:false,autoPriority:false,emailAlerts:false,detailedHistory:false,
   sortOrder:100,active:true});
 function CatalogEditor({plan,onClose,onSaved}) {
   const isNew = !plan?.key;
@@ -142,7 +142,7 @@ function CatalogEditor({plan,onClose,onSaved}) {
     setBusy(true);
     try {
       const payload={name:data.name.trim(),description:data.description.trim(),audience:data.audience,
-        monthlyPriceCents:cents,maxServers:data.maxServers == null ? null : Number(data.maxServers),autoFailover:!!data.autoFailover,
+        monthlyPriceCents:cents,maxServers:data.maxServers == null ? null : Number(data.maxServers),maxApps:Number(data.maxApps ?? 0),autoFailover:!!data.autoFailover,
         autoPriority:!!data.autoPriority,emailAlerts:!!data.emailAlerts,detailedHistory:!!data.detailedHistory,
         canResellPanel:!!data.canResellPanel,canCreateSubmasters:!!data.canResellPanel&&!!data.canCreateSubmasters,
         canViewFinance:!!data.canResellPanel&&!!data.canViewFinance,
@@ -168,6 +168,7 @@ function CatalogEditor({plan,onClose,onSaved}) {
           <label className="pricing-check"><input type="checkbox" checked={data.maxServers == null} onChange={e=>set("maxServers",e.target.checked ? null : 1)}/> DNS ilimitados</label>
           {data.maxServers != null && <input type="number" min="1" step="1" required value={data.maxServers} onChange={e=>set("maxServers",e.target.value)}/>}
         </Field>
+        <Field label="Apps próprios incluídos"><input type="number" min="0" max="50" step="1" required value={data.maxApps ?? 0} onChange={e=>set("maxApps",Number(e.target.value))}/></Field>
         <Field label="Ordem de exibição"><input type="number" min="0" max="9999" required value={data.sortOrder} onChange={e=>set("sortOrder",e.target.value)}/></Field>
       </div>
       <div className="pricing-feature-options">
@@ -209,6 +210,7 @@ function CatalogPlans(){
       <p className="muted">{p.description||"Sem descrição"}</p>
       <div className="pricing-tier-big">{p.maxServers == null ? "Ilimitadas" : `${p.maxServers} ${p.maxServers===1?"URL":"URLs"}`}</div>
       <dl>
+        <div><dt>Apps próprios incluídos</dt><dd>{p.maxApps ?? 0}</dd></div>
         <div><dt>Mensalidade DeltaTV</dt><dd>{p.monthlyPriceCents==null?"A definir":`${money(p.monthlyPriceCents)} / mês`}</dd></div>
         <div><dt>Disponível para</dt><dd>{p.audience==="content"?"Parceiros":p.audience==="reseller"?"Revendas":"Ambos"}</dd></div>
         <div><dt>Failover</dt><dd>{p.autoFailover?"Sim":"Não"}</dd></div>

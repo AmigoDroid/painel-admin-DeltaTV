@@ -16,6 +16,7 @@ export const TASKS = [
   {"label": "Gerenciar Masters e Submasters", "route": "network", "description": "Rede de distribuição e hierarquia", "keywords": ["master", "rede", "vendas", "revenda"]},
   {"label": "Configurar Player Web", "route": "webaccess", "description": "Acessos pelo navegador", "keywords": ["web", "roku", "webroku", "playerweb"]},
   {"label": "Consultar aplicativos", "route": "downloads", "description": "Links e instruções de instalação", "keywords": ["roku", "lg", "samsung", "android", "download"]},
+  {"label":"Apps da plataforma","route":"clientApps","description":"Cadastre apps Roku, vincule parceiros e gere códigos de uso único","keywords":["roku","app","vinculação"]},
   {"label": "Aplicativos personalizados", "route": "whiteLabel", "description": "Configurações white-label", "keywords": ["app", "customizar", "tema"]},
   {"label": "Consultar qualidade dos servidores", "route": "servermonitor", "description": "Saúde e latência das fontes", "keywords": ["link", "url", "origem", "offline"]},
   {"label": "Alterar usuários e permissões", "route": "users", "description": "Contas administrativas e acessos", "keywords": ["equipe", "login", "conta"]},

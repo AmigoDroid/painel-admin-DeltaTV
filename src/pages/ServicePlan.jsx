@@ -35,6 +35,9 @@ export default function ServicePlan({partnerId}){
  </select></label>
  {form.maxServersOverride !== null && form.maxServersOverride !== undefined && form.maxServersOverride !== 0 && <label>Quantidade máxima<input type="number" min="1" step="1" required disabled={!allowed||busy}
    value={form.maxServersOverride} onChange={e=>set("maxServersOverride",e.target.value===""?"":Number(e.target.value))}/></label>}
+ <label>Vagas de apps próprios (exceção contratual)<select disabled={!allowed||busy} value={form.maxAppsOverride == null ? 'default' : 'custom'} onChange={e=>set('maxAppsOverride',e.target.value==='default'?null:(plan?.features?.maxApps ?? 0))}>
+   <option value="default">Padrão do plano</option><option value="custom">Quantidade personalizada</option></select></label>
+ {form.maxAppsOverride !== null && form.maxAppsOverride !== undefined && <input aria-label="Apps próprios permitidos" type="number" min="0" max="50" required value={form.maxAppsOverride} onChange={e=>set('maxAppsOverride',e.target.value===''?0:Number(e.target.value))}/>}
  {FIELDS.map(([field,name])=><label key={field}>{name}<select disabled={!allowed||busy} value={form[field]===null||form[field]===undefined?"default":String(form[field])} onChange={e=>set(field,e.target.value==="default"?null:e.target.value==="true")}>
  <option value="default">Padrão do plano</option><option value="true">Permitir</option><option value="false">Desativar</option>
  </select></label>)}
@@ -42,6 +45,7 @@ export default function ServicePlan({partnerId}){
   <p className="muted">{plan?.features.canResellPanel?'✓ Pode revender acesso ao painel':'Sem permissão de revenda'} · {plan?.features.canCreateSubmasters?'✓ Pode cadastrar Submasters':'Não pode cadastrar Submasters'} · {plan?.features.canManageGateways?'✓ Gateways próprios':'Sem gateway próprio'}</p>
   <p className="muted">Para alterar essas permissões para todas as contas do plano, edite o catálogo em Planos do Parceiro.</p></div>
  <div className="panel" style={{padding:14}}><strong>Recursos efetivos atuais</strong><p className="muted">{plan?.features.maxServers == null ? "URLs ilimitadas" : `${plan.features.maxServers} URLs`} por código · Failover {plan?.features.autoFailover?"ativo":"desligado"} · Prioridade {plan?.features.autoPriority?"automática":"manual"} · Alertas {plan?.features.emailAlerts?"ativos":"desligados"}</p></div>
+ <p className="muted">Apps próprios incluídos: <strong>{plan?.features?.maxApps ?? 0}</strong></p>
  {allowed?<button className="btn primary" disabled={busy}>{busy?"Salvando…":"Salvar plano e exceções"}</button>:<p className="muted">Apenas a DeltaTV pode modificar planos de serviço.</p>}
  </form>{done&&<p style={{color:"var(--ok,#29a980)"}} role="status">{done}</p>}
  </>}</section>;
