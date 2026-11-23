@@ -3,11 +3,11 @@ import {api} from '../api.js';
 import {formatBRL} from '@deltatv/ui/money';
 
 const empty=()=>({code:'',name:'',wholesaleCents:100,minResaleCents:100,active:true,
- maxDns:1,activationLimit:100,autoFailover:true,autoPriority:false,emailAlerts:true,detailedHistory:false});
+ maxDns:1,activationLimit:100,maxApps:0,autoFailover:true,autoPriority:false,emailAlerts:true,detailedHistory:false});
 const money=formatBRL;
 const codeFor=name=>name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'').replace(/^([0-9])/,'p_$1').slice(0,30);
 const toForm=p=>({code:p.code,name:p.name,wholesaleCents:Number(p.wholesale_cents),minResaleCents:Number(p.min_resale_cents),active:p.active,
- maxDns:p.max_dns===null?null:Number(p.max_dns),activationLimit:p.activation_limit===null?null:Number(p.activation_limit),
+ maxDns:p.max_dns===null?null:Number(p.max_dns),activationLimit:p.activation_limit===null?null:Number(p.activation_limit),maxApps:Number(p.max_apps??0),
  autoFailover:!!p.auto_failover,autoPriority:!!p.auto_priority,emailAlerts:!!p.email_alerts,detailedHistory:!!p.detailed_history});
 const FormRow=({label,children})=><label style={{display:'grid',gap:6}}><strong>{label}</strong>{children}</label>;
 const Columns=({children})=><div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(min(100%,215px),1fr))',gap:12}}>{children}</div>;
@@ -52,6 +52,7 @@ export default function ServicePackages(){
      <FormRow label="Ativações permitidas">
       <label><input type="checkbox" checked={form.activationLimit===null} onChange={e=>set('activationLimit',e.target.checked?null:100)}/> Sem limite</label>
       {form.activationLimit!==null&&<input required type="number" min="0" max="2000000000" value={form.activationLimit} onChange={e=>set('activationLimit',Number(e.target.value))}/>}</FormRow>
+     <FormRow label="Apps próprios incluídos"><input required type="number" min="0" max="50" step="1" value={form.maxApps} onChange={e=>set('maxApps',e.target.value===''?0:Number(e.target.value))}/></FormRow>
     </Columns>
     <Columns>
      {[["autoFailover","Failover automático"],["autoPriority","Prioridade por desempenho"],["emailAlerts","Alertas por e-mail"],["detailedHistory","Histórico detalhado"]].map(([key,name])=>
@@ -71,7 +72,7 @@ export default function ServicePackages(){
    <h2>Pacotes disponíveis</h2>
    <Columns>{items.map(p=><article key={p.code} className="card" style={{padding:16,display:'grid',gap:8}}>
     <strong>{p.name}</strong><small className="muted">Versão {p.revision} · {p.active?'Disponível':'Desativado'} · {p.assigned_count} atribuições</small>
-    <span>{p.max_dns===null?'DNS ilimitados':`${p.max_dns} DNS/código`} · {p.activation_limit===null?'Ativações ilimitadas':`${p.activation_limit} ativações`}</span>
+    <span>{p.max_dns===null?'DNS ilimitados':`${p.max_dns} DNS/código`} · {p.activation_limit===null?'Ativações ilimitadas':`${p.activation_limit} ativações`} · {p.max_apps??0} app(s) próprio(s)</span>
     <small>Preço base: {money(p.wholesale_cents)} por mês</small>
     <div style={{display:'flex',gap:6,flexWrap:'wrap'}}><button type="button" className="btn sm" onClick={()=>edit(p)}>Editar</button>
     <button type="button" className="btn sm" onClick={()=>void duplicate(p)}>Duplicar</button>
