@@ -1,0 +1,10 @@
+{
+  "origem_base": "painel(5).zip + V4 consolidado + planos universais + permissões Meus Apps + pt-BR modal + alinhamento de testes estáticos",
+  "projeto": "admin",
+  "arquivos": 8,
+  "comparacao_base": {
+    "alterado": 6,
+    "novo": 2
+  },
+  "migrations_apenas_preexistentes": []
+}
