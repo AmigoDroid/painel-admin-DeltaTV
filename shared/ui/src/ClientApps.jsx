@@ -32,6 +32,11 @@ export default function ClientApps({ api, whiteLabel, onUpgrade }) {
       <button type="button" className={tab === 'white' ? 'btn primary' : 'btn'} role="tab" aria-selected={tab === 'white'} onClick={() => setTab('white')}>White-label (login Xtream)</button>
     </div>
     {tab === 'white' ? whiteLabel : <>
+      <ol className="card" aria-label="Como adicionar seu app" style={{ padding: '14px 14px 14px 32px', display: 'grid', gap: 8, margin: 0 }}>
+        <li>Peça à DeltaTV o <strong>identificador</strong> e o <strong>código de vinculação</strong> do seu aplicativo (ou aguarde: ela pode atribuir o app direto à sua conta).</li>
+        <li>Clique em <strong>Adicionar App</strong>, cole os dois dados e escolha qual <strong>código da sua parceria</strong> receberá as TVs.</li>
+        <li>Pronto: as TVs que instalarem o seu app entram pelo código escolhido. Você pode pausar o app ou trocar o código quando quiser.</li>
+      </ol>
       <p role="status">Vagas: <strong>{state.slots.used} / {state.slots.included}</strong> incluídas no plano.</p>
       {error && <p role="alert" className="error">{error}</p>}{notice && <p role="status">{notice}</p>}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
