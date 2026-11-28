@@ -42,7 +42,7 @@ const Section = ({ title, hint, children }) => (
 
 /* Barra de distribuição das licenças: dá para ver de relance quanto está saudável. */
 function LicenseBar({ l }) {
-  const segs = [["Ativas", l.active, "var(--ok)"], ["Expiradas", l.expired, "var(--warn)"], ["Suspensas", l.suspended, "var(--info)"], ["Bloqueadas", l.blocked, "var(--bad)"]];
+  const segs = [["Ativas", l.active, "var(--ok)"], ["Período de teste", l.trial ?? 0, "var(--info)"], ["Expiradas", l.expired, "var(--warn)"], ["Suspensas", l.suspended, "var(--info)"], ["Bloqueadas", l.blocked, "var(--bad)"]];
   const total = segs.reduce((s, x) => s + x[1], 0);
   if (!total) return null;
   return (
@@ -148,7 +148,7 @@ export default function Dashboard({ menu, onNavigate }) {
 
   const first = (user?.name || "").trim().split(/\s+/)[0];
   const today = new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long", timeZone: "America/Sao_Paulo" });
-  const licTotal = d.licenses.active + d.licenses.expired + d.licenses.suspended + d.licenses.blocked;
+  const licTotal = d.licenses.active + (d.licenses.trial ?? 0) + d.licenses.expired + d.licenses.suspended + d.licenses.blocked;
 
   return (
     <>
@@ -156,8 +156,10 @@ export default function Dashboard({ menu, onNavigate }) {
         <div><h2>{first ? `Olá, ${first}` : "Visão geral"}</h2><p className="muted page-sub dash-date">{today}</p></div>
       </div>
 
-      <AllFunctions groups={menu} onNavigate={onNavigate} />
-      <EasyStart role="admin" onNavigate={(id) => { window.location.hash = id; }} />
+      {user?.role !== "superadmin" && <>
+        <AllFunctions groups={menu} onNavigate={onNavigate} />
+        <EasyStart role="admin" onNavigate={(id) => { window.location.hash = id; }} />
+      </>}
       <div className={`attn ${attention.length ? "" : "ok"}`}>
         {attention.length
           ? <>
@@ -171,15 +173,12 @@ export default function Dashboard({ menu, onNavigate }) {
         <div className="grid cards">
           <Stat icon="key" label="Licenças ativas" value={d.licenses.active} hint={`${licTotal} no total`}><LicenseBar l={d.licenses} /></Stat>
           <Stat icon="tv" label="Dispositivos ativados" value={d.devices.active} hint={`${d.devices.blocked} bloqueados`} href="#devices" />
+          <Stat icon="clock" label="Período de teste" value={d.devices.trial ?? "—"} hint="Dispositivos com teste vigente" />
           <Stat icon="pulse" tone="ok" label="Online agora" value={presence ? presence.online : "—"} hint={presence ? `Atividade nos últimos ${presence.windowSeconds} s` : "Carregando…"} href="#devices" />
           <Stat icon="unlink" tone={d.devices.unlinked > 0 ? "warn" : ""} label="Sem vínculo" value={d.devices.unlinked ?? 0} hint={d.devices.unlinked ? "Aguardando configuração →" : "Nenhum aguardando"} href="#unlinked" />
         </div>
       </Section>
 
-      {user?.role === "superadmin" && <div className="card" style={{padding:18,display:'flex',gap:12,flexWrap:'wrap',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
-        <div><strong>Gerenciar parceiros</strong><p className="muted" style={{margin:'5px 0 0'}}>Acesse a lista de todos os parceiros e edite contas, pacotes, DNS e vigência.</p></div>
-        <button className="btn primary" type="button" onClick={() => onNavigate('partners')}>Abrir lista de parceiros</button>
-      </div>}
       <Section title="Parceiros e revendas" hint="Cada um com a sua tela no menu">
         <div className="grid cards">
           <Stat icon="store" tone="ok" label="Revendas online" value={livePartners?.onlineCount ?? "—"} hint="Portais conectados agora" href="#resellers" />
@@ -225,7 +224,7 @@ export default function Dashboard({ menu, onNavigate }) {
         <Table>
           <thead><tr><th>MAC</th><th>Origem</th><th>Status</th><th>Quando</th></tr></thead>
           <tbody>
-            {d.recentActivations.map((a) => <tr key={a.id}><td className="mono">{a.mac || "—"}</td><td>{a.licenseId ? "Licença individual" : "Parceria / revenda"}</td><td><Badge status={a.status} /></td><td>{fmtDateTime(a.activatedAt)}</td></tr>)}
+            {d.recentActivations.map((a) => <tr key={a.id}><td className="mono">{a.mac || "—"}</td><td>{a.licenseId ? "Licença individual" : "Parceria / revenda"}</td><td><Badge status={a.status} label={a.status === "trial" ? "Período de teste" : a.status === "expired" ? "Expirado" : undefined} /></td><td>{fmtDateTime(a.activatedAt)}</td></tr>)}
             {!d.recentActivations.length && <tr><td colSpan={4} className="muted">Nenhuma ativação ainda.</td></tr>}
           </tbody>
         </Table>

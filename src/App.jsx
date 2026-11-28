@@ -11,7 +11,6 @@ import { api, getAuth, login, logout } from "./api.js";
 import { UiProvider, Field, useAction, BrandMark } from "./ui.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import NetworkWorkspace from "./pages/NetworkWorkspace.jsx";
-import AllFunctions from "./AllFunctions.jsx";
 import { resolveLegacyRoute } from "./work-areas.js";
 import { useSimpleMode } from "@deltatv/ui/useSimpleMode";
 import { EasyPageGuide } from "@deltatv/ui/EasyStart";
@@ -275,7 +274,7 @@ function Shell({ user }) {
         <div className="brand"><BrandMark size={32} /><div><strong><PlatformBrand/></strong><span>Administração</span></div><button type="button" className="sidebar-close" aria-label="Fechar menu" onClick={() => setOpen(false)}>×</button></div>
         <nav className="nav-scroll" aria-label="Menu principal">
           {GROUPS.map(renderMenuGroup)}
-          {EXTRA_GROUPS.some(g=>g.items.some(allowed)) && <div className="nav-group">
+          {user.role === "superadmin" ? EXTRA_GROUPS.map(renderMenuGroup) : EXTRA_GROUPS.some(g=>g.items.some(allowed)) && <div className="nav-group">
             <button type="button" className="nav" aria-expanded={moreTools} onClick={()=>setMoreTools(v=>!v)}>
               <span className="nav__label"><NavIcon k="settings"/> Mais ferramentas</span><span aria-hidden="true">{moreTools?'−':'+'}</span>
             </button>

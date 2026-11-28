@@ -16,7 +16,8 @@ test('Admin: menu lateral único e direto, sem sub-dashboards', () => {
 test('Admin: painel inicial mostra todas as funções permitidas e abre direto', () => {
   const app = read('../src/App.jsx');
   const dash = read('../src/pages/Dashboard.jsx');
-  assert.match(app, /homeGroups/);
+  assert.match(app, /user.role === "superadmin" \? EXTRA_GROUPS\.map\(renderMenuGroup\)/);
+  assert.match(dash, /user\?\.role !== "superadmin" && <>\s*<AllFunctions[^>]+\/>\s*<EasyStart/);
   assert.match(app, /allowed\(k\)/);
   assert.match(dash, /<AllFunctions groups=\{menu\} onNavigate=\{onNavigate\}/);
   assert.doesNotMatch(dash, /href=\{'#'\+id\} className="dw-home-hub"/);

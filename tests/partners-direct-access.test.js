@@ -9,7 +9,8 @@ test('DeltaTV visualiza a lista de parceiros no topo do menu e diretamente no Da
   const dash = src('pages/Dashboard.jsx');
   assert.match(app, /partners: \["Gerenciar parceiros", Partners\]/);
   assert.match(app, /items:\s*\[['"]dashboard['"],\s*['"]workspace['"],\s*['"]partners['"]/);
-  assert.match(dash, /onNavigate\('partners'\)/);
+  assert.match(dash, /href="#partners"/);
+  assert.doesNotMatch(dash, /Abrir lista de parceiros/);
   assert.equal(adminPageAllowed('partners', { id:'1', role:'superadmin' }), true);
 });
 

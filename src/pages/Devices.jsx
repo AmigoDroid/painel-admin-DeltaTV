@@ -62,7 +62,7 @@ export default function Devices({ onChanged, scoped = false }) {
       <div className="toolbar">
         <input aria-label="Pesquisar dispositivo por MAC" placeholder="Pesquisar por MAC" value={q} onChange={(e) => setQ(e.target.value)} />
         <select value={list.params.status} onChange={(e) => list.filter({ status: e.target.value })}>
-          <option value="">Vínculos atuais</option><option value="active">Com vínculo ativo</option><option value="blocked">Somente bloqueados</option><option value="revoked">Somente removidos</option>{!scoped && <option value="unlinked">Sem vínculo</option>}
+          <option value="">Vínculos atuais</option><option value="active">Com vínculo ativo</option><option value="trial">Período de teste</option><option value="expired">Expirado</option><option value="blocked">Somente bloqueados</option><option value="revoked">Somente removidos</option>{!scoped && <option value="unlinked">Sem vínculo</option>}
         </select>
         <label><input type="checkbox" checked={list.params.showRemoved === "true"} onChange={e => list.filter({ showRemoved: String(e.target.checked) })} /> Mostrar removidos</label>
         <select value={list.params.online} onChange={(e) => list.filter({ online: e.target.value })} aria-label="Conexão">
@@ -77,9 +77,9 @@ export default function Devices({ onChanged, scoped = false }) {
           <td>{isSuper && bulk.checkbox(device)}{scoped && canWrite && <input type="checkbox" aria-label={`Selecionar ${device.mac}`} checked={selection.includes(device.deviceId)} onChange={e=>setSelection(prev=>e.target.checked?[...prev,device.deviceId]:prev.filter(id=>id!==device.deviceId))}/>}<button type="button" className="device-mac-link mono" onClick={() => setRecord({ device, tab: "summary" })}>{device.mac}</button></td>
           <td><PlatformBadge platform={device.platform} /></td><td><OnlineBadge online={device.online} lastSeenAt={device.lastSeenAt} /></td>
           <td><strong>{device.live?.playback?.title || '—'}</strong><div className="muted">{device.live?.online ? `IP: ${device.live.ip || 'indisponível'}` : 'Sem telemetria atual'}</div></td>
-          <td><strong>{device.currentCount}</strong><div className="muted">{device.activeCount} ativa(s){device.removedCount > 0 ? ` · ${device.removedCount} removida(s)` : ""}</div></td>
+          <td><strong>{device.currentCount}</strong><div className="muted">{device.removedCount > 0 ? `${device.removedCount} removida(s)` : ""}</div></td>
           <td>{device.partners?.join(" · ") || "—"}</td>
-          <td>{device.status === "unlinked" ? <span className="badge muted">Sem vínculo</span> : <Badge status={device.status} label={device.status === "active" ? "Com vínculo ativo" : device.status === "blocked" ? "Vínculos bloqueados" : "Vínculos removidos"} />}
+          <td>{device.status === "unlinked" ? <span className="badge muted">Sem vínculo</span> : <Badge status={device.status} label={({ active: "Com vínculo ativo", trial: "Período de teste", expired: "Expirado", blocked: "Vínculos bloqueados", revoked: "Vínculos removidos" })[device.status]} />}
             {device.blockedCount > 0 && device.activeCount > 0 && <div className="muted">{device.blockedCount} bloqueada(s)</div>}</td>
           <td className="actions"><RowMenu items={[
             { label: "Abrir ficha do dispositivo", onClick: () => setRecord({ device, tab: "summary" }) },
