@@ -27,7 +27,7 @@ export default function PartnerPackage({partnerId,onSaved=()=>{}}){
    }catch(err){setError(err.message||'Não foi possível aplicar o pacote.');}finally{setBusy(false);}}} style={{display:'grid',gap:10}}>
    <label style={{display:'grid',gap:6}}>Alterar Pacote de Serviço
     <select required value={code} onChange={e=>setCode(e.target.value)}>
-     <option value="">Escolha um pacote</option>{packages.filter(p=>p.active||p.code===current?.code).map(p=><option key={p.code} value={p.code}>{p.name}</option>)}
+     <option value="">Escolha um pacote</option>{packages.filter(p=>(p.active&&p.audience!=="reseller")||p.code===current?.code).map(p=><option key={p.code} value={p.code}>{p.name}</option>)}
     </select>
    </label>
    <button className="btn primary" type="submit" disabled={busy||!code}>{busy?'Aplicando…':'Aplicar pacote'}</button>

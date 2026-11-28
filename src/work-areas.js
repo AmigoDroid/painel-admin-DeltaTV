@@ -77,11 +77,11 @@ export function visibleWorkAreaSection(area, route, allowed) {
 /** Os sub-dashboards deixaram de existir na navegação: todas as funções abrem
  * direto no menu principal. Endereços antigos (#area/..., #pagamentos etc.)
  * continuam válidos e são redirecionados para a página real da função. */
-const DIRECT_CENTERS = {pagamentos:'billing',dispositivos:'devices',licenciamento:'licenses',ativacao:'ativar-tv'};
+const DIRECT_CENTERS = {pricing:'service-packages',pagamentos:'billing',dispositivos:'devices',licenciamento:'licenses',ativacao:'ativar-tv'};
 export function resolveLegacyRoute(route) {
   if (DIRECT_CENTERS[route]) return DIRECT_CENTERS[route];
   const area = findWorkArea(route);
   if (!area) return route;
   const section = area.items.find(item => workAreaPath(area, item) === route || (item.id.startsWith('area/') && item.id === route));
-  return section ? section.page : 'dashboard';
+  return section ? (DIRECT_CENTERS[section.page] || section.page) : 'dashboard';
 }

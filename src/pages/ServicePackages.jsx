@@ -1,20 +1,23 @@
 import {useCallback,useEffect,useState} from 'react';
+import {ContractList,LicensePrices} from './PlansAndPricing.jsx';
 import {api} from '../api.js';
 import {formatBRL} from '@deltatv/ui/money';
 import {Modal} from '../ui.jsx';
 import './service-packages.css';
 
-const empty=()=>({code:'',name:'',wholesaleCents:100,minResaleCents:100,active:true,
+const empty=()=>({code:'',name:'',audience:'content',validityDays:30,monthlyPriceCents:null,canResellPanel:false,canCreateSubmasters:false,canViewFinance:false,canManageGateways:false,hiddenFromNetwork:false,wholesaleCents:100,minResaleCents:100,active:true,
  maxDns:1,activationLimit:100,maxApps:0,autoFailover:true,autoPriority:false,emailAlerts:true,detailedHistory:false});
 const money=formatBRL;
 const codeFor=name=>name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'').replace(/^([0-9])/,'p_$1').slice(0,30);
-const toForm=p=>({code:p.code,name:p.name,wholesaleCents:Number(p.wholesale_cents),minResaleCents:Number(p.min_resale_cents),active:p.active,
+const toForm=p=>({code:p.code,name:p.name,audience:p.audience,validityDays:p.validity_days,monthlyPriceCents:p.monthly_price_cents,
+ canResellPanel:p.can_resell_panel,canCreateSubmasters:p.can_create_submasters,canViewFinance:p.can_view_finance,canManageGateways:p.can_manage_gateways,hiddenFromNetwork:p.hidden_from_network,wholesaleCents:Number(p.wholesale_cents),minResaleCents:Number(p.min_resale_cents),active:p.active,
  maxDns:p.max_dns===null?null:Number(p.max_dns),activationLimit:p.activation_limit===null?null:Number(p.activation_limit),maxApps:Number(p.max_apps??0),
  autoFailover:!!p.auto_failover,autoPriority:!!p.auto_priority,emailAlerts:!!p.email_alerts,detailedHistory:!!p.detailed_history});
 const FormRow=({label,children})=><label style={{display:'grid',gap:6}}><strong>{label}</strong>{children}</label>;
 const Columns=({children})=><div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(min(100%,215px),1fr))',gap:12}}>{children}</div>;
 
 export default function ServicePackages(){
+ const [tab,setTab]=useState('packages');
  const [items,setItems]=useState([]),[form,setForm]=useState(empty),[original,setOriginal]=useState(null),[editing,setEditing]=useState(false);
  const [partners,setPartners]=useState([]),[selectedPartner,setSelectedPartner]=useState(''),[selectedPackage,setSelectedPackage]=useState('');
  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
@@ -43,8 +46,10 @@ export default function ServicePackages(){
   <header className="sp-heading">
    <div><span className="sp-eyebrow">DeltaTV · Gestão de recursos</span><h1>Pacotes de Serviço</h1>
     <p className="muted">Os recursos mudam para os parceiros que herdam o pacote. Exceções individuais e valores negociados permanecem preservados.</p></div>
-   <button type="button" className="btn primary" onClick={newPackage}>+ Novo pacote</button>
+   {tab==="packages"&&<button type="button" className="btn primary" onClick={newPackage}>+ Novo pacote</button>}
   </header>
+  <div className="tabs">{[["packages","Pacotes"],["contracts","Contratos atuais"],["prices","Preços das licenças de TV"]].map(([id,label])=><button key={id} type="button" className={tab===id?"tab active":"tab"} onClick={()=>setTab(id)}>{label}</button>)}</div>
+  {tab==="contracts"?<ContractList/>:tab==="prices"?<LicensePrices/>:<>
   {notice&&<div className="notice" role="status">{notice}</div>}
   {error&&!editing&&<div className="alert" role="alert">{error}</div>}
   <section className="card sp-section">
@@ -58,7 +63,7 @@ export default function ServicePackages(){
      <span><small>Ativações</small><b>{p.activation_limit===null?'Ilimitadas':p.activation_limit}</b></span>
      <span><small>Apps próprios</small><b>{p.max_apps??0}</b></span>
     </div>
-    <div className="sp-package-bottom"><small className="muted">Base: {money(p.wholesale_cents)} / mês</small>
+    <div className="sp-package-bottom"><small className="muted">Mensalidade: {p.monthly_price_cents==null?"A definir":money(p.monthly_price_cents)+" / mês"}</small>
      <div className="sp-actions"><button type="button" className="btn sm primary" onClick={()=>edit(p)}>Editar plano</button>
       <button type="button" className="btn sm" onClick={()=>void duplicate(p)}>Duplicar</button>
       <button type="button" className="btn sm" onClick={()=>void setActive(p)}>{p.active?'Desativar':'Ativar'}</button></div></div>
@@ -71,9 +76,10 @@ export default function ServicePackages(){
    <form onSubmit={assign} className="sp-assign"><Columns>
     <FormRow label="Parceiro"><select required value={selectedPartner} onChange={e=>setSelectedPartner(e.target.value)}><option value="">Selecionar parceiro</option>
       {partners.map(p=><option key={p.id||p.partner_id} value={p.id||p.partner_id}>{p.name}</option>)}</select></FormRow>
-    <FormRow label="Pacote"><select required value={selectedPackage} onChange={e=>setSelectedPackage(e.target.value)}><option value="">Selecionar pacote</option>{items.filter(p=>p.active).map(p=><option key={p.code} value={p.code}>{p.name}</option>)}</select></FormRow>
+    <FormRow label="Pacote"><select required value={selectedPackage} onChange={e=>setSelectedPackage(e.target.value)}><option value="">Selecionar pacote</option>{items.filter(p=>p.active&&p.audience!=="reseller").map(p=><option key={p.code} value={p.code}>{p.name}</option>)}</select></FormRow>
    </Columns><button type="submit" className="btn primary" disabled={busy}>Atribuir pacote</button></form>
   </section>
+  </>}
   {editing&&<Modal wide title={original?`Editar pacote · ${form.name}`:'Criar Pacote de Serviço'} onClose={()=>{if(!busy){setEditing(false);setError('');}}}>
    <form className="sp-editor" onSubmit={save}>
     <p className="muted sp-editor-intro">Defina o comportamento do sistema para os parceiros vinculados. O backend protege recursos em uso antes de permitir reduções.</p>
@@ -100,10 +106,14 @@ export default function ServicePackages(){
     </div>
     <div className="sp-editor-section"><h4><span>04</span> Referências comerciais</h4>
      <Columns>
-      <FormRow label="Preço base (R$ / mês)"><input required type="number" min="0.01" step="0.01" value={form.wholesaleCents/100} onChange={e=>set('wholesaleCents',Math.round(Number(e.target.value)*100))}/></FormRow>
-      <FormRow label="Piso de revenda (R$ / mês)"><input required type="number" min="0.01" step="0.01" value={form.minResaleCents/100} onChange={e=>set('minResaleCents',Math.round(Number(e.target.value)*100))}/></FormRow>
+      <FormRow label="Mensalidade do parceiro (R$)"><input type="number" min="0" max="1000000" step="0.01" placeholder="A definir" value={form.monthlyPriceCents==null?'':form.monthlyPriceCents/100} onChange={e=>set('monthlyPriceCents',e.target.value===''?null:Math.round(Number(e.target.value)*100))}/></FormRow>
+      <FormRow label="Público"><select disabled={!!original} value={form.audience} onChange={e=>set('audience',e.target.value)}><option value="content">Parceiros</option><option value="reseller">Revendas</option><option value="both">Ambos</option></select></FormRow>
+      <FormRow label="Validade inicial (dias)"><input required type="number" min="1" max="3660" value={form.validityDays} onChange={e=>set('validityDays',Number(e.target.value))}/></FormRow>
+      <FormRow label="Preço base (R$ / mês)"><input required type="number" min="0" step="0.01" value={form.wholesaleCents/100} onChange={e=>set('wholesaleCents',Math.round(Number(e.target.value)*100))}/></FormRow>
+      <FormRow label="Piso de revenda (R$ / mês)"><input required type="number" min="0" step="0.01" value={form.minResaleCents/100} onChange={e=>set('minResaleCents',Math.round(Number(e.target.value)*100))}/></FormRow>
      </Columns><small className="muted">A edição não reajusta automaticamente os contratos financeiros já negociados.</small>
     </div>
+    <fieldset><legend>Disponibilidade e permissões</legend>{[["hiddenFromNetwork","Ocultar nas ofertas da rede"],["canResellPanel","Revender o painel"],["canCreateSubmasters","Criar Submasters"],["canViewFinance","Consultar financeiro"],["canManageGateways","Configurar gateways"]].map(([key,label])=><label className="sp-check" key={key}><input type="checkbox" checked={form[key]} onChange={e=>set(key,e.target.checked)}/>{label}</label>)}</fieldset>
     {error&&<p className="alert" role="alert">{error}</p>}
     <footer className="sp-editor-footer"><button type="button" className="btn" disabled={busy} onClick={()=>{setEditing(false);setError('');}}>Cancelar</button>
       <button type="submit" className="btn primary" disabled={busy}>{busy?'Salvando…':original?'Salvar alterações':'Criar pacote'}</button></footer>

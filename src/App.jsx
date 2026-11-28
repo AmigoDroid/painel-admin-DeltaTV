@@ -19,7 +19,7 @@ import VpsMonitor from "./pages/VpsMonitor.jsx";
 import VpsFiles from "./pages/VpsFiles.jsx";
 import Licenses from "./pages/Licenses.jsx";
 import Partners, { Resellers } from "./pages/Partners.jsx";
-import PlansAndPricing from "./pages/PlansAndPricing.jsx";
+
 import ServicePackages from "./pages/ServicePackages.jsx";
 import PartnerTrash from "./pages/PartnerTrash.jsx";
 import Devices from "./pages/Devices.jsx";
@@ -63,14 +63,14 @@ const PAGES = {
   partners: ["Gerenciar parceiros", Partners], servermonitor: ["Qualidade dos servidores", ServerMonitor], emergencydns: ["Troca emergencial de DNS", EmergencyDnsPage], sources: ["Fontes globais de conteúdo", Sources],
   resellers: ["Revendas", Resellers], network: ["Rede de distribuição", DistributionNetwork], "portal-sales": ["Gerenciar parceiros", Partners], support: ["Resolver problema da TV", () => <SupportCenter base="/admin" />], trash: ["Lixeira", PartnerTrash], clients: ["Clientes", Clients], credits: ["Créditos", Credits], downloads: ["Aplicativos", Downloads],
   "network-finance": ["Recebimentos da minha rede", NetworkFinance], "finance-networks": ["Financeiro das redes", NetworkFinanceSuperadmin],
-  billing: ["Financeiro", Billing], gateways: ["Gateways de pagamento", PaymentGateways], pix: ["Pix (legado)", Pix], pricing: ["Planos e recursos", PlansAndPricing], "service-packages": ["Pacotes de serviço", ServicePackages], "global-config": ["Configurações Globais", GlobalSettings], commerce3: ["Planos SaaS e comissões", Commerce3],
+  billing: ["Financeiro", Billing], gateways: ["Gateways de pagamento", PaymentGateways], pix: ["Pix (legado)", Pix], pricing: ["Pacotes de serviço", ServicePackages], "service-packages": ["Pacotes de serviço", ServicePackages], "global-config": ["Configurações Globais", GlobalSettings], commerce3: ["Planos SaaS e comissões", Commerce3],
   help: ["Central de Ajuda", HelpManagement], users: ["Usuários", Users], loginhistory: ["Histórico de login", LoginHistory], notifications: ["Notificações", Notifications], mail: ["E-mails", Mail], audit: ["Auditoria", Audit],
 };
 
 // Menu único e direto (como no painel do parceiro): cada função abre a própria página,
 // sem passar por sub-dashboards. A mesma lista alimenta o menu lateral e a tela inicial.
 const GROUPS = [
- {label:null,items:['dashboard','workspace','partners','resellers','pricing','service-packages','invitations','devices']},
+ {label:null,items:['dashboard','workspace','partners','resellers','service-packages','invitations','devices']},
  {label:'Operação',items:['licenses','billing','network-finance','sources','support','downloads']},
  {label:'Administração',items:['users','global-config']},
 ];
@@ -227,7 +227,7 @@ function Shell({ user }) {
   }, [user.role, permissionsFingerprint]);
   const Current = PAGES[page]?.[1] || Dashboard;
   const adminView = user.role === "admin" ? adminScopedView(page) : null;
-  const go = (k) => { if (!allowed(k)) return; setPage(k); setOpen(false); window.scrollTo(0, 0); };
+  const go = (k) => { if (k === "pricing") k = "service-packages"; if (!allowed(k)) return; setPage(k); setOpen(false); window.scrollTo(0, 0); };
   // Esc fecha a gaveta; ao voltar para tela grande ela não fica "aberta" escondida.
   useEffect(() => {
     if (!open) return undefined;

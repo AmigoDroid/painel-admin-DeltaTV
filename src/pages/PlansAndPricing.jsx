@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, getAuth } from "../api.js";
+import { api } from "../api.js";
 import { Empty, Field, LoadError, Modal, Pager, Table, fmtMoney, toCents, useDebounced } from "../ui.jsx";
 import ContentContract from "./ContentContract.jsx";
 import ServicePlan from "./ServicePlan.jsx";
@@ -66,7 +66,7 @@ function ContractModal({ partner, onClose, reload }) {
   if(content)return <Modal wide title={`Plano atual · ${partner.name}`} onClose={onClose}>
    <p className="muted">Os benefícios e limites deste parceiro são administrados pelo plano existente, no perfil dele.</p>
    <a className="btn primary" href="#partners" onClick={onClose}>Abrir cadastro de parceiros</a>
-   <a className="btn" href="#service-packages" onClick={onClose}>Planos do parceiro</a>
+   <a className="btn" href="#service-packages" onClick={onClose}>Pacotes de serviço</a>
    <details><summary>Consultar contrato legado</summary><ContentContract partnerId={partner.id}/><ServicePlan partnerId={partner.id}/></details>
   </Modal>;
   return <Modal wide title={`Condições · ${partner.name}`} onClose={onClose}>
@@ -79,7 +79,7 @@ function ContractModal({ partner, onClose, reload }) {
   </Modal>;
 }
 
-function ContractList() {
+export function ContractList() {
   const [query, setQuery] = useState("");
   const [kind, setKind] = useState("");
   const [page, setPage] = useState(1);
@@ -126,118 +126,7 @@ function ContractList() {
   </>;
 }
 
-const blankPlan = () => ({key:"",name:"",description:"",audience:"content",monthlyPriceCents:0,
-  canResellPanel:false,canCreateSubmasters:false,canViewFinance:false,canManageGateways:false,
-  maxServers:1,maxApps:0,autoFailover:false,autoPriority:false,emailAlerts:false,detailedHistory:false,
-  sortOrder:100,active:true});
-function CatalogEditor({plan,onClose,onSaved}) {
-  const isNew = !plan?.key;
-  const [data,setData]=useState(plan||blankPlan());
-  const [price,setPrice]=useState(data.monthlyPriceCents == null ? "" : (data.monthlyPriceCents/100).toFixed(2).replace(".",","));
-  const [error,setError]=useState(""),[busy,setBusy]=useState(false);
-  const set=(k,v)=>setData(d=>({...d,[k]:v,...(k==="autoFailover"&&!v?{autoPriority:false}:{})}));
-  const submit=async(e)=>{e.preventDefault();setError("");
-    const cents = price.trim() ? toCents(price) : null;
-    if(price.trim() && (cents == null || cents>100000000)) return setError("Informe um preço válido em reais.");
-    setBusy(true);
-    try {
-      const payload={name:data.name.trim(),description:data.description.trim(),audience:data.audience,
-        monthlyPriceCents:cents,maxServers:data.maxServers == null ? null : Number(data.maxServers),maxApps:Number(data.maxApps ?? 0),autoFailover:!!data.autoFailover,
-        autoPriority:!!data.autoPriority,emailAlerts:!!data.emailAlerts,detailedHistory:!!data.detailedHistory,
-        canResellPanel:!!data.canResellPanel,canCreateSubmasters:!!data.canResellPanel&&!!data.canCreateSubmasters,
-        canViewFinance:!!data.canResellPanel&&!!data.canViewFinance,
-        canManageGateways:!!data.canResellPanel&&!!data.canManageGateways,
-        sortOrder:Number(data.sortOrder)};
-      if(isNew) await api("/admin/service-plans",{method:"POST",body:{key:data.key.trim(),...payload}});
-      else await api(`/admin/service-plans/${encodeURIComponent(plan.key)}`,{method:"PUT",body:{...payload,active:!!data.active}});
-      onSaved();onClose();
-    }catch(err){setError(err.message)}finally{setBusy(false)};
-  };
-  return <Modal wide title={isNew?"Criar plano de recursos":`Editar plano · ${plan.name}`} onClose={onClose}>
-    <form className="pricing-editor" onSubmit={submit}>
-      <p className="muted">Os recursos são aplicados pelo backend. O preço de referência não altera automaticamente os contratos existentes.</p>
-      <div className="pricing-form-grid">
-        <Field label="Identificador interno"><input required maxLength={32} disabled={!isNew} pattern="[a-z][a-z0-9_]{2,31}" value={data.key} onChange={e=>set("key",e.target.value.toLowerCase())} placeholder="ex.: parceiro_gold" /></Field>
-        <Field label="Nome do plano"><input required minLength={3} maxLength={120} value={data.name} onChange={e=>set("name",e.target.value)} /></Field>
-      </div>
-      <Field label="Descrição"><textarea maxLength={500} rows={2} value={data.description} onChange={e=>set("description",e.target.value)}/></Field>
-      <div className="pricing-form-grid">
-        <Field label="Disponível para"><select value={data.audience} onChange={e=>set("audience",e.target.value)}><option value="content">Parceiros de conteúdo</option><option value="reseller">Revendas</option><option value="both">Ambos</option></select></Field>
-        <Field label="Mensalidade paga à DeltaTV (R$)"><input inputMode="decimal" value={price} onChange={e=>setPrice(e.target.value)} placeholder="0,00 para acesso gratuito"/></Field>
-        <Field label="DNS por código">
-          <label className="pricing-check"><input type="checkbox" checked={data.maxServers == null} onChange={e=>set("maxServers",e.target.checked ? null : 1)}/> DNS ilimitados</label>
-          {data.maxServers != null && <input type="number" min="1" step="1" required value={data.maxServers} onChange={e=>set("maxServers",e.target.value)}/>}
-        </Field>
-        <Field label="Apps próprios incluídos"><input type="number" min="0" max="50" step="1" required value={data.maxApps ?? 0} onChange={e=>set("maxApps",Number(e.target.value))}/></Field>
-        <Field label="Ordem de exibição"><input type="number" min="0" max="9999" required value={data.sortOrder} onChange={e=>set("sortOrder",e.target.value)}/></Field>
-      </div>
-      <div className="pricing-feature-options">
-        {[["autoFailover","Failover automático"],["autoPriority","Prioridade por desempenho"],["emailAlerts","Alertas por e-mail"],["detailedHistory","Histórico detalhado"]].map(([id,label])=><label key={id} className="pricing-check"><input type="checkbox" checked={!!data[id]} disabled={id==="autoPriority"&&!data.autoFailover} onChange={e=>set(id,e.target.checked)}/>{label}</label>)}
-        <div className="pricing-form-grid" style={{gridColumn:'1/-1',borderTop:'1px solid var(--border,#ddd)',paddingTop:14}}>
-          <label className="pricing-check"><input type="checkbox" checked={!!data.canResellPanel} onChange={e=>set('canResellPanel',e.target.checked)}/> Permitir revender o Painel do Parceiro</label>
-          {data.canResellPanel&&<>
-          <label className="pricing-check"><input type="checkbox" checked={!!data.canCreateSubmasters} onChange={e=>set('canCreateSubmasters',e.target.checked)}/> Criar novos Submasters</label>
-          <label className="pricing-check"><input type="checkbox" checked={!!data.canViewFinance} onChange={e=>set('canViewFinance',e.target.checked)}/> Consultar financeiro da rede</label>
-          <label className="pricing-check"><input type="checkbox" checked={!!data.canManageGateways} onChange={e=>set('canManageGateways',e.target.checked)}/> Configurar Mercado Pago / InfinitePay</label></>}
-        </div>
-        {!isNew&&!plan.system&&<label className="pricing-check"><input type="checkbox" checked={!!data.active} onChange={e=>set("active",e.target.checked)}/> Plano disponível para novas atribuições</label>}
-      </div>
-      {error&&<p className="error" role="alert">{error}</p>}
-      <div className="actions"><button className="btn" type="button" disabled={busy} onClick={onClose}>Cancelar</button><button className="btn primary" type="submit" disabled={busy}>{busy?"Salvando…":"Salvar plano"}</button></div>
-    </form>
-  </Modal>;
-}
-function CatalogPlans(){
-  const [plans,setPlans]=useState([]),[loading,setLoading]=useState(true),[error,setError]=useState("");
-  const [editing,setEditing]=useState(null),[deleting,setDeleting]=useState(null),[busy,setBusy]=useState(false),[revision,setRevision]=useState(0);
-  const reload=()=>setRevision(r=>r+1);
-  useEffect(()=>{let ignore=false;setLoading(true);
-    api("/admin/service-plans").then(r=>{if(!ignore){setPlans(r.data||[]);setError("")}})
-      .catch(e=>{if(!ignore)setError(e.message)}).finally(()=>{if(!ignore)setLoading(false)});
-    return()=>{ignore=true};
-  },[revision]);
-  const remove=async()=>{setBusy(true);setError("");try{
-    await api(`/admin/service-plans/${encodeURIComponent(deleting.key)}`,{method:"DELETE"});setDeleting(null);reload();
-  }catch(e){setError(e.message);setDeleting(null)}finally{setBusy(false)}};
-  return <>
-    <div className="pricing-info">Este é o catálogo de planos que já existia. Defina os recursos, permissões de revenda e a mensalidade paga à DeltaTV (inclusive R$ 0). Contratos com preço negociado individualmente continuam preservados.</div>
-    <div className="toolbar"><button className="btn primary" type="button" onClick={()=>setEditing(blankPlan())}>+ Criar novo plano</button><button className="btn" type="button" disabled={loading} onClick={reload}>Atualizar</button></div>
-    {error&&<p className="error" role="alert">{error}</p>}
-    {loading&&<p className="muted">Carregando planos…</p>}
-    <div className="pricing-tier-grid">{plans.map(p=><article key={p.key} className="pricing-tier card">
-      <div className="pricing-tier-label">{p.system?"Plano padrão":p.active?"Personalizado":"Desativado"}</div>
-      <h3>{p.name}</h3>
-      <p className="muted">{p.description||"Sem descrição"}</p>
-      <div className="pricing-tier-big">{p.maxServers == null ? "Ilimitadas" : `${p.maxServers} ${p.maxServers===1?"URL":"URLs"}`}</div>
-      <dl>
-        <div><dt>Apps próprios incluídos</dt><dd>{p.maxApps ?? 0}</dd></div>
-        <div><dt>Mensalidade DeltaTV</dt><dd>{p.monthlyPriceCents==null?"A definir":`${money(p.monthlyPriceCents)} / mês`}</dd></div>
-        <div><dt>Disponível para</dt><dd>{p.audience==="content"?"Parceiros":p.audience==="reseller"?"Revendas":"Ambos"}</dd></div>
-        <div><dt>Failover</dt><dd>{p.autoFailover?"Sim":"Não"}</dd></div>
-        <div><dt>Prioridade automática</dt><dd>{p.autoPriority?"Sim":"Não"}</dd></div>
-        <div><dt>Alertas por e-mail</dt><dd>{p.emailAlerts?"Sim":"Não"}</dd></div>
-        <div><dt>Histórico detalhado</dt><dd>{p.detailedHistory?"Sim":"Não"}</dd></div>
-        <div><dt>Revender o painel</dt><dd>{p.canResellPanel?'Sim':'Não'}</dd></div>
-        <div><dt>Criar Submasters</dt><dd>{p.canCreateSubmasters?'Sim':'Não'}</dd></div>
-        <div><dt>Cadastros vinculados</dt><dd>{p.assignedCount}</dd></div>
-      </dl>
-      <div className="pricing-plan-actions">
-        <button className="btn sm primary" type="button" onClick={()=>setEditing(p)}>Editar</button>
-        <button className="btn sm" type="button" onClick={()=>setEditing({...p,key:"",name:`${p.name} · Cópia`,system:false,active:true})}>Duplicar</button>
-        {!p.system&&<button className="btn sm" type="button" onClick={()=>setDeleting(p)}>Excluir</button>}
-      </div>
-    </article>)}</div>
-    {!loading&&!plans.length&&<p className="muted">Nenhum plano cadastrado.</p>}
-    {editing&&<CatalogEditor key={editing.key||editing.name} plan={editing} onClose={()=>setEditing(null)} onSaved={reload}/>}
-    {deleting&&<Modal title="Excluir plano" onClose={()=>setDeleting(null)}>
-      <p>Excluir <strong>{deleting.name}</strong> permanentemente?</p>
-      <p className="muted">{deleting.assignedCount?`Este plano possui ${deleting.assignedCount} cadastro(s) vinculado(s). Reatribua os parceiros antes de excluir. Você pode desativá-lo na edição.`:"Esta ação não poderá ser desfeita."}</p>
-      <div className="actions"><button className="btn" onClick={()=>setDeleting(null)}>Cancelar</button><button className="btn primary" disabled={busy||deleting.assignedCount>0} onClick={remove}>Confirmar exclusão</button></div>
-    </Modal>}
-  </>;
-}
-
-function LicensePrices() {
+export function LicensePrices() {
   const [prices, setPrices] = useState(null);
   const [error, setError] = useState("");
   const [editing, setEditing] = useState(null);
@@ -275,19 +164,4 @@ function LicensePrices() {
       </form>
     </Modal>}
   </>;
-}
-
-export default function PlansAndPricing() {
-  const [tab, setTab] = useState("tiers");
-  if (getAuth()?.user?.role !== "superadmin") return <p className="error">Esta área é exclusiva da DeltaTV.</p>;
-  return <div className="pricing-page">
-    <div className="page-head"><div><h2>Planos e valores</h2><p className="muted page-sub">Uma visão central dos recursos, contratos de parceiros e preços das licenças.</p></div></div>
-    <div className="tabs pricing-tabs" role="tablist" aria-label="Planos e valores">
-      {[["tiers", "Planos do parceiro"], ["contracts", "Contratos atuais"], ["prices", "Preços das licenças de TV"]].map(([id, label]) =>
-        <button key={id} type="button" className={`tab ${tab === id ? "active" : ""}`} onClick={() => setTab(id)}>{label}</button>)}
-    </div>
-    {tab === "contracts" && <ContractList />}
-    {tab === "tiers" && <CatalogPlans/>}
-    {tab === "prices" && <LicensePrices />}
-  </div>;
 }

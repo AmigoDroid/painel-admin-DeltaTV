@@ -252,17 +252,17 @@ export default function NetworkWorkspace({section="workspace", onNavigate}){
      <h3>Gerenciar sua rede</h3><p className="muted">Abra diretamente a ferramenta desejada. Somente opções autorizadas pela DeltaTV aparecem.</p>
      <div className="actions" style={{flexWrap:"wrap"}}>{[
        ["partners","Parceiros","network:partners:read"],["resellers","Revendas","network:resellers:read"],
-       ["pricing","Planos e recursos","network:plans:read"],["sources","DNS e códigos","network:resources:read"],
+       ["service-packages","Pacotes de serviço","network:plans:read"],["sources","DNS e códigos","network:resources:read"],
        ["devices","Dispositivos","network:devices:read"],["billing","Financeiro","network:billing:read"],
        ["users","Usuários","network:members:read"],
      ].filter(x=>permits(x[2])).map(([page,label])=><button type="button" className="btn" key={page} onClick={()=>onNavigate?.(page)}>{label}</button>)}</div>
    </div>}
    {section !== "dashboard" && section!=="audit" && section!=="trash" && showWorkspaceManager && <div className="toolbar" style={{display:"flex",flexWrap:"wrap",gap:8}}>
      {section === "workspace" && central && [["partners","Parceiros","network:partners:read"],["resellers","Revendas","network:resellers:read"],["plans","Planos e recursos","network:plans:read"]]
-       .filter(x=>permits(x[2])).map(([key,name])=><button key={key} className={`btn ${tab===key?"primary":""}`} onClick={()=>{setTab(key);setPage(1);setSelected(null);setEditingAccount(null);setPlanForm(null);}}>{name}</button>)}
+       .filter(x=>permits(x[2])).map(([key,name])=><button key={key} className={`btn ${tab===key?"primary":""}`} onClick={()=>{if(key==="plans" && adminId==="deltatv"){location.hash="service-packages";return;}setTab(key);setPage(1);setSelected(null);setEditingAccount(null);setPlanForm(null);}}>{name}</button>)}
      <button className="btn" onClick={()=>void reload()}>Atualizar</button>
    </div>}
-   {section !== "dashboard" && section!=="audit" && section!=="trash" && showWorkspaceManager && tab==="plans"&&permits("network:plans:read")&&<>
+   {section !== "dashboard" && section!=="audit" && section!=="trash" && showWorkspaceManager && tab==="plans"&&!(central&&adminId==="deltatv")&&permits("network:plans:read")&&<>
      {permits("network:plans:write")&&<div><button className="btn primary" onClick={()=>setPlanForm(blankPlan())}>Novo plano</button></div>}
      {planForm&&<Modal wide title={planForm.key?"Editar plano da rede":"Novo plano da rede"} onClose={()=>{if(!busy)setPlanForm(null)}}>
        <div className="sp-editor sp-network-editor"><p className="muted sp-editor-intro">Os recursos deste plano controlam o acesso dos parceiros da rede. Exceções individuais permanecem preservadas.</p>
